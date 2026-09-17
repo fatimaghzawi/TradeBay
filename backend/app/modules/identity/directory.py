@@ -24,6 +24,7 @@ from app.modules.identity.exceptions import (
 from app.modules.identity.guards import assert_not_last_admin
 from app.modules.identity.permissions import permission_code
 from app.modules.identity.repository import (
+    BusinessRepository,
     InvitationRepository,
     MembershipRepository,
     PermissionRepository,
@@ -48,6 +49,7 @@ class DirectoryService:
         self,
         *,
         users: UserRepository | None = None,
+        businesses: BusinessRepository | None = None,
         memberships: MembershipRepository | None = None,
         roles: RoleRepository | None = None,
         permissions: PermissionRepository | None = None,
@@ -58,6 +60,7 @@ class DirectoryService:
         audit: AuditService | None = None,
     ) -> None:
         self.users = users or UserRepository()
+        self.businesses = businesses or BusinessRepository()
         self.memberships = memberships or MembershipRepository()
         self.roles = roles or RoleRepository()
         self.permissions = permissions or PermissionRepository()
@@ -298,10 +301,17 @@ class DirectoryService:
                 "created_at": now,
             }
         )
+        business = await self.businesses.get_by_id(business_id)
         await get_email_sender().send(
             to=email.lower().strip(),
             template="invitation",
-            context={"business_id": business_id, "role_id": str(role["_id"]), "token": raw},
+            context={
+                "business_id": business_id,
+                "business_name": business.get("name") if business else None,
+                "role_id": str(role["_id"]),
+                "role_name": role.get("name"),
+                "token": raw,
+            },
         )
         await self.audit.log(
             action="USER_INVITED",

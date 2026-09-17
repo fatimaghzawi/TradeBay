@@ -1,1 +1,1 @@
-﻿export { aiApi } from "@/lib/api/aiApi";
+﻿// Feature module skeleton: ai — no business logic yet.

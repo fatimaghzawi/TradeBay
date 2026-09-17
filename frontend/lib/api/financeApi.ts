@@ -1,5 +1,8 @@
-import { apiClient } from "@/lib/api/client";
+/** Stub — finance domain not implemented. */
+function notImplemented(): never {
+  throw new Error("financeApi: not implemented");
+}
 
 export const financeApi = {
-  health: () => apiClient.get<{ status: string }>("/finance/health"),
+  health: notImplemented,
 };

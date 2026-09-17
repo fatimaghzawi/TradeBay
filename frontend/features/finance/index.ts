@@ -1,1 +1,1 @@
-﻿export { financeApi } from "@/lib/api/financeApi";
+﻿// Feature module skeleton: finance — no business logic yet.
