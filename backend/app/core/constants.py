@@ -14,8 +14,10 @@ SENSITIVE_LOG_FIELDS = frozenset(
         "refresh_token",
         "access_token",
         "token",
+        "otp",
         "token_hash",
         "invitation_token",
+        "verification_token",
         "secret",
         "jwt",
         "authorization",
@@ -50,6 +52,8 @@ class ErrorCode(StrEnum):
     EMAIL_UNVERIFIED = "EMAIL_UNVERIFIED"
     SELLING_NOT_VERIFIED = "SELLING_NOT_VERIFIED"
     LAST_ADMIN_PROTECTED = "LAST_ADMIN_PROTECTED"
+    INVITATION_INVALID = "INVITATION_INVALID"
+    PRIVILEGE_ESCALATION = "PRIVILEGE_ESCALATION"
 
 
 class PermissionAction(StrEnum):

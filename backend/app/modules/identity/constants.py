@@ -17,9 +17,33 @@ class BusinessAccountType(StrEnum):
 
 
 class BusinessAccountStatus(StrEnum):
-    ACTIVE = "active"
-    SUSPENDED = "suspended"
+    """ERD: pending | verified | suspended | rejected. `active` is accepted as a legacy alias of verified."""
+
     PENDING = "pending"
+    VERIFIED = "verified"
+    SUSPENDED = "suspended"
+    REJECTED = "rejected"
+    ACTIVE = "active"
+
+
+OPERATIONAL_BUSINESS_STATUSES: frozenset[str] = frozenset(
+    {
+        BusinessAccountStatus.VERIFIED,
+        BusinessAccountStatus.PENDING,
+        BusinessAccountStatus.ACTIVE,
+    }
+)
+
+AUTH_TOKEN_MAX_ATTEMPTS = 5
+EMAIL_VERIFY_TTL_HOURS = 24
+PASSWORD_RESET_TTL_HOURS = 2
+INVITATION_TTL_DAYS = 7
+CHALLENGE_RATE_LIMIT_MAX = 5
+CHALLENGE_RATE_LIMIT_WINDOW_SECONDS = 15 * 60
+
+
+def is_business_operational(status: str | None) -> bool:
+    return status in OPERATIONAL_BUSINESS_STATUSES
 
 
 class MembershipStatus(StrEnum):
@@ -45,7 +69,7 @@ class SupplierVerificationStatus(StrEnum):
 
 
 class AuthTokenPurpose(StrEnum):
-    EMAIL_VERIFY = "email_verify"
+    EMAIL_VERIFICATION = "email_verification"
     PASSWORD_RESET = "password_reset"
 
 

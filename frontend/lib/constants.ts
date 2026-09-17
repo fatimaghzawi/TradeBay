@@ -5,6 +5,12 @@ export const ROUTES = {
   login: "/login",
   register: "/register",
   forgotPassword: "/forgot-password",
+  verifyEmail: "/verify-email",
+  resetPassword: "/reset-password",
+  members: "/members",
+  invitations: "/invitations",
+  roles: "/roles",
+  acceptInvitation: "/accept-invitation",
   dashboard: "/dashboard",
   catalog: "/catalog",
   marketplace: "/catalog",
@@ -33,6 +39,9 @@ export const DOMAIN_NAV = [
   { href: ROUTES.finance, label: "Finance", key: "finance" },
   { href: ROUTES.trust, label: "Trust", key: "trust" },
   { href: ROUTES.settings, label: "Settings", key: "settings" },
+  { href: ROUTES.members, label: "Members", key: "members" },
+  { href: ROUTES.roles, label: "Roles", key: "roles" },
+  { href: ROUTES.invitations, label: "Invitations", key: "invitations" },
 ] as const;
 
 export const DASHBOARD_DOMAINS = [

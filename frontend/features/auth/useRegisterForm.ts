@@ -44,7 +44,7 @@ export function useRegisterForm() {
         business_name: payload.business_name || undefined,
       });
       await queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
-      router.replace("/dashboard");
+      router.replace("/verify-email");
     } catch (err) {
       setFormError(
         err instanceof ApiError ? err.message : "Unable to register. Try again.",

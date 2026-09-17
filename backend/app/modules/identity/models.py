@@ -55,6 +55,9 @@ class BusinessAccountDocument(MongoDocument):
     status: str
     legal_name: str | None = None
     tax_number: str | None = None
+    registration_number: str | None = None
+    contact_email: str | None = None
+    contact_phone: str | None = None
     address: AddressEmbedded | None = None
     created_at: datetime
     updated_at: datetime
@@ -124,13 +127,19 @@ class SessionDocument(MongoDocument):
 
 
 class AuthTokenDocument(MongoDocument):
-    """Hashed one-time token for email verification or password reset."""
+    """Hashed one-time challenge for email verification or password reset.
+
+    ERD also shows password_reset_token_hash on users; Identity stores challenges
+    here so EMAIL_VERIFICATION and PASSWORD_RESET cannot be confused.
+    """
 
     user_id: DocumentId
     purpose: str
     token_hash: str
     expires_at: datetime
     used_at: datetime | None = None
+    invalidated_at: datetime | None = None
+    attempts: int = 0
     created_at: datetime
 
 

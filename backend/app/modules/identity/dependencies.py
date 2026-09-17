@@ -16,7 +16,8 @@ from app.core.constants import ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME, ErrorCod
 from app.core.exceptions import UnauthorizedError
 from app.core.logging import business_id_ctx, user_id_ctx
 from app.core.security import TokenError, decode_access_token
-from app.modules.identity.constants import BusinessAccountStatus, UserStatus
+from app.modules.identity.constants import UserStatus, is_business_operational
+from app.modules.identity.directory import DirectoryService
 from app.modules.identity.exceptions import (
     AccountInactiveError,
     BusinessContextRequiredError,
@@ -73,6 +74,10 @@ def get_business_service() -> BusinessService:
     return BusinessService()
 
 
+def get_directory_service() -> DirectoryService:
+    return DirectoryService()
+
+
 def _extract_access_token(
     authorization: str | None,
     access_cookie: str | None,
@@ -120,7 +125,7 @@ async def get_current_user(
     business_id = session.get("active_business_account_id")
     if business_id:
         business = await BusinessRepository().get_by_id(business_id)
-        if business is not None and business.get("status") != BusinessAccountStatus.ACTIVE:
+        if business is not None and not is_business_operational(str(business.get("status", ""))):
             raise BusinessInactiveError()
         membership = await MembershipRepository().get_active_membership(user_id, business_id)
         ctx.business = business
@@ -157,6 +162,14 @@ async def get_current_membership(
     return auth.membership
 
 
+def assert_email_verified(user: dict[str, Any]) -> None:
+    """Reusable FR-AUTH-02 gate for commercial writes in this and future domains."""
+    if not user.get("email_verified_at"):
+        raise EmailUnverifiedError()
+    if user.get("status") != UserStatus.ACTIVE:
+        raise AccountInactiveError()
+
+
 def require_permission(resource: str, action: str) -> Callable[..., Any]:
     async def _dependency(auth: Annotated[AuthContext, Depends(get_current_user)]) -> AuthContext:
         if auth.business is None or auth.membership is None:
@@ -170,10 +183,19 @@ def require_permission(resource: str, action: str) -> Callable[..., Any]:
 
 def require_verified_email() -> Callable[..., Any]:
     async def _dependency(auth: Annotated[AuthContext, Depends(get_current_user)]) -> AuthContext:
-        if not auth.user.get("email_verified_at"):
-            raise EmailUnverifiedError()
-        if auth.user.get("status") != UserStatus.ACTIVE:
-            raise AccountInactiveError()
+        assert_email_verified(auth.user)
+        return auth
+
+    return _dependency
+
+
+def require_commercial_write(resource: str, action: str) -> Callable[..., Any]:
+    """FR-AUTH-02 + FR-AUTH-04: verified email AND resource.action on the active membership."""
+
+    permission_dep = require_permission(resource, action)
+
+    async def _dependency(auth: Annotated[AuthContext, Depends(permission_dep)]) -> AuthContext:
+        assert_email_verified(auth.user)
         return auth
 
     return _dependency
@@ -182,11 +204,9 @@ def require_verified_email() -> Callable[..., Any]:
 def require_seller(resource: str, action: str) -> Callable[..., Any]:
     """Selling writes: permission + verified supplier profile for the active company."""
 
-    inner = require_permission(resource, action)
+    inner = require_commercial_write(resource, action)
 
     async def _dependency(auth: Annotated[AuthContext, Depends(inner)]) -> AuthContext:
-        if not auth.user.get("email_verified_at"):
-            raise EmailUnverifiedError()
         if auth.business_id is None:
             raise BusinessContextRequiredError()
         profile = await SupplierProfileRepository().get_by_business(auth.business_id)

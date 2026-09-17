@@ -45,6 +45,10 @@ const PROTECTED_PREFIXES = [
   "/conversations",
   "/ai-sourcing",
   "/business-planner",
+  "/members",
+  "/invitations",
+  "/roles",
+  "/accept-invitation",
 ];
 
 function isProtectedPath(pathname: string): boolean {

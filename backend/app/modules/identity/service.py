@@ -8,6 +8,7 @@ from typing import Any
 from bson import ObjectId
 
 from app.core.config import Settings, get_settings
+from app.core.exceptions import ForbiddenError
 from app.core.security import (
     create_access_token,
     generate_invitation_token,
@@ -17,7 +18,11 @@ from app.core.security import (
     verify_password,
 )
 from app.db.seed import seed_trading_roles
+from app.db.transactions import run_in_transaction
 from app.modules.identity.constants import (
+    AUTH_TOKEN_MAX_ATTEMPTS,
+    EMAIL_VERIFY_TTL_HOURS,
+    PASSWORD_RESET_TTL_HOURS,
     SYSTEM_ROLE_BUSINESS_ADMIN,
     AuthTokenPurpose,
     BusinessAccountStatus,
@@ -25,7 +30,9 @@ from app.modules.identity.constants import (
     MembershipStatus,
     SupplierVerificationStatus,
     UserStatus,
+    is_business_operational,
 )
+from app.modules.identity.email import get_email_sender
 from app.modules.identity.exceptions import (
     AccountInactiveError,
     BusinessInactiveError,
@@ -35,6 +42,7 @@ from app.modules.identity.exceptions import (
     SessionRevokedError,
 )
 from app.modules.identity.guards import assert_not_last_admin
+from app.modules.identity.rate_limit import challenge_limiter
 from app.modules.identity.repository import (
     AuthTokenRepository,
     BusinessRepository,
@@ -47,6 +55,7 @@ from app.modules.identity.repository import (
     UserRepository,
 )
 from app.shared.events.bus import USER_REGISTERED, DomainEvent, event_bus
+from app.shared.repositories.base import MongoSession
 from app.shared.services.audit import AuditService
 from app.shared.utils.datetime import as_utc, utc_now
 from app.shared.utils.objectid import parse_object_id
@@ -63,12 +72,30 @@ def _serialize_user(doc: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _serialize_address(doc: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not doc:
+        return None
+    return {
+        "street": doc.get("street") or doc.get("line1"),
+        "city": doc.get("city"),
+        "district": doc.get("district"),
+        "governorate": doc.get("governorate") or doc.get("state"),
+        "postal_code": doc.get("postal_code"),
+        "country": doc.get("country"),
+    }
+
+
 def _serialize_business(doc: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": str(doc["_id"]),
         "name": doc["name"],
         "type": doc["type"],
         "status": doc["status"],
+        "legal_name": doc.get("legal_name"),
+        "tax_number": doc.get("tax_number"),
+        "contact_email": doc.get("contact_email"),
+        "contact_phone": doc.get("contact_phone"),
+        "address": _serialize_address(doc.get("address") if isinstance(doc.get("address"), dict) else None),
     }
 
 
@@ -131,7 +158,12 @@ class AuthService:
                 "updated_at": now,
             }
         )
-        raw_verify = await self._issue_auth_token(user["_id"], AuthTokenPurpose.EMAIL_VERIFY)
+        raw_verify = await self._issue_auth_token(user["_id"], AuthTokenPurpose.EMAIL_VERIFICATION)
+        await get_email_sender().send(
+            to=normalized,
+            template="email_verification",
+            context={"user_id": str(user["_id"]), "token": raw_verify},
+        )
 
         business: dict[str, Any] | None = None
         if business_name:
@@ -162,7 +194,6 @@ class AuthService:
             "user": _serialize_user(user),
             "business": _serialize_business(business) if business else None,
             **tokens,
-            **({"verification_token": raw_verify} if not self.settings.is_production else {}),
         }
 
     async def login(
@@ -200,8 +231,18 @@ class AuthService:
         )
         return {"user": _serialize_user(user), **tokens}
 
-    async def logout(self, *, session_id: str) -> None:
-        await self.sessions.revoke(session_id, utc_now())
+    async def logout(
+        self, *, session_id: str, user_id: str | None = None, ip_address: str | None = None
+    ) -> None:
+        session = await self.sessions.revoke(session_id, utc_now())
+        await self.audit.log(
+            action="USER_LOGOUT",
+            resource_type="session",
+            resource_id=session_id,
+            business_account_id=session.get("active_business_account_id") if session else None,
+            user_id=user_id,
+            ip_address=ip_address,
+        )
 
     async def refresh(
         self,
@@ -222,13 +263,20 @@ class AuthService:
         if user is None or user["status"] not in {UserStatus.ACTIVE, UserStatus.PENDING}:
             raise AccountInactiveError()
 
-        # Rotate refresh token
         await self.sessions.revoke(session["_id"], utc_now())
         tokens = await self._issue_session(
             user=user,
             business_account_id=session.get("active_business_account_id"),
             ip_address=ip_address,
             user_agent=user_agent,
+        )
+        await self.audit.log(
+            action="SESSION_REFRESHED",
+            resource_type="session",
+            resource_id=tokens["session_id"],
+            business_account_id=session.get("active_business_account_id"),
+            user_id=user["_id"],
+            ip_address=ip_address,
         )
         return {"user": _serialize_user(user), **tokens}
 
@@ -268,8 +316,8 @@ class AuthService:
             "permissions": permission_codes,
         }
 
-    async def verify_email(self, *, raw_token: str) -> dict[str, Any]:
-        token_row = await self._consume_auth_token(raw_token, AuthTokenPurpose.EMAIL_VERIFY)
+    async def verify_email(self, *, raw_token: str, ip_address: str | None = None) -> dict[str, Any]:
+        token_row = await self._consume_auth_token(raw_token, AuthTokenPurpose.EMAIL_VERIFICATION)
         now = utc_now()
         user = await self.users.update(
             token_row["user_id"],
@@ -277,22 +325,96 @@ class AuthService:
         )
         if user is None:
             raise InvalidCredentialsError()
+        await self.audit.log(
+            action="USER_EMAIL_VERIFIED",
+            resource_type="user",
+            resource_id=user["_id"],
+            user_id=user["_id"],
+            ip_address=ip_address,
+        )
         return {"user": _serialize_user(user)}
 
+    async def resend_verification(self, *, user_id: str) -> None:
+        challenge_limiter.hit(f"email_verification:{user_id}")
+        user = await self.users.get_by_id(user_id)
+        if user is None:
+            raise InvalidCredentialsError()
+        if user.get("email_verified_at"):
+            return
+        raw = await self._issue_auth_token(user["_id"], AuthTokenPurpose.EMAIL_VERIFICATION)
+        await get_email_sender().send(
+            to=user["email"],
+            template="email_verification",
+            context={"user_id": str(user["_id"]), "token": raw},
+        )
+
     async def request_password_reset(self, *, email: str) -> None:
-        user = await self.users.get_by_email(email.lower().strip())
+        normalized = email.lower().strip()
+        challenge_limiter.hit(f"password_reset:{normalized}")
+        user = await self.users.get_by_email(normalized)
         if user is None:
             return
         if user["status"] in {UserStatus.SUSPENDED, UserStatus.DEACTIVATED}:
             return
-        await self._issue_auth_token(user["_id"], AuthTokenPurpose.PASSWORD_RESET)
+        raw = await self._issue_auth_token(user["_id"], AuthTokenPurpose.PASSWORD_RESET)
+        await get_email_sender().send(
+            to=user["email"],
+            template="password_reset",
+            context={"user_id": str(user["_id"]), "token": raw},
+        )
 
-    async def reset_password(self, *, raw_token: str, new_password: str) -> None:
-        token_row = await self._consume_auth_token(raw_token, AuthTokenPurpose.PASSWORD_RESET)
+    async def reset_password(
+        self, *, raw_token: str, new_password: str, ip_address: str | None = None
+    ) -> None:
+        token_row = await self._require_open_auth_token(raw_token, AuthTokenPurpose.PASSWORD_RESET)
         now = utc_now()
-        await self.users.update(
-            token_row["user_id"],
-            {"password_hash": hash_password(new_password), "updated_at": now},
+        password_hash = hash_password(new_password)
+
+        async def work(session: MongoSession) -> None:
+            await self.auth_tokens.update(token_row["_id"], {"used_at": now}, session=session)
+            await self.users.update(
+                token_row["user_id"],
+                {"password_hash": password_hash, "updated_at": now},
+                session=session,
+            )
+            await self.sessions.revoke_all_for_user(token_row["user_id"], now, session=session)
+
+        await run_in_transaction(work)
+        await self.audit.log(
+            action="USER_PASSWORD_RESET",
+            resource_type="user",
+            resource_id=token_row["user_id"],
+            user_id=token_row["user_id"],
+            ip_address=ip_address,
+        )
+
+    async def change_password(
+        self,
+        *,
+        user_id: str,
+        current_password: str,
+        new_password: str,
+        ip_address: str | None = None,
+    ) -> None:
+        user = await self.users.get_by_id(user_id)
+        if user is None or not verify_password(current_password, user["password_hash"]):
+            raise InvalidCredentialsError()
+        now = utc_now()
+        password_hash = hash_password(new_password)
+
+        async def work(session: MongoSession) -> None:
+            await self.users.update(
+                user_id, {"password_hash": password_hash, "updated_at": now}, session=session
+            )
+            await self.sessions.revoke_all_for_user(user_id, now, session=session)
+
+        await run_in_transaction(work)
+        await self.audit.log(
+            action="USER_PASSWORD_CHANGED",
+            resource_type="user",
+            resource_id=user_id,
+            user_id=user_id,
+            ip_address=ip_address,
         )
 
     async def switch_business(self, *, session_id: str, user_id: str, business_id: str) -> dict[str, Any]:
@@ -300,7 +422,7 @@ class AuthService:
         if membership is None:
             raise MembershipRequiredError()
         business = await self.businesses.get_by_id(business_id)
-        if business is None or business.get("status") != BusinessAccountStatus.ACTIVE:
+        if business is None or not is_business_operational(str(business.get("status", ""))):
             raise BusinessInactiveError()
         session = await self.sessions.update(
             session_id,
@@ -326,7 +448,12 @@ class AuthService:
     async def _issue_auth_token(self, user_id: ObjectId, purpose: AuthTokenPurpose) -> str:
         raw = generate_invitation_token()
         now = utc_now()
-        hours = 24 if purpose == AuthTokenPurpose.EMAIL_VERIFY else 2
+        hours = (
+            EMAIL_VERIFY_TTL_HOURS
+            if purpose == AuthTokenPurpose.EMAIL_VERIFICATION
+            else PASSWORD_RESET_TTL_HOURS
+        )
+        await self.auth_tokens.invalidate_open(user_id, purpose, at=now)
         await self.auth_tokens.create(
             {
                 "user_id": user_id,
@@ -334,22 +461,33 @@ class AuthService:
                 "token_hash": hash_token(raw),
                 "expires_at": now + timedelta(hours=hours),
                 "used_at": None,
+                "invalidated_at": None,
+                "attempts": 0,
                 "created_at": now,
             }
         )
         return raw
 
-    async def _consume_auth_token(self, raw_token: str, purpose: AuthTokenPurpose) -> dict[str, Any]:
+    async def _require_open_auth_token(self, raw_token: str, purpose: AuthTokenPurpose) -> dict[str, Any]:
         row = await self.auth_tokens.get_by_hash(hash_token(raw_token))
         now = utc_now()
+        if row is None:
+            raise InvalidCredentialsError()
+        attempts = int(row.get("attempts") or 0) + 1
+        await self.auth_tokens.update(row["_id"], {"attempts": attempts})
         if (
-            row is None
-            or row.get("purpose") != purpose
+            row.get("purpose") != purpose
             or row.get("used_at") is not None
+            or row.get("invalidated_at") is not None
             or as_utc(row["expires_at"]) < now
+            or attempts > AUTH_TOKEN_MAX_ATTEMPTS
         ):
             raise InvalidCredentialsError()
-        await self.auth_tokens.update(row["_id"], {"used_at": now})
+        return row
+
+    async def _consume_auth_token(self, raw_token: str, purpose: AuthTokenPurpose) -> dict[str, Any]:
+        row = await self._require_open_auth_token(raw_token, purpose)
+        await self.auth_tokens.update(row["_id"], {"used_at": utc_now()})
         return row
 
     async def _permission_codes_for_role(self, role_id: ObjectId) -> list[str]:
@@ -367,53 +505,64 @@ class AuthService:
         name: str,
         owner_user_id: ObjectId,
         account_type: BusinessAccountType,
+        legal_name: str | None = None,
+        tax_number: str | None = None,
+        contact_email: str | None = None,
+        contact_phone: str | None = None,
+        address: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         now = utc_now()
-        business = await self.businesses.create(
-            {
-                "name": name,
-                "type": account_type,
-                "status": BusinessAccountStatus.ACTIVE,
-                "legal_name": name,
-                "tax_number": None,
-                "address": None,
-                "created_at": now,
-                "updated_at": now,
-            }
-        )
-        roles = await seed_trading_roles(business["_id"])
-        admin_role = roles[SYSTEM_ROLE_BUSINESS_ADMIN]
-        await self.memberships.create(
-            {
-                "user_id": owner_user_id,
-                "business_account_id": business["_id"],
-                "role_id": admin_role["_id"],
-                "status": MembershipStatus.ACTIVE,
-                "joined_at": now,
-                "created_at": now,
-                "updated_at": now,
-            }
-        )
-        # Every trading company may later sell; selling itself is gated by verification.
-        await self.supplier_profiles.create(
-            {
-                "business_account_id": business["_id"],
-                "verification_status": SupplierVerificationStatus.UNVERIFIED,
-                "documents": [],
-                "service_areas": [],
-                "rating_summary": {
-                    "average_rating": 0.0,
-                    "review_count": 0,
-                    "last_reviewed_at": None,
+        payload = {
+            "name": name,
+            "type": account_type,
+            "status": BusinessAccountStatus.VERIFIED,
+            "legal_name": (legal_name or name).strip() if legal_name or name else name,
+            "tax_number": tax_number,
+            "contact_email": contact_email.lower().strip() if contact_email else None,
+            "contact_phone": contact_phone.strip() if contact_phone else None,
+            "address": address,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+        async def work(session: MongoSession) -> dict[str, Any]:
+            business = await self.businesses.create(payload, session=session)
+            roles = await seed_trading_roles(business["_id"], session=session)
+            admin_role = roles[SYSTEM_ROLE_BUSINESS_ADMIN]
+            await self.memberships.create(
+                {
+                    "user_id": owner_user_id,
+                    "business_account_id": business["_id"],
+                    "role_id": admin_role["_id"],
+                    "status": MembershipStatus.ACTIVE,
+                    "joined_at": now,
+                    "created_at": now,
+                    "updated_at": now,
                 },
-                "verified_at": None,
-                "verified_by": None,
-                "rejection_reason": None,
-                "created_at": now,
-                "updated_at": now,
-            }
-        )
-        return business
+                session=session,
+            )
+            await self.supplier_profiles.create(
+                {
+                    "business_account_id": business["_id"],
+                    "verification_status": SupplierVerificationStatus.UNVERIFIED,
+                    "documents": [],
+                    "service_areas": [],
+                    "rating_summary": {
+                        "average_rating": 0.0,
+                        "review_count": 0,
+                        "last_reviewed_at": None,
+                    },
+                    "verified_at": None,
+                    "verified_by": None,
+                    "rejection_reason": None,
+                    "created_at": now,
+                    "updated_at": now,
+                },
+                session=session,
+            )
+            return business
+
+        return await run_in_transaction(work)
 
     async def _issue_session(
         self,
@@ -490,11 +639,24 @@ class BusinessService:
         user_id: str,
         name: str,
         account_type: str = BusinessAccountType.BUYER,
+        legal_name: str | None = None,
+        tax_number: str | None = None,
+        contact_email: str | None = None,
+        contact_phone: str | None = None,
+        address: dict[str, Any] | None = None,
+        ip_address: str | None = None,
     ) -> dict[str, Any]:
+        if account_type == BusinessAccountType.PLATFORM:
+            raise ForbiddenError("Platform businesses cannot be created through this API")
         business = await self.auth._create_business_with_admin(
             name=name,
             owner_user_id=parse_object_id(user_id),
             account_type=BusinessAccountType(account_type),
+            legal_name=legal_name,
+            tax_number=tax_number,
+            contact_email=contact_email,
+            contact_phone=contact_phone,
+            address=address,
         )
         await self.audit.log(
             action="BUSINESS_CREATED",
@@ -502,6 +664,7 @@ class BusinessService:
             resource_id=business["_id"],
             business_account_id=business["_id"],
             user_id=user_id,
+            ip_address=ip_address,
         )
         return _serialize_business(business)
 
