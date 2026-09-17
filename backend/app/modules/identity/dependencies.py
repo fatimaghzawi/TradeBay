@@ -109,15 +109,17 @@ async def get_current_user(
 
     sessions = SessionRepository()
     users = UserRepository()
-    session = await sessions.get_by_id(session_id)
-    if session is None or session.get("revoked_at") is not None:
-        raise UnauthorizedError("Session is not valid", code=ErrorCode.SESSION_REVOKED)
-
     user = await users.get_by_id(user_id)
     if user is None:
         raise UnauthorizedError("User not found")
+    # Prefer ACCOUNT_INACTIVE (403) over SESSION_REVOKED (401) after suspend,
+    # which revokes sessions before the next authenticated request.
     if user.get("status") in {UserStatus.SUSPENDED, UserStatus.DEACTIVATED}:
         raise AccountInactiveError()
+
+    session = await sessions.get_by_id(session_id)
+    if session is None or session.get("revoked_at") is not None:
+        raise UnauthorizedError("Session is not valid", code=ErrorCode.SESSION_REVOKED)
 
     ctx = AuthContext(user=user, session=session)
     user_id_ctx.set(user_id)
