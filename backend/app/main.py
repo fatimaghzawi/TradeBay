@@ -31,6 +31,9 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings)
     logger.info("application_starting", env=settings.app_env, app=settings.app_name)
+    from app.modules.identity.email import configure_email_sender
+
+    configure_email_sender(settings)
     await mongo_manager.connect(settings)
     yield
     await mongo_manager.disconnect()

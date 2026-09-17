@@ -1,11 +1,9 @@
-import { apiClient } from "@/lib/api/client";
+/** Stub — AI sourcing domain not implemented. */
+function notImplemented(): never {
+  throw new Error("aiSourcingApi: not implemented");
+}
 
-/** Scaffolded client — no LLM calls. */
 export const aiSourcingApi = {
-    listRequests: () =>
-    apiClient.get<unknown>("/ai-sourcing/requests", {
-      params: { page: 1, page_size: 20 },
-    }),
-  getRequest: (id: string) =>
-    apiClient.get<unknown>(`/ai-sourcing/requests/${id}`),
+  listRequests: notImplemented,
+  getRequest: notImplemented,
 };

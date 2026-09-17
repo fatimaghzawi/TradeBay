@@ -1,1 +1,1 @@
-﻿export { trustApi } from "@/lib/api/trustApi";
+﻿// Feature module skeleton: trust — no business logic yet.

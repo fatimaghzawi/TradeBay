@@ -9,7 +9,7 @@ from httpx import AsyncClient
 @pytest.mark.asyncio
 async def test_protected_route_requires_auth(client: AsyncClient) -> None:
     client.cookies.clear()
-    response = await client.get("/api/v1/products")
+    response = await client.get("/api/v1/members")
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "UNAUTHORIZED"
 

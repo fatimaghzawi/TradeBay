@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     cookie_samesite: str = "lax"
     cookie_domain: str | None = None
 
+    # Email — Elastic Email API (same pattern as WorkNest). Falls back to log-only when unset.
+    elasticemail_api_key: SecretStr | None = None
+    email_from: str = "TradeBay <fatimaghazzawi10@gmail.com>"
+    email_timeout_seconds: int = 30
+
     rate_limit_enabled: bool = False
     rate_limit_per_minute: int = 60
 
