@@ -1,0 +1,96 @@
+from enum import StrEnum
+
+
+class CommissionStatus(StrEnum):
+    PENDING = "pending"
+    RECOGNIZED = "recognized"
+    REVERSED = "reversed"
+
+
+class PayableStatus(StrEnum):
+    OPEN = "open"
+    PARTIALLY_SETTLED = "partially_settled"
+    SETTLED = "settled"
+    DISPUTED = "disputed"
+
+
+class PayoutStatus(StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class SettlementStatus(StrEnum):
+    DRAFT = "draft"
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"
+    PAID = "paid"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class PlatformLedgerStatus(StrEnum):
+    POSTED = "posted"
+    REVERSED = "reversed"
+
+
+class FundsState(StrEnum):
+    """TradeBay's internal money lifecycle. Not legal escrow — the provider holds the cash."""
+
+    HELD = "held"
+    RELEASED = "released"
+    REFUNDED = "refunded"
+
+
+class PlatformTransactionType(StrEnum):
+    BUYER_PAYMENT = "buyer_payment"
+    FUNDS_RELEASED = "funds_released"
+    PLATFORM_FEE = "platform_fee"
+    SUPPLIER_PAYOUT = "supplier_payout"
+    REFUND = "refund"
+    ADJUSTMENT = "adjustment"
+    CREDIT = "credit"
+
+
+class CommissionBase(StrEnum):
+    """Which part of the order the commission rate applies to."""
+
+    ORDER_SUBTOTAL = "order_subtotal"
+    ORDER_TOTAL = "order_total"
+
+
+class CommissionType(StrEnum):
+    PERCENTAGE = "percentage"
+    FIXED = "fixed"
+
+
+COMMISSION_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    CommissionStatus.PENDING: {CommissionStatus.RECOGNIZED, CommissionStatus.REVERSED},
+    CommissionStatus.RECOGNIZED: {CommissionStatus.REVERSED},
+}
+
+PAYABLE_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    PayableStatus.OPEN: {
+        PayableStatus.PARTIALLY_SETTLED,
+        PayableStatus.SETTLED,
+        PayableStatus.DISPUTED,
+    },
+    PayableStatus.PARTIALLY_SETTLED: {PayableStatus.SETTLED, PayableStatus.DISPUTED},
+    PayableStatus.DISPUTED: {PayableStatus.OPEN, PayableStatus.SETTLED},
+}
+
+# A failed payout leaves its payable open so a retry can be attempted.
+PAYOUT_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    PayoutStatus.PENDING: {PayoutStatus.PROCESSING, PayoutStatus.FAILED},
+    PayoutStatus.PROCESSING: {PayoutStatus.COMPLETED, PayoutStatus.FAILED},
+}
+
+SETTLEMENT_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    SettlementStatus.DRAFT: {SettlementStatus.PENDING_APPROVAL, SettlementStatus.CANCELLED},
+    SettlementStatus.PENDING_APPROVAL: {SettlementStatus.APPROVED, SettlementStatus.CANCELLED},
+    SettlementStatus.APPROVED: {SettlementStatus.PAID, SettlementStatus.FAILED},
+}
+
+# Alias for scaffolded services
+SettlementBatchStatus = SettlementStatus
