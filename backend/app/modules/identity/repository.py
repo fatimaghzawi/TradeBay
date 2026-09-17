@@ -162,13 +162,27 @@ class SessionRepository(BaseRepository):
         revoked_at: Any,
         *,
         session: MongoSession = None,
+        except_session_id: str | ObjectId | None = None,
     ) -> int:
+        query: dict[str, Any] = {
+            "user_id": parse_object_id(str(user_id)),
+            "revoked_at": None,
+        }
+        if except_session_id is not None:
+            query["_id"] = {"$ne": parse_object_id(str(except_session_id))}
         result = await self.collection.update_many(
-            {"user_id": parse_object_id(str(user_id)), "revoked_at": None},
+            query,
             {"$set": {"revoked_at": revoked_at}},
             session=session,
         )
         return int(result.modified_count)
+
+    async def list_active_for_user(self, user_id: str | ObjectId) -> list[dict[str, Any]]:
+        return await self.find_many(
+            {"user_id": parse_object_id(str(user_id)), "revoked_at": None},
+            limit=100,
+            sort=[("last_used_at", -1), ("created_at", -1)],
+        )
 
 
 class SupplierProfileRepository(BaseRepository):

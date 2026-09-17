@@ -75,3 +75,46 @@ class AuditService:
             ip_address=ip_address,
         )
         return created
+
+    async def list_for_business(
+        self,
+        business_account_id: str | ObjectId,
+        *,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        rows = await self._repository.find_many(
+            {"business_account_id": ObjectId(str(business_account_id))},
+            skip=skip,
+            limit=limit,
+            sort=[("created_at", -1)],
+        )
+        return [self._serialize(row) for row in rows]
+
+    async def get_for_business(
+        self,
+        business_account_id: str | ObjectId,
+        audit_log_id: str | ObjectId,
+    ) -> dict[str, Any] | None:
+        row = await self._repository.get_by_id(audit_log_id)
+        if row is None:
+            return None
+        if str(row.get("business_account_id")) != str(business_account_id):
+            return None
+        return self._serialize(row)
+
+    @staticmethod
+    def _serialize(row: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": str(row["_id"]),
+            "action": row.get("action"),
+            "resource_type": row.get("resource_type"),
+            "resource_id": str(row["resource_id"]) if row.get("resource_id") else None,
+            "business_account_id": (
+                str(row["business_account_id"]) if row.get("business_account_id") else None
+            ),
+            "user_id": str(row["user_id"]) if row.get("user_id") else None,
+            "metadata": row.get("metadata") or {},
+            "ip_address": row.get("ip_address"),
+            "created_at": row.get("created_at"),
+        }

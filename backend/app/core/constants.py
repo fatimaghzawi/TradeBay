@@ -77,6 +77,7 @@ class PermissionResource(StrEnum):
     USERS = "users"
     ROLES = "roles"
     SETTINGS = "settings"
+    AUDIT_LOGS = "audit_logs"
     BUSINESSES = "businesses"
     PRODUCTS = "products"
     CATEGORIES = "categories"

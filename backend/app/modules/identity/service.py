@@ -417,6 +417,110 @@ class AuthService:
             ip_address=ip_address,
         )
 
+    async def logout_all(
+        self,
+        *,
+        user_id: str,
+        current_session_id: str | None = None,
+        include_current: bool = True,
+        ip_address: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_now()
+        if include_current:
+            revoked = await self.sessions.revoke_all_for_user(user_id, now)
+        else:
+            revoked = await self.sessions.revoke_all_for_user(
+                user_id, now, except_session_id=current_session_id
+            )
+        await self.audit.log(
+            action="USER_LOGOUT_ALL",
+            resource_type="user",
+            resource_id=user_id,
+            user_id=user_id,
+            ip_address=ip_address,
+            metadata={"revoked_count": revoked, "include_current": include_current},
+        )
+        return {"revoked": revoked}
+
+    async def list_sessions(self, *, user_id: str, current_session_id: str) -> list[dict[str, Any]]:
+        rows = await self.sessions.list_active_for_user(user_id)
+        return [
+            {
+                "id": str(row["_id"]),
+                "active_business_account_id": (
+                    str(row["active_business_account_id"])
+                    if row.get("active_business_account_id")
+                    else None
+                ),
+                "ip_address": row.get("ip_address"),
+                "user_agent": row.get("user_agent"),
+                "last_used_at": row.get("last_used_at"),
+                "created_at": row.get("created_at"),
+                "expires_at": row.get("expires_at"),
+                "is_current": str(row["_id"]) == current_session_id,
+            }
+            for row in rows
+        ]
+
+    async def revoke_session(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        ip_address: str | None = None,
+    ) -> None:
+        session = await self.sessions.get_by_id(session_id)
+        if session is None or str(session["user_id"]) != user_id:
+            raise SessionRevokedError()
+        if session.get("revoked_at") is not None:
+            return
+        await self.sessions.revoke(session_id, utc_now())
+        await self.audit.log(
+            action="SESSION_REVOKED",
+            resource_type="session",
+            resource_id=session_id,
+            user_id=user_id,
+            ip_address=ip_address,
+        )
+
+    async def update_profile(
+        self,
+        *,
+        user_id: str,
+        first_name: str | None = None,
+        last_name: str | None = None,
+    ) -> dict[str, Any]:
+        updates: dict[str, Any] = {"updated_at": utc_now()}
+        if first_name is not None:
+            updates["first_name"] = first_name.strip()
+        if last_name is not None:
+            updates["last_name"] = last_name.strip()
+        if len(updates) == 1:
+            user = await self.users.get_by_id(user_id)
+            if user is None:
+                raise InvalidCredentialsError()
+            return _serialize_user(user)
+        user = await self.users.update(user_id, updates)
+        if user is None:
+            raise InvalidCredentialsError()
+        return _serialize_user(user)
+
+    async def resend_verification_for_email(self, *, email: str) -> None:
+        """Public resend — always silent to avoid account enumeration."""
+        normalized = email.lower().strip()
+        challenge_limiter.hit(f"email_verification_email:{normalized}")
+        user = await self.users.get_by_email(normalized)
+        if user is None or user.get("email_verified_at"):
+            return
+        if user["status"] in {UserStatus.SUSPENDED, UserStatus.DEACTIVATED}:
+            return
+        raw = await self._issue_auth_token(user["_id"], AuthTokenPurpose.EMAIL_VERIFICATION)
+        await get_email_sender().send(
+            to=user["email"],
+            template="email_verification",
+            context={"user_id": str(user["_id"]), "token": raw},
+        )
+
     async def switch_business(self, *, session_id: str, user_id: str, business_id: str) -> dict[str, Any]:
         membership = await self.memberships.get_active_membership(user_id, business_id)
         if membership is None:
@@ -673,6 +777,71 @@ class BusinessService:
             return None
         business = await self.businesses.get_by_id(business_account_id)
         return _serialize_business(business) if business else None
+
+    async def get_for_user(self, *, user_id: str, business_id: str) -> dict[str, Any]:
+        membership = await self.memberships.get_active_membership(user_id, business_id)
+        if membership is None:
+            raise MembershipRequiredError()
+        business = await self.businesses.get_by_id(business_id)
+        if business is None:
+            raise MembershipRequiredError()
+        role = await self.roles.get_by_id(membership["role_id"])
+        return {
+            **_serialize_business(business),
+            "membership": {
+                "id": str(membership["_id"]),
+                "business_account_id": str(membership["business_account_id"]),
+                "role_id": str(membership["role_id"]),
+                "status": membership["status"],
+            },
+            "role_name": role["name"] if role else None,
+        }
+
+    async def update_for_user(
+        self,
+        *,
+        user_id: str,
+        business_id: str,
+        name: str | None = None,
+        legal_name: str | None = None,
+        tax_number: str | None = None,
+        contact_email: str | None = None,
+        contact_phone: str | None = None,
+        address: dict[str, Any] | None = None,
+        ip_address: str | None = None,
+    ) -> dict[str, Any]:
+        membership = await self.memberships.get_active_membership(user_id, business_id)
+        if membership is None:
+            raise MembershipRequiredError()
+        business = await self.businesses.get_by_id(business_id)
+        if business is None:
+            raise MembershipRequiredError()
+        if business.get("type") == BusinessAccountType.PLATFORM:
+            raise ForbiddenError("Platform business identity cannot be updated here")
+        updates: dict[str, Any] = {"updated_at": utc_now()}
+        if name is not None:
+            updates["name"] = name.strip()
+        if legal_name is not None:
+            updates["legal_name"] = legal_name.strip()
+        if tax_number is not None:
+            updates["tax_number"] = tax_number
+        if contact_email is not None:
+            updates["contact_email"] = contact_email.lower().strip()
+        if contact_phone is not None:
+            updates["contact_phone"] = contact_phone.strip()
+        if address is not None:
+            updates["address"] = address
+        updated = await self.businesses.update(business_id, updates)
+        await self.audit.log(
+            action="BUSINESS_UPDATED",
+            resource_type="business_account",
+            resource_id=business_id,
+            business_account_id=business_id,
+            user_id=user_id,
+            ip_address=ip_address,
+            metadata={"fields": sorted(k for k in updates if k != "updated_at")},
+        )
+        return _serialize_business(updated or business)
 
     async def assert_not_last_admin(
         self, *, business_account_id: str, membership: dict[str, Any]
