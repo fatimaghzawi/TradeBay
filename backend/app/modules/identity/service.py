@@ -48,7 +48,7 @@ from app.modules.identity.repository import (
 )
 from app.shared.events.bus import USER_REGISTERED, DomainEvent, event_bus
 from app.shared.services.audit import AuditService
-from app.shared.utils.datetime import utc_now
+from app.shared.utils.datetime import as_utc, utc_now
 from app.shared.utils.objectid import parse_object_id
 
 
@@ -215,7 +215,7 @@ class AuthService:
             raise SessionRevokedError()
         if session.get("revoked_at") is not None:
             raise SessionRevokedError()
-        if session["expires_at"] < utc_now():
+        if as_utc(session["expires_at"]) < utc_now():
             raise SessionRevokedError()
 
         user = await self.users.get_by_id(session["user_id"])
@@ -346,7 +346,7 @@ class AuthService:
             row is None
             or row.get("purpose") != purpose
             or row.get("used_at") is not None
-            or row["expires_at"] < now
+            or as_utc(row["expires_at"]) < now
         ):
             raise InvalidCredentialsError()
         await self.auth_tokens.update(row["_id"], {"used_at": now})

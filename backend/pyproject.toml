@@ -29,7 +29,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=8.3.0",
-  "pytest-asyncio>=0.24.0",
+  "pytest-asyncio>=0.25.0",
   "pytest-cov>=6.0.0",
   "ruff>=0.8.0",
   "mypy>=1.13.0",
@@ -53,7 +53,9 @@ ignore = ["B008", "UP046", "UP047", "E501"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# Motor binds to one event loop; session fixtures and tests must share it.
 asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
 

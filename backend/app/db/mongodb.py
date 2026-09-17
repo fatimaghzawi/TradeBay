@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection, AsyncIOMotorDatabase
@@ -20,6 +21,7 @@ class MongoManager:
     def __init__(self) -> None:
         self._client: AsyncIOMotorClient[Any] | None = None
         self._database: AsyncIOMotorDatabase[Any] | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._indexes_ready = False
 
     @property
@@ -39,14 +41,20 @@ class MongoManager:
 
     async def connect(self, settings: Settings | None = None) -> None:
         settings = settings or get_settings()
+        loop = asyncio.get_running_loop()
         if self._client is not None:
-            return
+            if self._loop is loop and not loop.is_closed():
+                return
+            logger.warning("mongodb_reconnecting_new_event_loop")
+            await self.disconnect()
         self._client = AsyncIOMotorClient(
             settings.mongodb_uri,
             uuidRepresentation="standard",
             serverSelectionTimeoutMS=5000,
+            tz_aware=True,
         )
         self._database = self._client[settings.mongodb_database]
+        self._loop = loop
         await self.client.admin.command("ping")
         logger.info("mongodb_connected", database=settings.mongodb_database)
         await ensure_indexes(self.database)
@@ -62,6 +70,7 @@ class MongoManager:
             self._client.close()
             self._client = None
             self._database = None
+            self._loop = None
             self._indexes_ready = False
             logger.info("mongodb_disconnected")
 
@@ -69,8 +78,8 @@ class MongoManager:
         try:
             await self.client.admin.command("ping")
             return True
-        except Exception:
-            logger.warning("mongodb_ping_failed")
+        except Exception as exc:
+            logger.warning("mongodb_ping_failed", error=str(exc))
             return False
 
     @property

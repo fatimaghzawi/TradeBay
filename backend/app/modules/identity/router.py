@@ -79,13 +79,14 @@ async def register(
         user_agent=request.headers.get("user-agent"),
     )
     _set_auth_cookies(response, settings, result)
-    return success(
-        {
-            "user": result["user"],
-            "business": result.get("business"),
-            "access_token_expires_in_minutes": result["access_token_expires_in_minutes"],
-        }
-    )
+    payload: dict[str, Any] = {
+        "user": result["user"],
+        "business": result.get("business"),
+        "access_token_expires_in_minutes": result["access_token_expires_in_minutes"],
+    }
+    if "verification_token" in result:
+        payload["verification_token"] = result["verification_token"]
+    return success(payload)
 
 
 @router.post("/login", summary="Login with email and password")

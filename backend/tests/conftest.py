@@ -4,19 +4,43 @@ from __future__ import annotations
 
 import os
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-# Configure test env before importing the app
+
+def _dotenv_value(key: str) -> str | None:
+    """Read one key from repo-root or backend .env without overriding a live env var."""
+    existing = os.environ.get(key)
+    if existing:
+        return existing
+    conftest_dir = Path(__file__).resolve().parent
+    for path in (conftest_dir.parents[1] / ".env", conftest_dir.parent / ".env"):
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                continue
+            name, _, value = stripped.partition("=")
+            if name.strip() == key:
+                cleaned = value.strip().strip("'").strip('"')
+                return cleaned or None
+    return None
+
+
+# Configure test env before importing the app.
+# MONGODB_URI comes from the process env or .env; tests never use the .env database
+# name so a local run cannot drop the development Atlas database.
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("APP_NAME", "TradeBay")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-min-32-characters!!")
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-32-characters!")
 os.environ.setdefault(
     "MONGODB_URI",
-    os.environ.get("MONGODB_URI", "mongodb://localhost:27017/?directConnection=true"),
+    _dotenv_value("MONGODB_URI") or "mongodb://localhost:27017/?directConnection=true",
 )
 os.environ.setdefault("MONGODB_DATABASE", "tradebay_test")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:3000")
