@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from fastapi import Request, status
@@ -117,8 +118,23 @@ async def http_exception_handler(_: Request, exc: StarletteHTTPException) -> ORJ
     )
 
 
+def _jsonable_validation_errors(errors: Sequence[Any]) -> list[dict[str, Any]]:
+    """Pydantic may put raw Exception instances in error ctx; orjson cannot serialize those."""
+    cleaned: list[dict[str, Any]] = []
+    for error in errors:
+        item = dict(error)
+        ctx = item.get("ctx")
+        if isinstance(ctx, dict):
+            item["ctx"] = {
+                key: (str(value) if isinstance(value, BaseException) else value)
+                for key, value in ctx.items()
+            }
+        cleaned.append(item)
+    return cleaned
+
+
 async def validation_exception_handler(_: Request, exc: RequestValidationError) -> ORJSONResponse:
-    details = {"errors": exc.errors()}
+    details = {"errors": _jsonable_validation_errors(exc.errors())}
     return ORJSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=error_body(str(ErrorCode.VALIDATION_ERROR), "Validation error", details),

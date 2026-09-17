@@ -53,13 +53,19 @@ export const authApi = {
     apiClient.post<{
       user: AuthUser;
       business: AuthBusiness | null;
-      verification_token?: string;
     }>("/auth/register", payload),
   logout: () => apiClient.post<{ logged_out: boolean }>("/auth/logout"),
   forgotPassword: (email: string) =>
     apiClient.post<{ requested: boolean }>("/auth/forgot-password", { email }),
   verifyEmail: (token: string) =>
     apiClient.post<{ user: AuthUser }>("/auth/verify-email", { token }),
+  resendVerification: () =>
+    apiClient.post<{ requested: boolean }>("/auth/resend-verification"),
   resetPassword: (token: string, password: string) =>
     apiClient.post<{ reset: boolean }>("/auth/reset-password", { token, password }),
+  changePassword: (current_password: string, new_password: string) =>
+    apiClient.post<{ changed: boolean }>("/auth/change-password", {
+      current_password,
+      new_password,
+    }),
 };

@@ -31,6 +31,7 @@ from app.modules.settings.repository import (
     PlatformSettingsRepository,
     TaxSettingsRepository,
 )
+from app.shared.repositories.base import MongoSession
 from app.shared.types.money import to_decimal128
 from app.shared.utils.datetime import utc_now
 
@@ -70,10 +71,13 @@ async def seed_trading_roles(
     business_account_id: ObjectId,
     *,
     permission_index: dict[str, ObjectId] | None = None,
+    session: MongoSession = None,
 ) -> dict[str, dict[str, Any]]:
     """Create the five undeletable system roles for a trading company."""
     index = permission_index or await _permission_index()
-    return await _seed_roles_for_business(business_account_id, TRADING_SYSTEM_ROLES, index)
+    return await _seed_roles_for_business(
+        business_account_id, TRADING_SYSTEM_ROLES, index, session=session
+    )
 
 
 async def seed_platform_business(
@@ -87,7 +91,7 @@ async def seed_platform_business(
             {
                 "name": PLATFORM_BUSINESS_NAME,
                 "type": BusinessAccountType.PLATFORM,
-                "status": BusinessAccountStatus.ACTIVE,
+                "status": BusinessAccountStatus.VERIFIED,
                 "legal_name": PLATFORM_BUSINESS_NAME,
                 "tax_number": None,
                 "address": None,
@@ -167,6 +171,8 @@ async def _seed_roles_for_business(
     business_account_id: ObjectId,
     role_names: tuple[str, ...],
     permission_index: dict[str, ObjectId],
+    *,
+    session: MongoSession = None,
 ) -> dict[str, dict[str, Any]]:
     roles = RoleRepository()
     grants = RolePermissionRepository()
@@ -174,7 +180,8 @@ async def _seed_roles_for_business(
     created: dict[str, dict[str, Any]] = {}
     for name in role_names:
         role = await roles.find_one(
-            {"business_account_id": business_account_id, "name": name}
+            {"business_account_id": business_account_id, "name": name},
+            session=session,
         )
         if role is None:
             role = await roles.create(
@@ -185,17 +192,22 @@ async def _seed_roles_for_business(
                     "is_system_role": True,
                     "created_at": now,
                     "updated_at": now,
-                }
+                },
+                session=session,
             )
         created[name] = role
         wanted = SYSTEM_ROLE_GRANTS.get(name, frozenset())
         existing_ids = {
-            str(pid) for pid in await grants.list_permission_ids_for_role(role["_id"])
+            str(pid)
+            for pid in await grants.list_permission_ids_for_role(role["_id"], session=session)
         }
         for resource, action in wanted:
             pid = permission_index.get(f"{resource}.{action}")
             if pid is None or str(pid) in existing_ids:
                 continue
-            await grants.create({"role_id": role["_id"], "permission_id": pid, "created_at": now})
+            await grants.create(
+                {"role_id": role["_id"], "permission_id": pid, "created_at": now},
+                session=session,
+            )
             existing_ids.add(str(pid))
     return created

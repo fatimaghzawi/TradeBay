@@ -5,9 +5,11 @@ from fastapi import APIRouter
 from app.core.constants import API_V1_PREFIX
 from app.modules.identity.business_router import (
     businesses_router,
+    invitations_router,
     members_router,
     permissions_router,
     roles_router,
+    users_router,
 )
 from app.modules.identity.router import router as auth_router
 
@@ -18,6 +20,8 @@ api_router.include_router(businesses_router)
 api_router.include_router(members_router)
 api_router.include_router(roles_router)
 api_router.include_router(permissions_router)
+api_router.include_router(invitations_router)
+api_router.include_router(users_router)
 
 # Domain routers are included when modules exist (catalog, procurement, etc.).
 # Safe optional imports keep the app startable during incremental scaffolding.
