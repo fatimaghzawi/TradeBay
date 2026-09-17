@@ -1,6 +1,8 @@
+/** Query keys for identity/auth. Domain keys reserved for future modules. */
 export const queryKeys = {
   me: ["auth", "me"] as const,
   businesses: ["identity", "businesses"] as const,
+  // Domain stubs (not wired):
   products: ["catalog", "products"] as const,
   rfqs: ["procurement", "rfqs"] as const,
   orders: ["procurement", "orders"] as const,

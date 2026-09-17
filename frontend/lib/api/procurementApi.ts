@@ -1,5 +1,8 @@
-import { apiClient } from "@/lib/api/client";
+/** Stub — procurement domain not implemented. */
+function notImplemented(): never {
+  throw new Error("procurementApi: not implemented");
+}
 
 export const procurementApi = {
-  health: () => apiClient.get<{ status: string }>("/procurement/health"),
+  health: notImplemented,
 };

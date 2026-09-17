@@ -15,8 +15,10 @@ from app.modules.identity.dependencies import (
     get_current_user,
     get_refresh_token_from_cookie,
 )
+from app.modules.identity.http import client_ip
 from app.modules.identity.schemas import (
     AuthMeResponse,
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
@@ -75,7 +77,7 @@ async def register(
         first_name=body.first_name,
         last_name=body.last_name,
         business_name=body.business_name,
-        ip_address=request.client.host if request.client else None,
+        ip_address=client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
     _set_auth_cookies(response, settings, result)
@@ -84,8 +86,6 @@ async def register(
         "business": result.get("business"),
         "access_token_expires_in_minutes": result["access_token_expires_in_minutes"],
     }
-    if "verification_token" in result:
-        payload["verification_token"] = result["verification_token"]
     return success(payload)
 
 
@@ -100,7 +100,7 @@ async def login(
     result = await service.login(
         email=body.email,
         password=body.password,
-        ip_address=request.client.host if request.client else None,
+        ip_address=client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
     _set_auth_cookies(response, settings, result)
@@ -114,12 +114,13 @@ async def login(
 
 @router.post("/logout", summary="Revoke current session and clear cookies")
 async def logout(
+    request: Request,
     response: Response,
     auth: Annotated[AuthContext, Depends(get_current_user)],
     service: Annotated[AuthService, Depends(get_auth_service)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> dict[str, Any]:
-    await service.logout(session_id=auth.session_id)
+    await service.logout(session_id=auth.session_id, user_id=auth.user_id, ip_address=client_ip(request))
     _clear_auth_cookies(response, settings)
     return success({"logged_out": True})
 
@@ -136,7 +137,7 @@ async def refresh(
         raise UnauthorizedError("Refresh token cookie missing")
     result = await service.refresh(
         raw_refresh_token=refresh_cookie,
-        ip_address=request.client.host if request.client else None,
+        ip_address=client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
     _set_auth_cookies(response, settings, result)
@@ -160,9 +161,10 @@ async def me(
 @router.post("/verify-email", summary="Verify email with a one-time token")
 async def verify_email(
     body: VerifyEmailRequest,
+    request: Request,
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> dict[str, Any]:
-    result = await service.verify_email(raw_token=body.token)
+    result = await service.verify_email(raw_token=body.token, ip_address=client_ip(request))
     return success(result)
 
 
@@ -178,7 +180,38 @@ async def forgot_password(
 @router.post("/reset-password", summary="Reset password with a one-time token")
 async def reset_password(
     body: ResetPasswordRequest,
+    request: Request,
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> dict[str, Any]:
-    await service.reset_password(raw_token=body.token, new_password=body.password)
+    await service.reset_password(
+        raw_token=body.token, new_password=body.password, ip_address=client_ip(request)
+    )
     return success({"reset": True})
+
+
+@router.post("/resend-verification", summary="Resend email verification challenge")
+async def resend_verification(
+    auth: Annotated[AuthContext, Depends(get_current_user)],
+    service: Annotated[AuthService, Depends(get_auth_service)],
+) -> dict[str, Any]:
+    await service.resend_verification(user_id=auth.user_id)
+    return success({"requested": True})
+
+
+@router.post("/change-password", summary="Change password while authenticated")
+async def change_password(
+    body: ChangePasswordRequest,
+    request: Request,
+    response: Response,
+    auth: Annotated[AuthContext, Depends(get_current_user)],
+    service: Annotated[AuthService, Depends(get_auth_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict[str, Any]:
+    await service.change_password(
+        user_id=auth.user_id,
+        current_password=body.current_password,
+        new_password=body.new_password,
+        ip_address=client_ip(request),
+    )
+    _clear_auth_cookies(response, settings)
+    return success({"changed": True})

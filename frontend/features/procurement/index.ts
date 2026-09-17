@@ -1,1 +1,1 @@
-﻿export { procurementApi } from "@/lib/api/procurementApi";
+﻿// Feature module skeleton: procurement — no business logic yet.

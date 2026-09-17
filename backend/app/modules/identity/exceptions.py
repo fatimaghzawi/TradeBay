@@ -75,5 +75,23 @@ class LastAdminError(ConflictError):
         )
 
 
+class InvitationInvalidError(ForbiddenError):
+    def __init__(self, message: str = "Invitation is not valid") -> None:
+        super().__init__(message, code=ErrorCode.INVITATION_INVALID)
+
+
+class PrivilegeEscalationError(ForbiddenError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Cannot grant permissions outside your own permission set",
+            code=ErrorCode.PRIVILEGE_ESCALATION,
+        )
+
+
+class SystemRoleProtectedError(ConflictError):
+    def __init__(self) -> None:
+        super().__init__("System roles cannot be deleted")
+
+
 class IdentityError(AppError):
     """Generic identity-domain error."""

@@ -1,5 +1,8 @@
-import { apiClient } from "@/lib/api/client";
+/** Stub — AI domain not implemented. */
+function notImplemented(): never {
+  throw new Error("aiApi: not implemented");
+}
 
 export const aiApi = {
-  health: () => apiClient.get<{ status: string }>("/ai/health"),
+  health: notImplemented,
 };

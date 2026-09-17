@@ -1,5 +1,15 @@
-"""Marketplace API aliases — same routes as catalog (products, categories, inventory)."""
+"""Marketplace API skeleton — not implemented."""
 
-from app.modules.catalog.router import router
+from __future__ import annotations
 
-__all__ = ["router"]
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+
+from app.shared.http.skeleton import not_implemented
+
+router = APIRouter(prefix="/marketplace", tags=["Marketplace"])
+
+
+@router.get("", summary="Marketplace skeleton")
+async def domain_skeleton() -> JSONResponse:
+    return not_implemented("Marketplace")

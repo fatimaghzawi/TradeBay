@@ -1,11 +1,9 @@
-import { apiClient } from "@/lib/api/client";
+/** Stub — business-planner domain not implemented. */
+function notImplemented(): never {
+  throw new Error("businessPlannerApi: not implemented");
+}
 
-/** Scaffolded client — no AI plan generation. */
 export const businessPlannerApi = {
-  listPlans: () =>
-    apiClient.get<unknown>("/business-plans", {
-      params: { page: 1, page_size: 20 },
-    }),
-  getPlan: (id: string) =>
-    apiClient.get<unknown>(`/business-plans/${id}`),
+  listPlans: notImplemented,
+  getPlan: notImplemented,
 };

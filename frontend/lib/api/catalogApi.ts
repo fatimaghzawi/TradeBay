@@ -1,5 +1,8 @@
-import { apiClient } from "@/lib/api/client";
+/** Stub — catalog domain not implemented. */
+function notImplemented(): never {
+  throw new Error("catalogApi: not implemented");
+}
 
 export const catalogApi = {
-  health: () => apiClient.get<{ status: string }>("/catalog/health"),
+  health: notImplemented,
 };

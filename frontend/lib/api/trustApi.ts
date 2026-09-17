@@ -1,5 +1,8 @@
-import { apiClient } from "@/lib/api/client";
+/** Stub — trust domain not implemented. */
+function notImplemented(): never {
+  throw new Error("trustApi: not implemented");
+}
 
 export const trustApi = {
-  health: () => apiClient.get<{ status: string }>("/trust/health"),
+  health: notImplemented,
 };
