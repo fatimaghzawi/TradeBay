@@ -50,6 +50,7 @@ ignore = ["B008", "UP046", "UP047", "E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["N802"]
+"tests/conftest.py" = ["E402"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
