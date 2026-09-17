@@ -56,6 +56,7 @@ class MembershipStatus(StrEnum):
 class InvitationStatus(StrEnum):
     PENDING = "pending"
     ACCEPTED = "accepted"
+    DECLINED = "declined"
     EXPIRED = "expired"
     REVOKED = "revoked"
 

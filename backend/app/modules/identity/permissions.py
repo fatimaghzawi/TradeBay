@@ -33,6 +33,7 @@ DEFAULT_PERMISSION_CATALOG: list[tuple[str, str, str]] = [
     (R.ROLES, A.MANAGE, "Manage roles"),
     (R.BUSINESSES, A.READ, "View businesses"),
     (R.BUSINESSES, A.MANAGE, "Manage business settings"),
+    (R.AUDIT_LOGS, A.READ, "View business audit logs"),
     (R.PRODUCTS, A.READ, "View products"),
     (R.PRODUCTS, A.MANAGE, "Manage products"),
     (R.CATEGORIES, A.READ, "View categories"),

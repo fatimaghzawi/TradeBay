@@ -101,6 +101,106 @@ class DirectoryService:
             )
         return results
 
+    async def get_member(self, *, business_id: str, membership_id: str) -> dict[str, Any]:
+        membership = await self.memberships.get_by_id(membership_id)
+        if membership is None or str(membership["business_account_id"]) != business_id:
+            raise InvitationInvalidError("Membership not found")
+        user = await self.users.get_by_id(membership["user_id"])
+        role = await self.roles.get_by_id(membership["role_id"])
+        return {
+            "id": str(membership["_id"]),
+            "user_id": str(membership["user_id"]),
+            "email": user["email"] if user else None,
+            "first_name": user.get("first_name") if user else None,
+            "last_name": user.get("last_name") if user else None,
+            "role_id": str(membership["role_id"]),
+            "role_name": role["name"] if role else None,
+            "status": membership["status"],
+            "joined_at": membership.get("joined_at"),
+        }
+
+    async def get_role(self, *, business_id: str, role_id: str) -> dict[str, Any]:
+        role = await self._role_in_business(role_id, business_id)
+        codes = sorted(await self.permission_codes_for_role(role["_id"]))
+        return {
+            "id": str(role["_id"]),
+            "name": role["name"],
+            "is_system_role": bool(role.get("is_system_role")),
+            "permissions": codes,
+        }
+
+    async def get_invitation(
+        self,
+        *,
+        invitation_id: str,
+        requester_email: str,
+        requester_user_id: str,
+        actor_permissions_by_business: dict[str, set[str]] | None = None,
+    ) -> dict[str, Any]:
+        invitation = await self.invitations.get_by_id(invitation_id)
+        if invitation is None:
+            raise InvitationInvalidError()
+        business_id = str(invitation["business_account_id"])
+        is_recipient = invitation["invited_email"].lower() == requester_email.lower().strip()
+        can_manage = False
+        if actor_permissions_by_business and business_id in actor_permissions_by_business:
+            perms = actor_permissions_by_business[business_id]
+            can_manage = "users.read" in perms or "users.invite" in perms
+        if not is_recipient and not can_manage:
+            # Fall back: active membership with users.read on that business
+            membership = await self.memberships.get_active_membership(requester_user_id, business_id)
+            if membership is None:
+                raise InvitationInvalidError()
+            role_perms = await self.permission_codes_for_role(membership["role_id"])
+            if "users.read" not in role_perms and "users.invite" not in role_perms:
+                raise InvitationInvalidError()
+        return {
+            "id": str(invitation["_id"]),
+            "business_account_id": business_id,
+            "invited_email": invitation["invited_email"],
+            "role_id": str(invitation["role_id"]),
+            "status": invitation["status"],
+            "expires_at": invitation["expires_at"],
+        }
+
+    async def decline_invitation(
+        self, *, invitation_id: str, user_email: str, user_id: str, ip_address: str | None = None
+    ) -> None:
+        invitation = await self.invitations.get_by_id(invitation_id)
+        if (
+            invitation is None
+            or invitation.get("status") != InvitationStatus.PENDING
+            or invitation["invited_email"].lower() != user_email.lower().strip()
+        ):
+            raise InvitationInvalidError()
+        await self.invitations.update(invitation_id, {"status": InvitationStatus.DECLINED})
+        await self.audit.log(
+            action="INVITATION_DECLINED",
+            resource_type="invitation",
+            resource_id=invitation_id,
+            business_account_id=invitation["business_account_id"],
+            user_id=user_id,
+            ip_address=ip_address,
+        )
+
+    async def accept_invitation_by_id(
+        self, *, invitation_id: str, user_id: str, user_email: str, ip_address: str | None = None
+    ) -> dict[str, Any]:
+        invitation = await self.invitations.get_by_id(invitation_id)
+        now = utc_now()
+        if (
+            invitation is None
+            or invitation.get("status") != InvitationStatus.PENDING
+            or as_utc(invitation["expires_at"]) < now
+            or invitation["invited_email"].lower() != user_email.lower().strip()
+        ):
+            raise InvitationInvalidError()
+        return await self._accept_invitation_document(
+            invitation=invitation,
+            user_id=user_id,
+            ip_address=ip_address,
+        )
+
     async def update_member_role(
         self,
         *,
@@ -372,6 +472,20 @@ class DirectoryService:
             or invitation["invited_email"].lower() != user_email.lower().strip()
         ):
             raise InvitationInvalidError()
+        return await self._accept_invitation_document(
+            invitation=invitation,
+            user_id=user_id,
+            ip_address=ip_address,
+        )
+
+    async def _accept_invitation_document(
+        self,
+        *,
+        invitation: dict[str, Any],
+        user_id: str,
+        ip_address: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_now()
 
         async def work(session: MongoSession) -> None:
             existing = await self.memberships.get_active_membership(
@@ -409,6 +523,68 @@ class DirectoryService:
             "business_id": str(invitation["business_account_id"]),
             "role_id": str(invitation["role_id"]),
         }
+
+    async def suspend_membership(
+        self,
+        *,
+        business_id: str,
+        membership_id: str,
+        reason: str,
+        actor_user_id: str,
+        ip_address: str | None,
+    ) -> None:
+        cleaned = reason.strip()
+        if not cleaned:
+            raise InvitationInvalidError("Suspension reason is required")
+        membership = await self.memberships.get_by_id(membership_id)
+        if membership is None or str(membership["business_account_id"]) != business_id:
+            raise InvitationInvalidError("Membership not found")
+        if membership["status"] not in {MembershipStatus.ACTIVE, MembershipStatus.INVITED}:
+            raise InvitationInvalidError("Membership cannot be suspended")
+        await assert_not_last_admin(business_account_id=business_id, membership=membership)
+        await self.memberships.update(
+            membership_id,
+            {"status": MembershipStatus.SUSPENDED, "updated_at": utc_now()},
+        )
+        await self.audit.log(
+            action="MEMBERSHIP_SUSPENDED",
+            resource_type="membership",
+            resource_id=membership_id,
+            business_account_id=business_id,
+            user_id=actor_user_id,
+            ip_address=ip_address,
+            metadata={
+                "reason": cleaned,
+                "target_user_id": str(membership["user_id"]),
+            },
+        )
+
+    async def reactivate_membership(
+        self,
+        *,
+        business_id: str,
+        membership_id: str,
+        actor_user_id: str,
+        ip_address: str | None,
+    ) -> None:
+        membership = await self.memberships.get_by_id(membership_id)
+        if membership is None or str(membership["business_account_id"]) != business_id:
+            raise InvitationInvalidError("Membership not found")
+        if membership["status"] != MembershipStatus.SUSPENDED:
+            raise InvitationInvalidError("Membership is not suspended")
+        await self.memberships.update(
+            membership_id,
+            {"status": MembershipStatus.ACTIVE, "updated_at": utc_now()},
+        )
+        await self.audit.log(
+            action="MEMBERSHIP_REACTIVATED",
+            resource_type="membership",
+            resource_id=membership_id,
+            business_account_id=business_id,
+            user_id=actor_user_id,
+            ip_address=ip_address,
+            metadata={"target_user_id": str(membership["user_id"])},
+        )
 
     async def suspend_user(
         self,

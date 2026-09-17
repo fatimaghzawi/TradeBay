@@ -183,6 +183,89 @@ def require_permission(resource: str, action: str) -> Callable[..., Any]:
     return _dependency
 
 
+async def _load_permissions_for_membership(membership: dict[str, Any]) -> tuple[dict[str, Any] | None, set[str]]:
+    role = await RoleRepository().get_by_id(membership["role_id"])
+    codes: set[str] = set()
+    if role:
+        perm_ids = await RolePermissionRepository().list_permission_ids_for_role(role["_id"])
+        perm_repo = PermissionRepository()
+        for pid in perm_ids:
+            perm = await perm_repo.get_by_id(pid)
+            if perm:
+                codes.add(f"{perm['resource']}.{perm['action']}")
+    return role, codes
+
+
+def require_business_scope() -> Callable[..., Any]:
+    """Require an active membership in the path business_id (no specific permission)."""
+
+    async def _dependency(
+        business_id: str,
+        auth: Annotated[AuthContext, Depends(get_current_user)],
+    ) -> AuthContext:
+        membership = await MembershipRepository().get_active_membership(auth.user_id, business_id)
+        if membership is None:
+            raise BusinessContextRequiredError()
+        business = await BusinessRepository().get_by_id(business_id)
+        if business is None or not is_business_operational(str(business.get("status", ""))):
+            raise BusinessInactiveError()
+        role, codes = await _load_permissions_for_membership(membership)
+        return AuthContext(
+            user=auth.user,
+            session=auth.session,
+            business=business,
+            membership=membership,
+            role=role,
+            permissions=codes,
+        )
+
+    return _dependency
+
+
+def require_business_permission(resource: str, action: str) -> Callable[..., Any]:
+    """Authorize against membership in path business_id (not only the session active business)."""
+
+    async def _dependency(
+        business_id: str,
+        auth: Annotated[AuthContext, Depends(get_current_user)],
+    ) -> AuthContext:
+        return await resolve_business_permission(
+            business_id=business_id,
+            auth=auth,
+            resource=resource,
+            action=action,
+        )
+
+    return _dependency
+
+
+async def resolve_business_permission(
+    *,
+    business_id: str,
+    auth: AuthContext,
+    resource: str,
+    action: str,
+) -> AuthContext:
+    membership = await MembershipRepository().get_active_membership(auth.user_id, business_id)
+    if membership is None:
+        raise BusinessContextRequiredError()
+    business = await BusinessRepository().get_by_id(business_id)
+    if business is None or not is_business_operational(str(business.get("status", ""))):
+        raise BusinessInactiveError()
+    role, codes = await _load_permissions_for_membership(membership)
+    scoped = AuthContext(
+        user=auth.user,
+        session=auth.session,
+        business=business,
+        membership=membership,
+        role=role,
+        permissions=codes,
+    )
+    if not scoped.has_permission(resource, action):
+        raise PermissionDeniedError(resource, action)
+    return scoped
+
+
 def require_verified_email() -> Callable[..., Any]:
     async def _dependency(auth: Annotated[AuthContext, Depends(get_current_user)]) -> AuthContext:
         assert_email_verified(auth.user)

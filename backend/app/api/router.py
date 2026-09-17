@@ -1,21 +1,27 @@
-"""Aggregate versioned API routers."""
+﻿"""Aggregate versioned API routers."""
 
 from fastapi import APIRouter
 
 from app.core.constants import API_V1_PREFIX
-from app.modules.identity.business_router import (
-    businesses_router,
+from app.modules.identity.auth_router import router as auth_router
+from app.modules.identity.business_router import businesses_router
+from app.modules.identity.identity_router import (
     invitations_router,
+    me_router,
     members_router,
     permissions_router,
+    platform_router,
     roles_router,
+    sessions_router,
     users_router,
 )
-from app.modules.identity.router import router as auth_router
 
 api_router = APIRouter(prefix=API_V1_PREFIX)
 
 api_router.include_router(auth_router)
+api_router.include_router(me_router)
+api_router.include_router(sessions_router)
+api_router.include_router(platform_router)
 api_router.include_router(businesses_router)
 api_router.include_router(members_router)
 api_router.include_router(roles_router)

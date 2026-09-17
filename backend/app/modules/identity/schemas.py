@@ -145,3 +145,22 @@ class UpdateRoleRequest(BaseModel):
 class SuspendUserRequest(BaseModel):
     user_id: str = Field(min_length=24, max_length=24)
     reason: str = Field(min_length=1, max_length=500)
+
+
+class SuspendMembershipRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class UpdateProfileRequest(BaseModel):
+    first_name: str | None = Field(default=None, min_length=1, max_length=100)
+    last_name: str | None = Field(default=None, min_length=1, max_length=100)
+
+
+class UpdateBusinessRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    legal_name: str | None = None
+    tax_number: str | None = None
+    contact_email: EmailStr | None = None
+    contact_phone: str | None = Field(default=None, max_length=40)
+    address: AddressInput | None = None
+
