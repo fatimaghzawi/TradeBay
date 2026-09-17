@@ -58,8 +58,14 @@ class NotFoundError(AppError):
 
 
 class ConflictError(AppError):
-    def __init__(self, message: str = "Conflict", *, details: dict[str, Any] | None = None) -> None:
-        super().__init__(ErrorCode.CONFLICT, message, status_code=409, details=details)
+    def __init__(
+        self,
+        message: str = "Conflict",
+        *,
+        code: ErrorCode | str = ErrorCode.CONFLICT,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(code, message, status_code=409, details=details)
 
 
 class RateLimitError(AppError):

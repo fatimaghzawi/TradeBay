@@ -187,6 +187,8 @@ def require_seller(resource: str, action: str) -> Callable[..., Any]:
     async def _dependency(auth: Annotated[AuthContext, Depends(inner)]) -> AuthContext:
         if not auth.user.get("email_verified_at"):
             raise EmailUnverifiedError()
+        if auth.business_id is None:
+            raise BusinessContextRequiredError()
         profile = await SupplierProfileRepository().get_by_business(auth.business_id)
         if profile is None or profile.get("verification_status") != "verified":
             raise SellingNotVerifiedError()

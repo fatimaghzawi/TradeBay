@@ -21,5 +21,5 @@ TransactionalWork = Callable[[ClientSession], Awaitable[T]]
 async def run_in_transaction(work: TransactionalWork[T]) -> T:
     """Run `work(session)` inside a Mongo transaction and return its result."""
 
-    async with mongo_manager.client.start_session() as session:
+    async with await mongo_manager.client.start_session() as session:
         return await session.with_transaction(work)
