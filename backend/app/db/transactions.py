@@ -6,8 +6,8 @@ inside one transaction. That requires a replica set (see docker-compose).
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from collections.abc import Callable, Coroutine
+from typing import Any, TypeVar
 
 from pymongo.client_session import ClientSession
 
@@ -15,7 +15,7 @@ from app.db.mongodb import mongo_manager
 
 T = TypeVar("T")
 
-TransactionalWork = Callable[[ClientSession], Awaitable[T]]
+TransactionalWork = Callable[[ClientSession], Coroutine[Any, Any, T]]
 
 
 async def run_in_transaction(work: TransactionalWork[T]) -> T:
