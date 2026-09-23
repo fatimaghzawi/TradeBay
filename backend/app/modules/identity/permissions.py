@@ -154,7 +154,6 @@ def _sales_manager_codes() -> frozenset[tuple[str, str]]:
 def _sales_representative_codes() -> frozenset[tuple[str, str]]:
     return frozenset(
         {
-            (R.USERS, A.READ),
             (R.BUSINESSES, A.READ),
             (R.PRODUCTS, A.READ),
             (R.CATEGORIES, A.READ),

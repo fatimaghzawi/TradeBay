@@ -2,8 +2,8 @@
 
 export default function RootLoading() {
   return (
-    <div className="mx-auto max-w-3xl px-6 py-16">
-      <LoadingState rows={5} />
+    <div className="tb-app flex min-h-[70vh] items-center justify-center px-4">
+      <LoadingState variant="page" title="Loading TradeBay" message="Opening this surface…" />
     </div>
   );
 }

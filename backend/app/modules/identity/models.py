@@ -43,6 +43,8 @@ class UserDocument(MongoDocument):
     first_name: str
     last_name: str
     phone: str | None = None
+    avatar_url: str | None = None
+    personal_email: EmailStr | None = None
     status: str
     email_verified_at: datetime | None = None
     created_at: datetime
@@ -58,6 +60,9 @@ class BusinessAccountDocument(MongoDocument):
     registration_number: str | None = None
     contact_email: str | None = None
     contact_phone: str | None = None
+    email_domain: str | None = None
+    logo_url: str | None = None
+    cover_url: str | None = None
     address: AddressEmbedded | None = None
     created_at: datetime
     updated_at: datetime
@@ -82,6 +87,8 @@ class RoleDocument(MongoDocument):
     name: str
     description: str | None = None
     is_system_role: bool = False
+    is_active: bool = True
+    deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -101,10 +108,11 @@ class RolePermissionDocument(MongoDocument):
 
 
 class InvitationDocument(MongoDocument):
-    """Carries a role, never permissions — grants always resolve through the role."""
+    """Company invite: delivery_email gets the link; invited_email is the login identity."""
 
     business_account_id: DocumentId
     invited_email: EmailStr
+    delivery_email: EmailStr | None = None
     role_id: DocumentId
     invited_by_user_id: DocumentId
     token_hash: str

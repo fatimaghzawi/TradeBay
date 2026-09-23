@@ -66,6 +66,7 @@ class NotificationDocument(MongoDocument):
     message: str | None = None
     reference_type: str | None = None
     reference_id: OptionalDocumentId = None
+    cta_path: str | None = None
     is_read: bool = False
     read_at: datetime | None = None
     created_at: datetime

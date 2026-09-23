@@ -1,8 +1,30 @@
-"""Shared AI infrastructure (provider abstraction + stubs).
+"""Shared AI provider layer.
 
-Authoritative AI *domain entities* live in:
-- `app.modules.ai_sourcing` (SourcingRequest, recommendations)
-- `app.modules.business_planner` (BusinessPlan, PriceEstimate)
+Domain modules call `get_ai_provider()` for advisory extraction only.
+Marketplace truth stays in catalog / identity / procurement collections.
 
-This package must never mutate orders, payments, inventory, or permissions.
+Optional RAG (`get_rag_retriever`) supplies catalog vocabulary context —
+never prices, stock, or verification.
 """
+
+from app.modules.ai.provider import AIProvider, AIProviderError, get_ai_provider
+from app.modules.ai.rag import (
+    RagChunk,
+    RagRetriever,
+    ensure_catalog_rag_index,
+    format_rag_context,
+    get_rag_retriever,
+    reset_rag_cache,
+)
+
+__all__ = [
+    "AIProvider",
+    "AIProviderError",
+    "RagChunk",
+    "RagRetriever",
+    "ensure_catalog_rag_index",
+    "format_rag_context",
+    "get_ai_provider",
+    "get_rag_retriever",
+    "reset_rag_cache",
+]

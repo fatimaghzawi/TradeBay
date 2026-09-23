@@ -23,6 +23,7 @@ class MongoManager:
         self._database: AsyncIOMotorDatabase[Any] | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._indexes_ready = False
+        self._schema_task: asyncio.Task[None] | None = None
 
     @property
     def client(self) -> AsyncIOMotorClient[Any]:
@@ -47,25 +48,86 @@ class MongoManager:
                 return
             logger.warning("mongodb_reconnecting_new_event_loop")
             await self.disconnect()
-        self._client = AsyncIOMotorClient(
-            settings.mongodb_uri,
-            uuidRepresentation="standard",
-            serverSelectionTimeoutMS=5000,
-            tz_aware=True,
-        )
-        self._database = self._client[settings.mongodb_database]
-        self._loop = loop
-        await self.client.admin.command("ping")
-        logger.info("mongodb_connected", database=settings.mongodb_database)
-        await ensure_indexes(self.database)
-        self._indexes_ready = True
-        logger.info("mongodb_indexes_ensured")
-        from app.db.seed import seed_startup
 
-        await seed_startup()
-        logger.info("mongodb_seed_ensured")
+        attempts = 5 if not settings.is_production else 3
+        last_error: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                self._client = AsyncIOMotorClient(
+                    settings.mongodb_uri,
+                    uuidRepresentation="standard",
+                    serverSelectionTimeoutMS=8000,
+                    connectTimeoutMS=10000,
+                    socketTimeoutMS=20000,
+                    maxPoolSize=50,
+                    minPoolSize=5,
+                    retryWrites=True,
+                    tz_aware=True,
+                )
+                self._database = self._client[settings.mongodb_database]
+                self._loop = loop
+                await self.client.admin.command("ping")
+                logger.info("mongodb_connected", database=settings.mongodb_database, attempt=attempt)
+                break
+            except Exception as exc:
+                last_error = exc
+                logger.warning(
+                    "mongodb_connect_retry",
+                    attempt=attempt,
+                    attempts=attempts,
+                    error_type=type(exc).__name__,
+                    error=str(exc)[:200],
+                )
+                if self._client is not None:
+                    self._client.close()
+                    self._client = None
+                    self._database = None
+                    self._loop = None
+                if attempt < attempts:
+                    await asyncio.sleep(min(2 ** attempt, 10))
+        else:
+            assert last_error is not None
+            raise last_error
+
+        # Atlas index + demo seed take ~80s. Blocking lifespan on that makes
+        # uvicorn --reload look like a 500 in the Next.js proxy (ECONNREFUSED).
+        # Tests and production still wait so schema is deterministic.
+        if settings.is_production or settings.is_test:
+            await self._ensure_schema(settings)
+            # Only mark ready after schema succeeds (raise on failure above).
+            self._indexes_ready = True
+        else:
+            self._indexes_ready = True
+            self._schema_task = asyncio.create_task(self._ensure_schema(settings))
+
+    async def _ensure_schema(self, settings: Settings) -> None:
+        try:
+            if self._database is None:
+                return
+            await ensure_indexes(self.database, fail_fast=settings.is_production)
+            logger.info("mongodb_indexes_ensured")
+            from app.db.seed import seed_startup
+
+            await seed_startup()
+            logger.info("mongodb_seed_ensured")
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("mongodb_schema_ensure_failed")
+            if settings.is_production or settings.is_test:
+                # Fail closed: do not pretend the API is ready without indexes.
+                self._indexes_ready = False
+                raise
 
     async def disconnect(self) -> None:
+        task = self._schema_task
+        self._schema_task = None
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
         if self._client is not None:
             self._client.close()
             self._client = None

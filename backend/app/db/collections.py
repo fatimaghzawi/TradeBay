@@ -24,6 +24,8 @@ class CollectionName(StrEnum):
     PRODUCT_IMAGES = "product_images"
     INVENTORIES = "inventories"
     INVENTORY_TRANSACTIONS = "inventory_transactions"
+    CARTS = "carts"
+    CART_ITEMS = "cart_items"
 
     # Procurement
     RFQS = "rfqs"
@@ -33,6 +35,7 @@ class CollectionName(StrEnum):
     ORDERS = "orders"
     ORDER_ITEMS = "order_items"
     SHIPMENTS = "shipments"
+    SHIPMENT_ITEMS = "shipment_items"
 
     # Communication
     CONVERSATIONS = "conversations"
@@ -48,11 +51,14 @@ class CollectionName(StrEnum):
     SOURCING_REQUESTS = "sourcing_requests"
     SOURCING_REQUEST_ITEMS = "sourcing_request_items"
     SOURCING_RECOMMENDATIONS = "sourcing_recommendations"
+    BUSINESS_PROCUREMENT_PROFILES = "business_procurement_profiles"
 
     # Business Planner (independent from AI Sourcing)
     BUSINESS_PLANS = "business_plans"
     BUSINESS_PLAN_ITEMS = "business_plan_items"
     PRICE_ESTIMATES = "price_estimates"
+    BUSINESS_PLAN_SESSIONS = "business_plan_sessions"
+    BUSINESS_PLAN_MESSAGES = "business_plan_messages"
 
     # Customer finance (invoice lines are embedded, not a collection)
     CUSTOMER_INVOICES = "customer_invoices"
@@ -77,3 +83,4 @@ class CollectionName(StrEnum):
     PLATFORM_SETTINGS = "platform_settings"
     TAX_SETTINGS = "tax_settings"
     BUSINESS_SETTINGS = "business_settings"
+    DOCUMENT_COUNTERS = "document_counters"

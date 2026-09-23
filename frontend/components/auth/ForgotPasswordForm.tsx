@@ -1,11 +1,11 @@
 "use client";
 
+import { AuthField, AuthSubmitButton } from "@/components/auth/AuthField";
+import { ResetStepper } from "@/components/auth/ResetPasswordForm";
 import { ApiError } from "@/lib/api/client";
 import { authApi } from "@/lib/api/authApi";
 import { forgotPasswordSchema } from "@/lib/validation/auth";
-import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { useLiveFields } from "@/lib/validation/live";
 import { ROUTES } from "@/lib/constants";
 import Link from "next/link";
 import { useState } from "react";
@@ -15,6 +15,7 @@ export function ForgotPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [pending, setPending] = useState(false);
+  const live = useLiveFields(forgotPasswordSchema, { email });
 
   return (
     <form
@@ -22,6 +23,7 @@ export function ForgotPasswordForm() {
       onSubmit={(e) => {
         e.preventDefault();
         setError(null);
+        if (!live.finish()) return;
         const parsed = forgotPasswordSchema.safeParse({ email });
         if (!parsed.success) {
           setError(parsed.error.issues[0]?.message ?? "Invalid email");
@@ -35,30 +37,72 @@ export function ForgotPasswordForm() {
             setError(
               err instanceof ApiError
                 ? err.message
-                : "Unable to send reset email.",
+                : "Couldn't send reset email.",
             ),
           )
           .finally(() => setPending(false));
       }}
     >
+      <ResetStepper active="request" />
+
+      <div>
+        <h1 className="auth-display text-[1.95rem] sm:text-[2.25rem]">
+          Forgot password?
+        </h1>
+        <p className="auth-lede mt-2">
+          Enter your email and we&apos;ll send a 6-digit reset code if an account
+          exists.
+        </p>
+      </div>
+
       {sent ? (
-        <Alert variant="success" title="Check your inbox">
-          If an account exists for {email}, a reset link has been sent.
-        </Alert>
+        <div className="rounded-xl bg-[#eef6f2] px-3.5 py-3 text-sm text-[#0d3b2a] ring-1 ring-[#d4e0da]">
+          <p className="font-semibold text-[#1a6b4f]">Check your inbox</p>
+          <p className="mt-1 text-[#4a5f55]">
+            If an account exists for{" "}
+            <span className="font-semibold text-[#0d3b2a]">{email}</span>, a 6-digit reset code
+            has been sent. Enter it on the next screen to set your new password.
+          </p>
+          <Link
+            href={`${ROUTES.resetPassword}?email=${encodeURIComponent(email)}`}
+            className="mt-3 inline-flex font-semibold text-[#1a6b4f] underline-offset-2 hover:underline"
+          >
+            Enter reset code →
+          </Link>
+        </div>
       ) : null}
-      {error ? <Alert variant="error">{error}</Alert> : null}
-      <Input
-        label="Email"
-        name="email"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Sending…" : "Send reset link"}
-      </Button>
+
+      {error ? (
+        <p className="rounded-xl bg-[#fef3f2] px-3.5 py-2.5 text-sm text-[#b42318] ring-1 ring-[#fecdca]">
+          {error}
+        </p>
+      ) : null}
+
+      {!sent ? (
+        <>
+          <AuthField
+            label="Email address"
+            name="email"
+            type="email"
+            icon="mail"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => live.touch("email")}
+            error={live.errors.email}
+          />
+
+          <AuthSubmitButton pending={pending} tone="orange">
+            {pending ? "Sending…" : "Send reset code"}
+          </AuthSubmitButton>
+        </>
+      ) : null}
+
       <p className="text-center text-sm">
-        <Link href={ROUTES.login} className="text-secondary hover:underline">
+        <Link
+          href={ROUTES.login}
+          className="font-semibold text-[#0d3b2a] hover:underline"
+        >
           Back to sign in
         </Link>
       </p>

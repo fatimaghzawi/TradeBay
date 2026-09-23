@@ -65,12 +65,16 @@ async def test_invitation_carries_role_not_permissions(
     viewer = next(item for item in roles if item["name"] == "Viewer")
     invited = await client.post(
         "/api/v1/invitations",
-        json={"email": "invitee@example.com", "role_id": viewer["id"]},
+        json={
+            "email": "invitee@example.com",
+            "role_id": viewer["id"],
+            "permissions": viewer["permissions"],
+        },
     )
     assert invited.status_code == 200
     body = invited.json()["data"]
     assert body["role_id"] == viewer["id"]
-    assert "permissions" not in body
+    assert body["permissions"] == sorted(viewer["permissions"])
     assert "token" not in body
 
 

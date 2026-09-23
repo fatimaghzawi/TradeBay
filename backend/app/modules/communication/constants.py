@@ -70,8 +70,8 @@ class SystemEvent(StrEnum):
     DISPUTE_RESOLVED = "DISPUTE_RESOLVED"
 
 
-# Which conversation types carry a commercial context. DIRECT and SUPPORT are exempt from
-# the partial unique index on (context_type, context_id).
+# DIRECT and SUPPORT do not require a commercial document to open a thread.
+# Context on those types is optional metadata (latest RFQ/order), never a new chat.
 CONTEXTLESS_CONVERSATION_TYPES: frozenset[str] = frozenset(
     {ConversationType.DIRECT, ConversationType.SUPPORT}
 )

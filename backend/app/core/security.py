@@ -43,6 +43,14 @@ def generate_invitation_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def generate_otp_code(*, length: int = 6) -> str:
+    """Numeric one-time code for email verification (user types it in the app)."""
+    if length < 4 or length > 8:
+        raise ValueError("OTP length must be between 4 and 8")
+    upper = 10**length
+    return f"{secrets.randbelow(upper):0{length}d}"
+
+
 def create_access_token(
     *,
     settings: Settings,

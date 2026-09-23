@@ -24,6 +24,8 @@ dependencies = [
   "python-multipart>=0.0.18",
   "httpx>=0.28.0",
   "orjson>=3.10.0",
+  "reportlab>=4.2.0",
+  "sentry-sdk[fastapi]>=2.19.0",
 ]
 
 [project.optional-dependencies]

@@ -21,6 +21,7 @@ class CategoryDocument(MongoDocument):
     parent_category_id: OptionalDocumentId = None
     is_active: bool = True
     display_order: int = 0
+    image_url: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -36,8 +37,11 @@ class ProductDocument(MongoDocument):
     slug: str
     description: str | None = None
     unit: str = "unit"
+    origin: str | None = None
     moq: int = 1
+    lead_time_days: int = 0
     status: str = "draft"
+    is_featured: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -53,14 +57,17 @@ class ProductPriceDocument(MongoDocument):
     is_active: bool = True
     created_at: datetime
     updated_at: datetime
+    deleted_at: datetime | None = None
 
 
 class ProductImageDocument(MongoDocument):
     product_id: DocumentId
     url: str
     alt_text: str | None = None
-    sort_order: int = 0
+    is_primary: bool = False
+    display_order: int = 0
     created_at: datetime
+    deleted_at: datetime | None = None
 
 
 class InventoryDocument(MongoDocument):

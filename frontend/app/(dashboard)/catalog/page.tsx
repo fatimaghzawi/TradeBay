@@ -1,11 +1,6 @@
-﻿import { DomainPlaceholder } from "@/components/shared/DomainPlaceholder";
+﻿import { redirect } from "next/navigation";
+import { ROUTES } from "@/lib/constants";
 
-export default function CatalogPage() {
-  return (
-    <DomainPlaceholder
-      domain="catalog"
-      title="Catalog"
-      description="Manage products, supplier listings, and commercial terms."
-    />
-  );
+export default function CatalogRedirectPage() {
+  redirect(ROUTES.inventoryProducts);
 }

@@ -1,5 +1,9 @@
-﻿"""Negotiation domain — offer history separate from Quotation/Order.
+"""Negotiation — offer chains separate from Quotation/Order documents.
 
 Commercial truth remains Quotation → Order in procurement.
-Future flow: Conversation → Negotiation → Accepted Offer → Quotation → Order.
+
+Read in this order:
+
+1. ``constants.py`` · ``models.py``
+2. ``service.py`` · ``router.py``
 """

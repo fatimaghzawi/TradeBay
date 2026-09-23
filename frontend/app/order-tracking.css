@@ -1,0 +1,616 @@
+/* ── Order tracking — Shein-style stepper (clean icons + smooth motion) ─ */
+
+@keyframes tb-shein-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tb-shein-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--shein-accent) 28%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+.tb-shein {
+  --shein-ink: var(--tb-ink, #14201b);
+  --shein-muted: var(--tb-muted-foreground, #5a6560);
+  --shein-accent: var(--tb-primary, #0d3b2a);
+  --shein-line: #e2e8e4;
+  --shein-soft: #f4f7f5;
+  --shein-done: #1a6b4f;
+  display: grid;
+  gap: 1.15rem;
+  min-width: 0;
+  animation: tb-shein-in 0.4s ease both;
+}
+
+.tb-shein-kicker {
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--shein-accent);
+}
+
+.tb-shein-hero h1 {
+  margin: 0.2rem 0 0.35rem;
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: clamp(1.55rem, 2.8vw, 2rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--shein-ink);
+}
+
+.tb-shein-hero > p {
+  margin: 0;
+  max-width: 34rem;
+  color: var(--shein-muted);
+  line-height: 1.45;
+}
+
+.tb-shein-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tb-shein-nav > a {
+  color: var(--shein-accent);
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+
+.tb-shein-nav > a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tb-shein-nav__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.tb-shein-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.tb-shein-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--shein-line);
+  border-radius: 0.95rem;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.tb-shein-card:hover {
+  border-color: color-mix(in srgb, var(--shein-accent) 35%, var(--shein-line));
+  box-shadow: 0 12px 28px -22px rgba(13, 59, 42, 0.4);
+}
+
+.tb-shein-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.tb-shein-card__top strong {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+}
+
+.tb-shein-card__top span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--shein-muted);
+}
+
+.tb-shein-card__top em {
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 750;
+  color: var(--shein-done);
+  white-space: nowrap;
+}
+
+.tb-shein-card__mini {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.35rem;
+  padding: 0.15rem 0;
+}
+
+.tb-shein-card__mini > span {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--shein-line);
+  color: #9aa8a0;
+  background: var(--shein-soft);
+}
+
+.tb-shein-card__mini > span svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.tb-shein-card__mini > span[data-on] {
+  border-color: color-mix(in srgb, var(--shein-done) 40%, var(--shein-line));
+  color: var(--shein-done);
+  background: #e8f3ee;
+}
+
+.tb-shein-card__mini > span[data-now] {
+  border-color: var(--shein-accent);
+  color: #fff;
+  background: var(--shein-accent);
+}
+
+.tb-shein-card__eta {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--shein-ink);
+}
+
+.tb-shein-empty {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+  padding: 1.75rem 1.2rem;
+  border: 1px dashed var(--shein-line);
+  border-radius: 0.95rem;
+  background: var(--shein-soft);
+}
+
+.tb-shein-empty h2 {
+  margin: 0;
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: 1.25rem;
+}
+
+.tb-shein-empty p {
+  margin: 0 0 0.65rem;
+  color: var(--shein-muted);
+  max-width: 28rem;
+}
+
+/* Status header */
+.tb-shein-status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(12rem, 0.7fr);
+  gap: 1rem 1.15rem;
+  align-items: center;
+  padding: 1.15rem 1.2rem;
+  border: 1px solid var(--shein-line);
+  border-radius: 1.05rem;
+  background:
+    linear-gradient(135deg, #f7faf8 0%, #eef5f1 55%, #fff 100%);
+}
+
+.tb-shein-status__badge {
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--shein-accent);
+  animation: tb-shein-ring 2.4s ease-out infinite;
+}
+
+.tb-shein-status__badge svg {
+  width: 1.55rem;
+  height: 1.55rem;
+}
+
+.tb-shein-status__copy h1 {
+  margin: 0.15rem 0 0.3rem;
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: clamp(1.45rem, 2.6vw, 1.85rem);
+  font-weight: 650;
+  color: var(--shein-ink);
+}
+
+.tb-shein-status__copy > p:last-child {
+  margin: 0;
+  color: var(--shein-muted);
+  line-height: 1.4;
+  font-size: 0.92rem;
+}
+
+.tb-shein-status__eta {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.75rem;
+  background: #fff;
+  border: 1px solid var(--shein-line);
+}
+
+.tb-shein-status__eta > span {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--shein-muted);
+}
+
+.tb-shein-status__eta strong {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--shein-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.tb-shein-status__eta em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--shein-muted);
+}
+
+/* Classic Shein horizontal stepper */
+.tb-shein-stepper {
+  position: relative;
+  padding: 0.35rem 0.25rem 0.15rem;
+}
+
+.tb-shein-stepper__line {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 1.55rem;
+  height: 2px;
+  background: var(--shein-line);
+  z-index: 0;
+  overflow: hidden;
+}
+
+.tb-shein-stepper__line > span {
+  display: block;
+  height: 100%;
+  background: var(--shein-done);
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tb-shein-stepper__list {
+  position: relative;
+  z-index: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.tb-shein-stepper__list li {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  text-align: center;
+}
+
+.tb-shein-stepper__icon {
+  width: 2.85rem;
+  height: 2.85rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--shein-line);
+  background: #fff;
+  color: #9aa8a0;
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease;
+}
+
+.tb-shein-stepper__icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.tb-shein-stepper__list li[data-done] .tb-shein-stepper__icon {
+  border-color: var(--shein-done);
+  background: #e8f3ee;
+  color: var(--shein-done);
+}
+
+.tb-shein-stepper__list li[data-current] .tb-shein-stepper__icon {
+  border-color: var(--shein-accent);
+  background: var(--shein-accent);
+  color: #fff;
+  animation: tb-shein-ring 2.4s ease-out infinite;
+}
+
+.tb-shein-stepper__list strong {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--shein-ink);
+}
+
+.tb-shein-stepper__list em {
+  font-style: normal;
+  font-size: 0.68rem;
+  color: var(--shein-muted);
+}
+
+.tb-shein-stepper__list li[data-todo] strong,
+.tb-shein-stepper__list li[data-todo] em {
+  color: #9aa8a0;
+}
+
+.tb-shein-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(16rem, 0.8fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.tb-shein-panel {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.1rem 1.15rem;
+  border: 1px solid var(--shein-line);
+  border-radius: 0.95rem;
+  background: #fff;
+}
+
+.tb-shein-panel h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.tb-shein-panel h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--shein-muted);
+}
+
+.tb-shein-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.tb-shein-timeline li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--shein-line);
+}
+
+.tb-shein-timeline li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.tb-shein-timeline__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-top: 0.4rem;
+  border-radius: 50%;
+  background: #c5d2cb;
+}
+
+.tb-shein-timeline li[data-first] .tb-shein-timeline__dot {
+  background: var(--shein-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--shein-accent) 14%, transparent);
+}
+
+.tb-shein-timeline strong {
+  display: block;
+  font-size: 0.92rem;
+}
+
+.tb-shein-timeline p {
+  margin: 0.15rem 0;
+  font-size: 0.82rem;
+  color: var(--shein-muted);
+}
+
+.tb-shein-timeline time {
+  font-size: 0.72rem;
+  color: var(--shein-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tb-shein-items,
+.tb-shein-ships {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.tb-shein-items li,
+.tb-shein-ships a {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.55rem;
+  background: var(--shein-soft);
+}
+
+.tb-shein-items span,
+.tb-shein-ships span {
+  font-size: 0.74rem;
+  color: var(--shein-muted);
+}
+
+.tb-shein-ships a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.tb-shein-ships a:hover {
+  outline: 1px solid color-mix(in srgb, var(--shein-accent) 30%, transparent);
+}
+
+.tb-shein-actions {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--shein-line);
+}
+
+.tb-shein-actions label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--shein-muted);
+}
+
+.tb-shein-actions input {
+  border: 1px solid #d0d4d7;
+  border-radius: 0.45rem;
+  padding: 0.5rem 0.65rem;
+  font: inherit;
+  font-size: 0.88rem;
+  background: #fff;
+}
+
+.tb-shein-actions .tb-inv-btn-accent {
+  background: linear-gradient(165deg, #22926a, #0d3b2a);
+  color: #fff;
+  border-color: transparent;
+}
+
+.tb-shein-actions .tb-inv-btn-accent:disabled {
+  opacity: 0.55;
+  color: #fff;
+}
+
+.tb-shein-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--shein-muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  .tb-shein-status,
+  .tb-shein-split {
+    grid-template-columns: 1fr;
+  }
+
+  .tb-shein-stepper__list em {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .tb-shein-stepper__list strong {
+    font-size: 0.68rem;
+  }
+
+  .tb-shein-stepper__icon {
+    width: 2.4rem;
+    height: 2.4rem;
+  }
+
+  .tb-shein-stepper__line {
+    top: 1.35rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-shein,
+  .tb-shein-status__badge,
+  .tb-shein-stepper__list li[data-current] .tb-shein-stepper__icon {
+    animation: none;
+  }
+
+  .tb-shein-stepper__line > span {
+    transition: none;
+  }
+}
+
+/* Dark mode — order tracking */
+html.dark .tb-shein {
+  --shein-ink: var(--tb-ink, #f3f5f8);
+  --shein-muted: var(--tb-muted-fg, #c5ced9);
+  --shein-accent: var(--tb-accent, #5dcc9a);
+  --shein-line: var(--tb-line, rgba(210, 220, 232, 0.16));
+  --shein-soft: var(--tb-surface-muted, #1c232f);
+  --shein-done: #5dcc9a;
+}
+
+html.dark .tb-shein-hero,
+html.dark .tb-shein-status,
+html.dark .tb-shein-stepper,
+html.dark .tb-shein-card,
+html.dark .tb-shein-panel,
+html.dark .tb-shein-aside {
+  background: var(--tb-surface, #222a36) !important;
+  border-color: var(--tb-line) !important;
+  color: var(--tb-ink);
+  box-shadow: none !important;
+}
+
+html.dark .tb-shein-hero {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, #5dcc9a 12%, #222a36) 0%, #222a36 55%, #1c232f 100%) !important;
+}
+
+html.dark .tb-shein-stepper__icon,
+html.dark .tb-shein-stepper__list li {
+  background: var(--tb-raise, #2f3848) !important;
+  border-color: var(--tb-line) !important;
+  color: var(--tb-ink);
+}
+
+html.dark .tb-shein-stepper__list li[data-done] .tb-shein-stepper__icon,
+html.dark .tb-shein-stepper__list li[data-current] .tb-shein-stepper__icon {
+  background: color-mix(in srgb, #5dcc9a 22%, var(--tb-raise)) !important;
+  color: #5dcc9a !important;
+  border-color: color-mix(in srgb, #5dcc9a 45%, var(--tb-line)) !important;
+}
+
+html.dark .tb-shein-nav > a,
+html.dark .tb-shein-kicker {
+  color: var(--tb-accent, #5dcc9a);
+}
+
+html.dark .tb-shein-status__badge {
+  background: color-mix(in srgb, #5dcc9a 18%, var(--tb-raise));
+  color: #5dcc9a;
+}

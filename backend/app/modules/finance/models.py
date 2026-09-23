@@ -96,13 +96,15 @@ class CreditNoteDocument(MongoDocument):
 
     credit_note_number: str
     invoice_id: DocumentId
+    buyer_business_id: DocumentId
     order_id: OptionalDocumentId = None
-    reason: str | None = None
+    reason: str
     amount: Money
     currency: str = "USD"
     status: str
     lines: list[CreditNoteLineEmbedded] = Field(default_factory=list)
     issued_at: datetime | None = None
+    applied_at: datetime | None = None
     created_by: OptionalDocumentId = None
     created_at: datetime
     updated_at: datetime
@@ -113,12 +115,15 @@ class RefundDocument(MongoDocument):
 
     refund_number: str
     payment_id: DocumentId
+    credit_note_id: OptionalDocumentId = None
     invoice_id: OptionalDocumentId = None
+    buyer_business_id: DocumentId
     order_id: OptionalDocumentId = None
     amount: Money
     currency: str = "USD"
     reason: str | None = None
     status: str
+    refund_reference: str | None = None
     processed_at: datetime | None = None
     created_by: OptionalDocumentId = None
     created_at: datetime

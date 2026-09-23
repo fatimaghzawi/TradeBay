@@ -1,4 +1,7 @@
-"""Identity repositories — persistence only."""
+"""Identity repositories — persistence only (no business rules).
+
+Each class maps to one ``CollectionName``. Services call these; routers do not.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +10,7 @@ from typing import Any
 from bson import ObjectId
 
 from app.db.collections import CollectionName
+from app.modules.identity.constants import MembershipStatus
 from app.shared.repositories.base import BaseRepository, MongoSession
 from app.shared.utils.objectid import parse_object_id
 
@@ -17,12 +21,33 @@ class UserRepository(BaseRepository):
     async def get_by_email(self, email: str) -> dict[str, Any] | None:
         return await self.find_one({"email": email.lower().strip()})
 
+    async def set_avatar_url_for_ids(
+        self,
+        user_ids: list[Any],
+        url: str,
+        *,
+        updated_at: Any,
+    ) -> None:
+        ids = [parse_object_id(str(user_id)) for user_id in user_ids if user_id is not None]
+        if not ids:
+            return
+        await self.collection.update_many(
+            {"_id": {"$in": ids}},
+            {"$set": {"avatar_url": url, "updated_at": updated_at}},
+        )
+
 
 class BusinessRepository(BaseRepository):
     collection_name = CollectionName.BUSINESS_ACCOUNTS
 
     async def list_for_user(self, user_id: str | ObjectId) -> list[dict[str, Any]]:
         raise NotImplementedError("Resolve businesses through memberships, never a global scan")
+
+    async def get_by_email_domain(self, email_domain: str) -> dict[str, Any] | None:
+        domain = email_domain.lower().strip()
+        if not domain:
+            return None
+        return await self.find_one({"email_domain": domain})
 
 
 class MembershipRepository(BaseRepository):
@@ -39,24 +64,47 @@ class MembershipRepository(BaseRepository):
             {
                 "user_id": parse_object_id(str(user_id)),
                 "business_account_id": parse_object_id(str(business_account_id)),
-                "status": "active",
+                "status": MembershipStatus.ACTIVE,
             },
             session=session,
         )
 
     async def list_for_user(self, user_id: str | ObjectId) -> list[dict[str, Any]]:
         return await self.find_many(
-            {"user_id": parse_object_id(str(user_id)), "status": "active"},
+            {"user_id": parse_object_id(str(user_id)), "status": MembershipStatus.ACTIVE},
             limit=100,
+            sort=[("joined_at", -1), ("created_at", -1)],
         )
 
     async def list_for_business(self, business_account_id: str | ObjectId) -> list[dict[str, Any]]:
         return await self.find_many(
             {
                 "business_account_id": parse_object_id(str(business_account_id)),
-                "status": {"$in": ["active", "invited", "suspended"]},
+                "status": {
+                    "$in": [
+                        MembershipStatus.ACTIVE,
+                        MembershipStatus.INVITED,
+                        MembershipStatus.SUSPENDED,
+                    ]
+                },
             },
             limit=200,
+        )
+
+    async def get_for_user_business(
+        self,
+        user_id: str | ObjectId,
+        business_account_id: str | ObjectId,
+        *,
+        session: MongoSession = None,
+    ) -> dict[str, Any] | None:
+        """Any membership row for (user, business), regardless of status."""
+        return await self.find_one(
+            {
+                "user_id": parse_object_id(str(user_id)),
+                "business_account_id": parse_object_id(str(business_account_id)),
+            },
+            session=session,
         )
 
 
@@ -69,6 +117,15 @@ class PermissionRepository(BaseRepository):
 
     async def get_by_resource_action(self, resource: str, action: str) -> dict[str, Any] | None:
         return await self.find_one({"resource": resource, "action": action})
+
+    async def codes_for_ids(self, permission_ids: list[ObjectId]) -> set[str]:
+        if not permission_ids:
+            return set()
+        rows = await self.find_many(
+            {"_id": {"$in": list(permission_ids)}},
+            limit=max(len(permission_ids), 1),
+        )
+        return {f"{row['resource']}.{row['action']}" for row in rows}
 
 
 class RolePermissionRepository(BaseRepository):
@@ -121,6 +178,19 @@ class AuthTokenRepository(BaseRepository):
     async def get_by_hash(self, token_hash: str) -> dict[str, Any] | None:
         return await self.find_one({"token_hash": token_hash})
 
+    async def get_latest_open(
+        self, user_id: str | ObjectId, purpose: str
+    ) -> dict[str, Any] | None:
+        return await self.collection.find_one(
+            {
+                "user_id": parse_object_id(str(user_id)),
+                "purpose": purpose,
+                "used_at": None,
+                "invalidated_at": None,
+            },
+            sort=[("created_at", -1)],
+        )
+
     async def invalidate_open(
         self,
         user_id: str | ObjectId,
@@ -156,6 +226,24 @@ class SessionRepository(BaseRepository):
     ) -> dict[str, Any] | None:
         return await self.update(session_id, {"revoked_at": revoked_at}, session=session)
 
+    async def revoke_if_active(
+        self,
+        session_id: str | ObjectId,
+        revoked_at: Any,
+        *,
+        session: MongoSession = None,
+    ) -> dict[str, Any] | None:
+        """Compare-and-swap revoke — returns None if already revoked (refresh race)."""
+        oid = session_id if isinstance(session_id, ObjectId) else parse_object_id(str(session_id))
+        from pymongo import ReturnDocument
+
+        return await self.collection.find_one_and_update(
+            {"_id": oid, "revoked_at": None},
+            {"$set": {"revoked_at": revoked_at}},
+            return_document=ReturnDocument.AFTER,
+            session=session,
+        )
+
     async def revoke_all_for_user(
         self,
         user_id: str | ObjectId,
@@ -183,6 +271,25 @@ class SessionRepository(BaseRepository):
             limit=100,
             sort=[("last_used_at", -1), ("created_at", -1)],
         )
+
+    async def clear_active_business_for_user(
+        self,
+        user_id: str | ObjectId,
+        business_account_id: str | ObjectId,
+        *,
+        session: MongoSession = None,
+    ) -> int:
+        """Drop stale active-business pointers after membership removal."""
+        result = await self.collection.update_many(
+            {
+                "user_id": parse_object_id(str(user_id)),
+                "active_business_account_id": parse_object_id(str(business_account_id)),
+                "revoked_at": None,
+            },
+            {"$set": {"active_business_account_id": None}},
+            session=session,
+        )
+        return int(result.modified_count)
 
 
 class SupplierProfileRepository(BaseRepository):

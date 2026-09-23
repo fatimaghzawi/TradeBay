@@ -14,11 +14,13 @@ jobs:
         image: mongo:7
         ports:
           - 27017:27017
+        command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
         options: >-
-          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
+          --health-cmd "mongosh --quiet --eval 'try { rs.status().ok } catch (e) { rs.initiate({ _id: \"rs0\", members: [{ _id: 0, host: \"localhost:27017\" }] }).ok }'"
           --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
+          --health-timeout 10s
+          --health-retries 12
+          --health-start-period 25s
     defaults:
       run:
         working-directory: backend
@@ -27,7 +29,7 @@ jobs:
       APP_NAME: TradeBay
       SECRET_KEY: ci-secret-key-min-32-characters!!!!
       JWT_SECRET_KEY: ci-jwt-secret-key-32-characters!!!
-      MONGODB_URI: mongodb://localhost:27017
+      MONGODB_URI: mongodb://localhost:27017/?replicaSet=rs0&directConnection=true
       MONGODB_DATABASE: tradebay_ci
       CORS_ORIGINS: http://localhost:3000
       FRONTEND_URL: http://localhost:3000

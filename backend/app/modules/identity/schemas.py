@@ -9,17 +9,53 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from app.modules.identity.password import validate_password
 
 
+def _normalize_lebanon_phone(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if cleaned == "":
+        return None
+    digits = "".join(ch for ch in cleaned if ch.isdigit())
+    if digits.startswith("961"):
+        digits = digits[3:]
+    elif digits.startswith("0"):
+        digits = digits[1:]
+    if len(digits) != 8 or not digits.isdigit():
+        raise ValueError("Phone must be +961 followed by exactly 8 digits")
+    return f"+961{digits}"
+
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     business_name: str | None = Field(default=None, max_length=200)
+    business_type: str | None = Field(default=None, max_length=20)
+    invitation_token: str | None = Field(default=None, max_length=200)
 
     @field_validator("password")
     @classmethod
     def password_policy(cls, value: str) -> str:
         return validate_password(value)
+
+    @field_validator("business_type")
+    @classmethod
+    def business_type_allowed(cls, value: str | None) -> str | None:
+        if value is None or value == "":
+            return None
+        normalized = value.strip().lower()
+        if normalized not in {"buyer", "supplier"}:
+            raise ValueError("business_type must be buyer or supplier")
+        return normalized
+
+    @field_validator("invitation_token")
+    @classmethod
+    def invitation_token_clean(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
 
 
 class LoginRequest(BaseModel):
@@ -35,6 +71,7 @@ class UserPublic(BaseModel):
     first_name: str
     last_name: str
     status: str
+    avatar_url: str | None = None
     email_verified_at: datetime | None = None
 
 
@@ -56,7 +93,20 @@ class BusinessPublic(BaseModel):
     tax_number: str | None = None
     contact_email: str | None = None
     contact_phone: str | None = None
+    email_domain: str | None = None
+    logo_url: str | None = None
+    cover_url: str | None = None
     address: AddressInput | None = None
+    description: str | None = None
+    website: str | None = None
+    year_established: int | None = None
+    company_size: str | None = None
+    industry_categories: list[str] | None = None
+    business_tags: list[str] | None = None
+    verification_status: str | None = None
+    verification_documents: list[dict[str, object]] | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class MembershipPublic(BaseModel):
@@ -81,7 +131,22 @@ class CreateBusinessRequest(BaseModel):
     tax_number: str | None = None
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(default=None, max_length=40)
+    email_domain: str | None = Field(default=None, max_length=253)
     address: AddressInput | None = None
+
+    @field_validator("contact_phone")
+    @classmethod
+    def lebanon_phone(cls, value: str | None) -> str | None:
+        return _normalize_lebanon_phone(value)
+
+    @field_validator("email_domain")
+    @classmethod
+    def company_domain(cls, value: str | None) -> str | None:
+        from app.modules.identity.company_domain import validate_company_email_domain
+
+        if value is None or not str(value).strip():
+            return None
+        return validate_company_email_domain(value)
 
 
 class SwitchBusinessRequest(BaseModel):
@@ -89,15 +154,19 @@ class SwitchBusinessRequest(BaseModel):
 
 
 class VerifyEmailRequest(BaseModel):
-    token: str = Field(min_length=8, max_length=256)
+    """Email OTP (6 digits). Slightly wider max for validation-error test inputs."""
 
+    token: str = Field(min_length=6, max_length=64)
+    email: EmailStr | None = None
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
 
 class ResetPasswordRequest(BaseModel):
-    token: str = Field(min_length=8, max_length=256)
+    """Password reset OTP (6 digits). Slightly wider max for validation-error test inputs."""
+
+    token: str = Field(min_length=6, max_length=64)
     password: str = Field(min_length=8, max_length=128)
 
     @field_validator("password")
@@ -121,8 +190,18 @@ class ResendVerificationRequest(BaseModel):
 
 
 class CreateInvitationRequest(BaseModel):
+    """Invite a teammate.
+
+    `email` is the personal inbox that receives the invitation link.
+    `company_email` is the TradeBay login identity (must use the company domain).
+    When omitted, the server generates `{local-part}@{company_domain}` from `email`.
+    """
+
     email: EmailStr
+    company_email: EmailStr | None = None
     role_id: str = Field(min_length=24, max_length=24)
+    """Permission codes to grant (required; must be a subset of the role and the inviter)."""
+    permissions: list[str] = Field(min_length=1)
 
 
 class AcceptInvitationRequest(BaseModel):
@@ -147,6 +226,64 @@ class SuspendUserRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
 
+class PlatformCreateUserRequest(BaseModel):
+    """Platform staff provision a login account (no trading company)."""
+
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+
+    @field_validator("password")
+    @classmethod
+    def password_policy(cls, value: str) -> str:
+        return validate_password(value)
+
+
+class PlatformCreateTradingBusinessRequest(BaseModel):
+    """Platform staff provision a buyer or supplier with an owner admin."""
+
+    account_type: str = Field(min_length=5, max_length=20)
+    business_name: str = Field(min_length=1, max_length=200)
+    owner_email: EmailStr
+    owner_password: str = Field(min_length=8, max_length=128)
+    owner_first_name: str = Field(min_length=1, max_length=100)
+    owner_last_name: str = Field(min_length=1, max_length=100)
+    email_domain: str | None = Field(default=None, max_length=253)
+    legal_name: str | None = Field(default=None, max_length=200)
+    tax_number: str | None = Field(default=None, max_length=64)
+    contact_email: EmailStr | None = None
+    contact_phone: str | None = Field(default=None, max_length=40)
+    verify_supplier: bool = True
+
+    @field_validator("owner_password")
+    @classmethod
+    def password_policy(cls, value: str) -> str:
+        return validate_password(value)
+
+    @field_validator("account_type")
+    @classmethod
+    def account_type_allowed(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"buyer", "supplier"}:
+            raise ValueError("account_type must be buyer or supplier")
+        return normalized
+
+    @field_validator("contact_phone")
+    @classmethod
+    def lebanon_phone(cls, value: str | None) -> str | None:
+        return _normalize_lebanon_phone(value)
+
+    @field_validator("email_domain")
+    @classmethod
+    def company_domain(cls, value: str | None) -> str | None:
+        from app.modules.identity.company_domain import validate_company_email_domain
+
+        if value is None or not str(value).strip():
+            return None
+        return validate_company_email_domain(value)
+
+
 class SuspendMembershipRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
@@ -163,4 +300,60 @@ class UpdateBusinessRequest(BaseModel):
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(default=None, max_length=40)
     address: AddressInput | None = None
+    email_domain: str | None = Field(default=None, max_length=253)
+    description: str | None = Field(default=None, max_length=500)
+    website: str | None = Field(default=None, max_length=300)
+    year_established: int | None = Field(default=None, ge=1800, le=2100)
+    company_size: str | None = Field(default=None, max_length=64)
+    industry_categories: list[str] | None = Field(default=None, max_length=12)
+    business_tags: list[str] | None = Field(default=None, max_length=12)
+
+    @field_validator("contact_phone")
+    @classmethod
+    def lebanon_phone(cls, value: str | None) -> str | None:
+        return _normalize_lebanon_phone(value)
+
+    @field_validator("email_domain")
+    @classmethod
+    def company_domain(cls, value: str | None) -> str | None:
+        from app.modules.identity.company_domain import validate_company_email_domain
+
+        if value is None or not str(value).strip():
+            return None
+        return validate_company_email_domain(value)
+
+    @field_validator("industry_categories", "business_tags")
+    @classmethod
+    def normalize_tags(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        cleaned: list[str] = []
+        for item in value:
+            label = item.strip()
+            if label and label not in cleaned and len(label) <= 48:
+                cleaned.append(label)
+        return cleaned[:12]
+
+
+class VerificationDocumentInput(BaseModel):
+    document_type: str = Field(min_length=1, max_length=64)
+    file_name: str | None = Field(default=None, max_length=255)
+    url: str | None = Field(default=None, max_length=1000)
+
+
+class SubmitSupplierVerificationRequest(BaseModel):
+    documents: list[VerificationDocumentInput] = Field(min_length=3, max_length=10)
+
+
+class ReviewSupplierVerificationRequest(BaseModel):
+    decision: str = Field(min_length=6, max_length=16)
+    reason: str | None = Field(default=None, max_length=500)
+
+    @field_validator("decision")
+    @classmethod
+    def decision_allowed(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"approve", "reject", "revoke"}:
+            raise ValueError("decision must be approve, reject, or revoke")
+        return normalized
 

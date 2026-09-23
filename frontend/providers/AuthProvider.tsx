@@ -2,12 +2,10 @@
 
 import { ApiError } from "@/lib/api/client";
 import { authApi, type AuthUser } from "@/lib/api/authApi";
-import {
-  identityApi,
-  type Business,
-} from "@/lib/api/identityApi";
+import { identityApi, type Business } from "@/lib/api/identityApi";
 import { AUTH_QUERY_KEY, BUSINESSES_QUERY_KEY } from "@/lib/auth/session";
 import { ROUTES } from "@/lib/constants";
+import { isGuestAllowedPath } from "@/lib/guestAccess";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -21,12 +19,14 @@ import {
 
 type AuthContextValue = {
   user: AuthUser | null;
+  /** Active company from session — not client-switched. */
   business: Business | null;
+  /** Memberships for gate checks only (e.g. one-company create). Not a switcher. */
   businesses: Business[];
   permissions: string[];
+  roleName: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  setBusiness: (business: Business | null) => void;
   hasPermission: (code: string) => boolean;
   refreshSession: () => Promise<void>;
   logout: () => Promise<void>;
@@ -39,19 +39,25 @@ const PROTECTED_PREFIXES = [
   "/catalog",
   "/procurement",
   "/finance",
-  "/trust",
   "/settings",
   "/admin",
   "/conversations",
+  "/negotiations",
   "/ai-sourcing",
   "/business-planner",
   "/members",
   "/invitations",
   "/roles",
-  "/accept-invitation",
+  "/businesses",
+  "/audit",
+  "/orders",
+  "/quotations",
+  "/inventory",
+  "/suppliers",
 ];
 
 function isProtectedPath(pathname: string): boolean {
+  if (isGuestAllowedPath(pathname)) return false;
   return PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
@@ -66,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: AUTH_QUERY_KEY,
     queryFn: () => authApi.me(),
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 
   const businessesQuery = useQuery({
@@ -73,26 +80,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: () => identityApi.listBusinesses(),
     enabled: !!sessionQuery.data?.user,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 
   const user = sessionQuery.data?.user ?? null;
   const permissions = sessionQuery.data?.permissions ?? [];
+  const roleName =
+    sessionQuery.data?.role_name ??
+    sessionQuery.data?.active_business?.role_name ??
+    null;
   const businesses = useMemo(
     () => businessesQuery.data?.businesses ?? [],
     [businessesQuery.data?.businesses],
   );
 
   const business = useMemo(() => {
-    const activeId = sessionQuery.data?.active_business?.id;
-    if (activeId) {
-      return businesses.find((item) => item.id === activeId) ?? sessionQuery.data?.active_business ?? null;
-    }
-    return businesses[0] ?? null;
+    const active = sessionQuery.data?.active_business ?? null;
+    if (!active?.id) return null;
+    return businesses.find((item) => item.id === active.id) ?? active;
   }, [businesses, sessionQuery.data?.active_business]);
 
   const isLoading =
     sessionQuery.isLoading ||
-    (sessionQuery.isSuccess && !!user && businessesQuery.isLoading);
+    (sessionQuery.isFetching && !sessionQuery.data && !sessionQuery.isError);
 
   useEffect(() => {
     if (
@@ -112,24 +122,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionQuery.isLoading,
   ]);
 
-  const setBusiness = useCallback(
-    (next: Business | null) => {
-      if (!next) return;
-      void identityApi.switchBusiness(next.id).then(() => {
-        void queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
-      });
-    },
-    [queryClient],
-  );
-
   const hasPermission = useCallback(
     (code: string) => permissions.includes(code),
     [permissions],
   );
 
   const refreshSession = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
-    await queryClient.invalidateQueries({ queryKey: BUSINESSES_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: BUSINESSES_QUERY_KEY });
   }, [queryClient]);
 
   const logout = useCallback(async () => {
@@ -147,9 +147,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       business,
       businesses,
       permissions,
+      roleName,
       isLoading,
       isAuthenticated: !!user,
-      setBusiness,
       hasPermission,
       refreshSession,
       logout,
@@ -159,8 +159,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       business,
       businesses,
       permissions,
+      roleName,
       isLoading,
-      setBusiness,
       hasPermission,
       refreshSession,
       logout,

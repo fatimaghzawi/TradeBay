@@ -11,7 +11,9 @@ function makeQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 60 * 1000,
+        staleTime: 15 * 1000,
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
         retry: (failureCount, error) => {
           if (
             error &&

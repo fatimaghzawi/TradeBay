@@ -6,6 +6,13 @@ class RFQVisibility(StrEnum):
     INVITED = "invited"
 
 
+class RFQType(StrEnum):
+    """Two entry modes — product quote vs open sourcing requirement."""
+
+    PRODUCT = "product"
+    SOURCING = "sourcing"
+
+
 class RFQStatus(StrEnum):
     DRAFT = "draft"
     PUBLISHED = "published"
@@ -13,6 +20,14 @@ class RFQStatus(StrEnum):
     NEGOTIATING = "negotiating"
     AWARDED = "awarded"
     CANCELLED = "cancelled"
+    EXPIRED = "expired"
+
+
+class SupplierInviteStatus(StrEnum):
+    INVITED = "invited"
+    VIEWED = "viewed"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
     EXPIRED = "expired"
 
 
@@ -27,6 +42,7 @@ class QuotationStatus(StrEnum):
 
 
 class OrderStatus(StrEnum):
+    DRAFT = "draft"
     PENDING = "pending"
     CONFIRMED = "confirmed"
     PROCESSING = "processing"
@@ -56,7 +72,6 @@ class OrderPaymentStatus(StrEnum):
     REFUNDED = "refunded"
 
 
-# Controlled state-transition maps (enforcement deferred)
 RFQ_TRANSITIONS: dict[str, set[str]] = {
     RFQStatus.DRAFT: {RFQStatus.PUBLISHED, RFQStatus.CANCELLED},
     RFQStatus.PUBLISHED: {
@@ -84,14 +99,21 @@ QUOTATION_TRANSITIONS: dict[str, set[str]] = {
         QuotationStatus.WITHDRAWN,
     },
     QuotationStatus.NEGOTIATING: {
+        QuotationStatus.SUBMITTED,  # revision re-submit
         QuotationStatus.ACCEPTED,
         QuotationStatus.REJECTED,
         QuotationStatus.EXPIRED,
         QuotationStatus.WITHDRAWN,
     },
+    # Declining one counter must not kill the quote. A later take/counter can reopen it.
+    QuotationStatus.REJECTED: {
+        QuotationStatus.NEGOTIATING,
+        QuotationStatus.SUBMITTED,
+    },
 }
 
 ORDER_TRANSITIONS: dict[str, set[str]] = {
+    OrderStatus.DRAFT: {OrderStatus.PENDING, OrderStatus.CANCELLED},
     OrderStatus.PENDING: {OrderStatus.CONFIRMED, OrderStatus.CANCELLED},
     OrderStatus.CONFIRMED: {OrderStatus.PROCESSING, OrderStatus.CANCELLED, OrderStatus.DISPUTED},
     OrderStatus.PROCESSING: {OrderStatus.SHIPPED, OrderStatus.CANCELLED, OrderStatus.DISPUTED},
@@ -117,8 +139,15 @@ SHIPMENT_TRANSITIONS: dict[str, set[str]] = {
 }
 
 
-# Aliases used by scaffolded service modules
 RFQ_STATUS_TRANSITIONS = RFQ_TRANSITIONS
 ORDER_STATUS_TRANSITIONS = ORDER_TRANSITIONS
 QUOTATION_STATUS_TRANSITIONS = QUOTATION_TRANSITIONS
 SHIPMENT_STATUS_TRANSITIONS = SHIPMENT_TRANSITIONS
+
+
+def assert_transition(transitions: dict[str, set[str]], current: str, target: str) -> None:
+    from app.core.exceptions import BadRequestError
+
+    allowed = transitions.get(current, set())
+    if target not in allowed:
+        raise BadRequestError("This action isn’t available for the current status")

@@ -103,3 +103,13 @@ REFUND_STATUS_TRANSITIONS: dict[str, set[str]] = {
     RefundStatus.REQUESTED: {RefundStatus.APPROVED, RefundStatus.REJECTED},
     RefundStatus.APPROVED: {RefundStatus.PROCESSED, RefundStatus.REJECTED},
 }
+
+
+def assert_finance_transition(
+    transitions: dict[str, set[str]], current: str, target: str, *, label: str = "status"
+) -> None:
+    from app.core.exceptions import BadRequestError
+
+    allowed = transitions.get(current, set())
+    if target not in allowed:
+        raise BadRequestError("This action isn't available for the current status")

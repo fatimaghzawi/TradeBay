@@ -1,187 +1,160 @@
-﻿"use client";
+"use client";
 
-import { ApiError } from "@/lib/api/client";
-import { authApi } from "@/lib/api/authApi";
-import { identityApi } from "@/lib/api/identityApi";
-import { Alert } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { changePasswordSchema } from "@/lib/validation/auth";
+import { IdentityPageShell } from "@/components/identity/IdentityPageShell";
+import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
+import { ROUTES } from "@/lib/constants";
 import { useAuth } from "@/providers/AuthProvider";
-import { useState } from "react";
+import Link from "next/link";
+
+const LINKS = [
+  {
+    href: ROUTES.profile,
+    title: "My profile",
+    body: "Update your name and check email verification.",
+    glyph: "☺",
+    tone: "sales",
+  },
+  {
+    href: ROUTES.changePassword,
+    title: "Change password",
+    body: "Update your password. Other sessions will be signed out.",
+    glyph: "⛨",
+    tone: "admin",
+  },
+  {
+    href: ROUTES.sessions,
+    title: "Active sessions",
+    body: "Review devices and revoke sessions you don’t recognize.",
+    glyph: "◉",
+    tone: "viewer",
+  },
+  {
+    href: ROUTES.businesses,
+    title: "Business settings",
+    body: "Company profile, domain, and verification.",
+    glyph: "◈",
+    tone: "manager",
+  },
+  {
+    href: ROUTES.members,
+    title: "Team & access",
+    body: "Members, invitations, and role assignments.",
+    glyph: "◎",
+    tone: "teal",
+  },
+  {
+    href: ROUTES.roles,
+    title: "Roles & permissions",
+    body: "System and custom roles for this business.",
+    glyph: "★",
+    tone: "finance",
+  },
+  {
+    href: ROUTES.audit,
+    title: "Audit logs",
+    body: "Security and business events for the active company.",
+    glyph: "☰",
+    tone: "custom",
+  },
+] as const;
 
 export default function SettingsPage() {
-  const { user, refreshSession, logout } = useAuth();
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [businessName, setBusinessName] = useState("");
-  const [legalName, setLegalName] = useState("");
-  const [taxNumber, setTaxNumber] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [businessError, setBusinessError] = useState<string | null>(null);
-  const [businessMessage, setBusinessMessage] = useState<string | null>(null);
-  const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
-
+  const { user, business, hasPermission, roleName } = useAuth();
   const verified = Boolean(user?.email_verified_at);
+  const links = LINKS.filter((link) => {
+    if (link.href === ROUTES.audit) return hasPermission("audit_logs.read");
+    if (link.href === ROUTES.members) return hasPermission("users.read");
+    if (link.href === ROUTES.roles) return hasPermission("roles.read");
+    return true;
+  });
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-semibold text-primary">Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Identity settings for this account. Permission checks stay on the server.
-        </p>
-      </div>
-
-      <Card className="space-y-3 p-4">
-        <h2 className="text-lg font-medium">Email verification</h2>
-        {verified ? (
-          <Alert variant="success">Email verified. Commercial writes are allowed when you also hold the required permission.</Alert>
-        ) : (
-          <>
-            <Alert variant="warning">
-              Your email is not verified. You can sign in, but commercial writes are blocked until you verify.
-            </Alert>
-            {verifyMessage ? <Alert variant="success">{verifyMessage}</Alert> : null}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                void authApi
-                  .resendVerification()
-                  .then(() => setVerifyMessage("A new verification token was sent."))
-                  .catch((err) =>
-                    setVerifyMessage(err instanceof ApiError ? err.message : "Unable to resend."),
-                  );
-              }}
+    <IdentityPageShell
+      crumb="Account / Settings"
+      title="Account & Security"
+      lede={
+        <>
+          {user?.email ?? "Your account"}
+          {roleName ? ` · ${roleName}` : ""}
+          {business ? ` · ${business.name}` : ""}.
+        </>
+      }
+      banner={{
+        icon: verified ? "✓" : "!",
+        title: verified ? "Email verified." : "Email not verified.",
+        body: verified
+          ? "You can use trading features when your role includes the right access."
+          : "Verify your email before using trading features.",
+      }}
+      stats={[
+        {
+          icon: "☺",
+          tone: "teal",
+          value: user?.first_name
+            ? `${user.first_name} ${(user.last_name ?? "").slice(0, 1)}.`
+            : "You",
+          label: "Signed in as",
+        },
+        {
+          icon: verified ? "✓" : "!",
+          tone: verified ? "green" : "rose",
+          value: verified ? "Verified" : "Pending",
+          label: "Email",
+        },
+        {
+          icon: "◈",
+          tone: "orange",
+          value: business?.name ?? "—",
+          label: "Company",
+        },
+        {
+          icon: "★",
+          tone: "rose",
+          value: roleName ?? "—",
+          label: "Role",
+        },
+      ]}
+      quote="“A secure account is the first desk on the quay.”"
+    >
+      {!verified ? (
+        <div className="mt-2">
+          <FeedbackBanner tone="error" title="Email not verified">
+            Verify your email before using trading features.{" "}
+            <Link
+              href={`${ROUTES.verifyEmail}?email=${encodeURIComponent(user?.email ?? "")}`}
+              className="font-semibold underline underline-offset-2"
             >
-              Resend verification
-            </Button>
-          </>
-        )}
-      </Card>
+              Enter verification code
+            </Link>
+          </FeedbackBanner>
+        </div>
+      ) : null}
 
-      <Card className="space-y-3 p-4">
-        <h2 className="text-lg font-medium">Change password</h2>
-        {passwordError ? <Alert variant="error">{passwordError}</Alert> : null}
-        {passwordMessage ? <Alert variant="success">{passwordMessage}</Alert> : null}
-        <form
-          className="grid max-w-md gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setPasswordError(null);
-            setPasswordMessage(null);
-            const parsed = changePasswordSchema.safeParse({
-              current_password: currentPassword,
-              new_password: newPassword,
-              confirmPassword,
-            });
-            if (!parsed.success) {
-              setPasswordError(parsed.error.issues[0]?.message ?? "Invalid password");
-              return;
-            }
-            void authApi
-              .changePassword(parsed.data.current_password, parsed.data.new_password)
-              .then(() => {
-                setPasswordMessage("Password updated. Sign in again.");
-                void logout();
-              })
-              .catch((err) =>
-                setPasswordError(err instanceof ApiError ? err.message : "Unable to change password."),
-              );
-          }}
-        >
-          <Input
-            label="Current password"
-            name="current_password"
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-          />
-          <Input
-            label="New password"
-            name="new_password"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-          />
-          <Input
-            label="Confirm new password"
-            name="confirm_password"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-          />
-          <Button type="submit">Update password</Button>
-        </form>
-      </Card>
-
-      <Card className="space-y-3 p-4">
-        <h2 className="text-lg font-medium">Create another business</h2>
-        <p className="text-sm text-muted-foreground">
-          Requires a verified email. You become Business Admin of the new company. Roles stay isolated per business.
-        </p>
-        {businessError ? <Alert variant="error">{businessError}</Alert> : null}
-        {businessMessage ? <Alert variant="success">{businessMessage}</Alert> : null}
-        <form
-          className="grid max-w-md gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setBusinessError(null);
-            setBusinessMessage(null);
-            void identityApi
-              .createBusiness({
-                name: businessName,
-                legal_name: legalName || undefined,
-                tax_number: taxNumber || undefined,
-                contact_email: contactEmail || undefined,
-              })
-              .then((business) => {
-                setBusinessMessage(`Created ${business.name}. Switch to it from the top bar.`);
-                setBusinessName("");
-                void refreshSession();
-              })
-              .catch((err) =>
-                setBusinessError(
-                  err instanceof ApiError ? err.message : "Unable to create business.",
-                ),
-              );
-          }}
-        >
-          <Input
-            label="Display name"
-            name="business_name"
-            value={businessName}
-            onChange={(e) => setBusinessName(e.target.value)}
-          />
-          <Input
-            label="Legal name"
-            name="legal_name"
-            value={legalName}
-            onChange={(e) => setLegalName(e.target.value)}
-          />
-          <Input
-            label="Tax number"
-            name="tax_number"
-            value={taxNumber}
-            onChange={(e) => setTaxNumber(e.target.value)}
-          />
-          <Input
-            label="Contact email"
-            name="contact_email"
-            type="email"
-            value={contactEmail}
-            onChange={(e) => setContactEmail(e.target.value)}
-          />
-          <Button type="submit" disabled={!businessName}>
-            Create business
-          </Button>
-        </form>
-      </Card>
-    </div>
+      <ul className="tb-roles-list">
+        {links.map((link) => (
+          <li key={link.href} className="tb-roles-row">
+            <span
+              className="tb-roles-glyph"
+              data-tone={link.tone === "teal" ? "sales" : link.tone}
+              aria-hidden
+            >
+              {link.glyph}
+            </span>
+            <div className="tb-roles-row-main min-w-0 flex-1">
+              <Link href={link.href} className="tb-roles-row-name">
+                {link.title}
+              </Link>
+              <p className="tb-roles-row-desc">{link.body}</p>
+            </div>
+            <Link
+              href={link.href}
+              className="text-sm font-bold text-[var(--tb-accent)] hover:underline"
+            >
+              Open →
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </IdentityPageShell>
   );
 }

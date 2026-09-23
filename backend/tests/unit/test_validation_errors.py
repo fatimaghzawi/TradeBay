@@ -31,6 +31,6 @@ def test_custom_password_validator_returns_422_not_500() -> None:
             assert response.status_code == 422
             body = response.json()
             assert body["error"]["code"] == "VALIDATION_ERROR"
-            assert "Password must include at least one number" in str(body)
+            assert "Password must include at least one number" in body["error"]["message"]
 
     asyncio.run(_run())

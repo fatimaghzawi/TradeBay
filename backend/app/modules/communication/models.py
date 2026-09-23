@@ -19,9 +19,9 @@ from app.shared.types.ids import DocumentId, OptionalDocumentId
 class ConversationDocument(MongoDocument):
     """A two-company thread.
 
-    `last_message_at`, `last_message_preview` and `message_count` are denormalized for
-    inbox sorting only; `messages` stays the source of truth and a rebuild from it alone
-    must always be possible.
+    One inbox conversation exists per company pair. RFQ, order, or direct opens
+    reuse that thread; `context_type` / `context_id` are the latest deal breadcrumb,
+    not a separate chat.
     """
 
     subject: str | None = None

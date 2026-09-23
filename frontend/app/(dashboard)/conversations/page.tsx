@@ -1,18 +1,20 @@
-﻿import { DomainPlaceholder } from "@/components/shared/DomainPlaceholder";
-import Link from "next/link";
-import { Button } from "@/components/ui/Button";
+﻿"use client";
 
-export default function ConversationsPage() {
-  return (
-    <div className="space-y-6">
-      <DomainPlaceholder
-        domain="Communication"
+import { ChatEmptyStage } from "@/components/communication/ChatInbox";
+import { InventoryPageHeader } from "@/components/catalog/InventoryUi";
+import { useAuth } from "@/providers/AuthProvider";
+
+export default function ConversationsIndexPage() {
+  const { hasPermission } = useAuth();
+
+  if (!hasPermission("conversations.read")) {
+    return (
+      <InventoryPageHeader
         title="Conversations"
-        description="Conversation list skeleton. Real-time messaging and WebSockets are deferred."
+        description="You don't have access to messages. Contact your business administrator if you need access."
       />
-      <Link href="/conversations/preview">
-        <Button variant="outline">Open conversation placeholder</Button>
-      </Link>
-    </div>
-  );
+    );
+  }
+
+  return <ChatEmptyStage />;
 }

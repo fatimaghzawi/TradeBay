@@ -1,21 +1,16 @@
-﻿import { Button } from "@/components/ui/Button";
-import Link from "next/link";
+﻿import { NotFoundState } from "@/components/ui/NotFoundState";
+import { ROUTES } from "@/lib/constants";
 
 export default function NotFound() {
   return (
-    <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-start justify-center px-6">
-      <p className="text-sm font-semibold uppercase tracking-wider text-secondary">
-        404
-      </p>
-      <h1 className="font-display mt-2 text-3xl font-semibold text-primary">
-        Page not found
-      </h1>
-      <p className="mt-3 text-sm text-muted-foreground">
-        The route you requested is not part of this TradeBay shell yet.
-      </p>
-      <Link href="/" className="mt-6">
-        <Button>Back to home</Button>
-      </Link>
+    <div className="tb-app flex min-h-[70vh] items-center justify-center px-4">
+      <NotFoundState
+        size="page"
+        title="Page not found"
+        message="This route isn’t on the bay — it may have moved, or the link is incomplete."
+        homeHref={ROUTES.home}
+        homeLabel="Back to home"
+      />
     </div>
   );
 }

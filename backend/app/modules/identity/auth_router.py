@@ -1,4 +1,8 @@
-"""Authentication API routes — BRD paths with legacy aliases retained."""
+"""Authentication HTTP routes under ``/api/v1/auth``.
+
+Canonical paths follow the BRD. Older path aliases remain with
+``include_in_schema=False`` so existing clients keep working.
+"""
 
 from __future__ import annotations
 
@@ -30,6 +34,9 @@ from app.modules.identity.service import AuthService
 from app.shared.schemas.response import success
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+# ── Cookie helpers ───────────────────────────────────────────────────────────
 
 
 def _set_auth_cookies(response: Response, settings: Settings, tokens: dict[str, Any]) -> None:
@@ -64,6 +71,9 @@ def _clear_auth_cookies(response: Response, settings: Settings) -> None:
     response.delete_cookie(REFRESH_COOKIE_NAME, **common)
 
 
+# ── Register / login / logout / refresh / me ─────────────────────────────────
+
+
 @router.post("/register", summary="Register a new user")
 async def register(
     body: RegisterRequest,
@@ -78,6 +88,8 @@ async def register(
         first_name=body.first_name,
         last_name=body.last_name,
         business_name=body.business_name,
+        business_type=body.business_type,
+        invitation_token=body.invitation_token,
         ip_address=client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
@@ -168,7 +180,12 @@ async def refresh(
     )
 
 
-@router.get("/me", summary="Current authenticated user and business context", response_model=None)
+@router.get(
+    "/me",
+    summary="Current authenticated user and business context",
+    description="Canonical session context. Prefer this over GET /me.",
+    response_model=None,
+)
 async def me(
     auth: Annotated[AuthContext, Depends(get_current_user)],
     service: Annotated[AuthService, Depends(get_auth_service)],
@@ -177,12 +194,19 @@ async def me(
     return success(AuthMeResponse(**payload).model_dump())
 
 
+# ── Email verification (canonical + legacy alias) ────────────────────────────
+
+
 async def _verify_email(
     body: VerifyEmailRequest,
     request: Request,
     service: AuthService,
 ) -> dict[str, Any]:
-    result = await service.verify_email(raw_token=body.token, ip_address=client_ip(request))
+    result = await service.verify_email(
+        raw_token=body.token,
+        email=str(body.email) if body.email else None,
+        ip_address=client_ip(request),
+    )
     return success(result)
 
 
@@ -240,6 +264,9 @@ async def resend_verification_legacy(
 ) -> dict[str, Any]:
     await service.resend_verification(user_id=auth.user_id)
     return success({"requested": True})
+
+
+# ── Password forgot / reset / change (canonical + legacy aliases) ─────────────
 
 
 @router.post("/forgot-password", summary="Request a password-reset token")

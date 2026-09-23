@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
@@ -21,9 +22,35 @@ from app.core.middleware import (
 )
 from app.db.health import mongodb_is_healthy
 from app.db.mongodb import mongo_manager
+from app.modules.catalog.storage import CATEGORY_UPLOAD_DIR, PRODUCT_UPLOAD_DIR, UPLOAD_ROOT
+from app.modules.identity.storage import BUSINESS_UPLOAD_DIR
 from app.shared.schemas.response import success
 
 logger = get_logger(__name__)
+
+
+def _configure_sentry(settings: Settings) -> None:
+    dsn = (settings.sentry_dsn or "").strip()
+    if not dsn:
+        return
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+    except ImportError:
+        logger.warning("sentry_sdk_missing")
+        return
+    sentry_sdk.init(
+        dsn=dsn,
+        environment=str(settings.app_env),
+        traces_sample_rate=0.1 if settings.is_production else 0.0,
+        send_default_pii=False,
+        integrations=[
+            StarletteIntegration(transaction_style="endpoint"),
+            FastApiIntegration(transaction_style="endpoint"),
+        ],
+    )
+    logger.info("sentry_configured", environment=str(settings.app_env))
 
 
 @asynccontextmanager
@@ -42,12 +69,13 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    _configure_sentry(settings)
     app = FastAPI(
         title=settings.app_name,
         version="0.1.0",
         description=(
             "TradeBay modular monolith API. "
-            "Domains: Identity, Catalog, Procurement, Finance, Platform Money, Trust, AI."
+            "Domains: Identity, Catalog, Procurement, Finance, Platform Money, AI."
         ),
         docs_url=settings.docs_url,
         redoc_url=settings.redoc_url,
@@ -55,21 +83,49 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Outermost first for responses: CORS must wrap everything so browser
+    # errors (incl. 401/500) still get Access-Control-Allow-Origin.
+    app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(RateLimitMiddleware, settings=settings)
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
+        allow_origin_regex=(
+            r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+            if not settings.is_production
+            else None
+        ),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
         expose_headers=["X-Request-ID"],
     )
-    app.add_middleware(SecurityHeadersMiddleware)
-    app.add_middleware(RateLimitMiddleware, settings=settings)
-    app.add_middleware(RequestContextMiddleware)
 
     register_exception_handlers(app)
     app.include_router(api_router)
 
+    # Public catalog product + category images only. Delivery evidence is served via
+    # authenticated procurement routes — never mount the whole uploads tree.
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    PRODUCT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    CATEGORY_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    BUSINESS_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    app.mount(
+        "/uploads/products",
+        StaticFiles(directory=str(PRODUCT_UPLOAD_DIR)),
+        name="product_uploads",
+    )
+    app.mount(
+        "/uploads/categories",
+        StaticFiles(directory=str(CATEGORY_UPLOAD_DIR)),
+        name="category_uploads",
+    )
+    app.mount(
+        "/uploads/businesses",
+        StaticFiles(directory=str(BUSINESS_UPLOAD_DIR)),
+        name="business_uploads",
+    )
     @app.get("/health", tags=["Health"], summary="Liveness probe")
     async def health() -> dict[str, Any]:
         return success(

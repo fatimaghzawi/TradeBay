@@ -21,6 +21,7 @@ class NegotiationOfferStatus(StrEnum):
 NEGOTIATION_TRANSITIONS: dict[str, set[str]] = {
     NegotiationStatus.OPEN: {
         NegotiationStatus.IN_PROGRESS,
+        NegotiationStatus.AGREED,
         NegotiationStatus.CANCELLED,
         NegotiationStatus.EXPIRED,
     },

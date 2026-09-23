@@ -36,8 +36,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Coverage / artifacts
-coverage/
+backend/uploads/
+frontend/public/uploads/
+
 .nyc_output/
 
 # Docker / local

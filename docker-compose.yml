@@ -65,8 +65,9 @@ services:
     container_name: tradebay-frontend
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-      API_INTERNAL_URL: http://backend:8000
+      # Same-origin browser calls via Next rewrites (httpOnly cookies).
+      # Do NOT set NEXT_PUBLIC_API_URL here — that forces cross-origin calls.
+      API_PROXY_TARGET: http://backend:8000
       WATCHPACK_POLLING: "true"
     ports:
       - "3000:3000"

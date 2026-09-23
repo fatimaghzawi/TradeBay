@@ -1,0 +1,802 @@
+"use client";
+
+import { VerifiedBadge } from "@/components/admin/VerifiedBadge";
+import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
+import { FieldError } from "@/components/ui/FormField";
+import { DirectoryMast } from "@/components/shared/DirectoryMast";
+import { useToast } from "@/components/ui/Toast";
+import { ApiError } from "@/lib/api/client";
+import {
+  aiSourcingApi,
+  type ProcurementRequirements,
+  type RecommendationProduct,
+  type RecommendationsResult,
+  type SourcingDraftResult,
+  type SupplierMatch,
+} from "@/lib/api/aiSourcingApi";
+import { cartApi } from "@/lib/api/cartApi";
+import { ROUTES } from "@/lib/constants";
+import { mediaUrl } from "@/lib/media";
+import {
+  isProductSaved,
+  PRODUCT_FAV_EVENT,
+  toggleProductFavorite,
+} from "@/lib/productFavorites";
+import {
+  isSupplierSaved,
+  SHORTLIST_EVENT,
+  toggleSupplier,
+} from "@/lib/supplierShortlist";
+import { openCartTray } from "@/lib/shoppingTrays";
+import { sourcingLetterSchema } from "@/lib/validation/forms";
+import { useLiveFields } from "@/lib/validation/live";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { LoadingEntity, BusyText } from "@/components/ui/LoadingState";
+
+type Step = "describe" | "confirm" | "results" | "draft";
+
+const EXAMPLE =
+  "I run a supermarket in Tyre. I sell food and household products. I am looking for beverage and cleaning-product suppliers. I usually buy in bulk every month and I need suppliers who can deliver to South Lebanon.";
+
+function labelRelevance(value: string | null | undefined) {
+  if (value === "highly_relevant") return "Strong fit";
+  if (value === "relevant") return "Good fit";
+  if (value === "partial") return "Partial";
+  return "Match";
+}
+
+function AISourcingExperienceInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [step, setStep] = useState<Step>("describe");
+  const [description, setDescription] = useState("");
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [requirements, setRequirements] = useState<ProcurementRequirements | null>(null);
+  const [recs, setRecs] = useState<RecommendationsResult | null>(null);
+  const [draft, setDraft] = useState<SourcingDraftResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resuming, setResuming] = useState(Boolean(searchParams.get("request")));
+  const promptFromQuery = searchParams.get("prompt");
+  const imageRefreshFor = useRef<string | null>(null);
+  const live = useLiveFields(sourcingLetterSchema, { description });
+
+  useEffect(() => {
+    if (!promptFromQuery) return;
+    setDescription(promptFromQuery);
+    setStep("describe");
+  }, [promptFromQuery]);
+
+  useEffect(() => {
+    const id = searchParams.get("request");
+    if (!id) {
+      setResuming(false);
+      return;
+    }
+    let cancelled = false;
+    setBusy(true);
+    void aiSourcingApi
+      .getRequest(id)
+      .then((req) => {
+        if (cancelled) return;
+        setRequestId(req.id);
+        const reqs = req.requirements as ProcurementRequirements | null;
+        if (reqs && typeof reqs === "object" && "product_requirements" in reqs) {
+          setRequirements(reqs);
+        }
+        if (req.items?.length) {
+          setDraft({
+            ...req,
+            published: false,
+            message: "Resumed sourcing draft from your business plan.",
+            items: req.items,
+          });
+          setStep("draft");
+        } else if (req.recommendations?.products?.length) {
+          setRecs({
+            sourcing_request_id: req.id,
+            status: req.status,
+            products: req.recommendations.products,
+            suppliers: req.recommendations.suppliers || [],
+            suggestions: [],
+          });
+          setStep("results");
+        } else if (reqs) {
+          setStep("confirm");
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Could not open that sourcing request.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBusy(false);
+          setResuming(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
+
+  async function onAnalyze() {
+    if (!live.finish()) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const result = await aiSourcingApi.analyze(description.trim());
+      setRequestId(result.sourcing_request_id);
+      setRequirements(result.requirements);
+      setStep("confirm");
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "We couldn't understand your description right now. Please try again or enter your requirements manually.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onConfirm() {
+    if (!requestId || !requirements) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const confirmed = await aiSourcingApi.confirm(requestId, requirements);
+      setRequirements(confirmed.requirements);
+      const found = await aiSourcingApi.recommend(requestId);
+      setRecs(found);
+      setStep("results");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not search TradeBay.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Refresh once if results are missing image URLs (stale client state). */
+  useEffect(() => {
+    if (step !== "results" || !requestId || !recs?.products.length) return;
+    if (imageRefreshFor.current === requestId) return;
+    const missingImages = recs.products.some(
+      (p) => p.product_id && !p.primary_image_url,
+    );
+    if (!missingImages) {
+      imageRefreshFor.current = requestId;
+      return;
+    }
+    imageRefreshFor.current = requestId;
+    let cancelled = false;
+    void aiSourcingApi
+      .getRequest(requestId)
+      .then((req) => {
+        if (cancelled || !req.recommendations?.products?.length) return;
+        setRecs((prev) => ({
+          sourcing_request_id: req.id,
+          status: req.status,
+          products: req.recommendations.products,
+          suppliers: req.recommendations.suppliers || [],
+          suggestions: prev?.suggestions ?? [],
+        }));
+      })
+      .catch(() => {
+        /* keep existing cards */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [step, requestId, recs]);
+
+
+  async function onCreateDraft() {
+    if (!requestId) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const created = await aiSourcingApi.createRequest(requestId);
+      setDraft(created);
+      setStep("draft");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not create sourcing draft.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onConvertToRfq() {
+    if (!requestId) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const result = await aiSourcingApi.convertToRfq(requestId);
+      router.push(ROUTES.procurementRfq(result.rfq.id));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not create RFQ.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function resetFlow() {
+    setStep("describe");
+    setDescription("");
+    setRequestId(null);
+    setRequirements(null);
+    setRecs(null);
+    setDraft(null);
+    setError(null);
+    imageRefreshFor.current = null;
+  }
+
+  return (
+    <div className="tb-src" data-step={step} data-busy={busy || undefined}>
+      <DirectoryMast
+        title="Ask the Bay"
+        size="page"
+        lede="What does your shelf need next? Describe what you want to source — TradeBay matches live catalog suppliers."
+      />
+
+      <div className="tb-src-body">
+        {resuming ? (
+          <FeedbackBanner tone="info" title="Opening sourcing draft">
+            Loading the request linked from your business plan…
+          </FeedbackBanner>
+        ) : null}
+
+        {error ? (
+          <FeedbackBanner tone="error" title="Something went adrift" onDismiss={() => setError(null)}>
+            {error}
+          </FeedbackBanner>
+        ) : null}
+
+        {step === "describe" && !resuming ? (
+          <section className="tb-src-letter">
+            <div className="tb-src-letter-seal" aria-hidden>
+              <span>TB</span>
+            </div>
+            <p className="tb-src-letter-to">To the bay,</p>
+            <label className="sr-only" htmlFor="src-desc">
+              Your letter
+            </label>
+            <textarea
+              id="src-desc"
+              className="tb-src-letter-body"
+              rows={8}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onBlur={() => live.touch("description")}
+              placeholder={EXAMPLE}
+              disabled={busy}
+            />
+            <FieldError error={live.errors.description} />
+            <div className="tb-src-letter-foot">
+              <div className="tb-src-inks" aria-label="Quick starters">
+                {[
+                  { label: "Tyre supermarket", text: EXAMPLE },
+                  {
+                    label: "Beirut hotel kitchen",
+                    text: "I manage a hotel restaurant in Beirut. I need pantry staples, olive oil, rice, pasta, and kitchen housewares for monthly bulk restocking. Prefer verified local suppliers who can deliver to Beirut.",
+                  },
+                  {
+                    label: "Mount Lebanon contractor",
+                    text: "I am a contractor based in Mount Lebanon. I need construction materials and hardware in bulk, with reliable delivery to Beirut and the South.",
+                  },
+                ].map((ink) => (
+                  <button
+                    key={ink.label}
+                    type="button"
+                    className="tb-src-ink"
+                    disabled={busy}
+                    onClick={() => setDescription(ink.text)}
+                  >
+                    {ink.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="tb-src-cast"
+                disabled={busy || description.trim().length < 8}
+                onClick={() => void onAnalyze()}
+              >
+                <BusyText busy={busy}>{busy ? "Reading the tide…" : "Cast to the bay →"}</BusyText>
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {step === "confirm" && requirements ? (
+          <section className="tb-src-sheet">
+            <div className="tb-src-sheet-top">
+              <div>
+                <h2>Edit your requirements</h2>
+                <p>Adjust anything below — we only search when you say so.</p>
+              </div>
+            </div>
+
+            <dl className="tb-src-mosaic">
+              <div>
+                <dt>
+                  <label htmlFor="src-biz">Business</label>
+                </dt>
+                <dd>
+                  <input
+                    id="src-biz"
+                    value={requirements.business_type ?? ""}
+                    onChange={(e) =>
+                      setRequirements({
+                        ...requirements,
+                        business_type: e.target.value || null,
+                      })
+                    }
+                    placeholder="e.g. supermarket"
+                    disabled={busy}
+                  />
+                </dd>
+              </div>
+              <div>
+                <dt>
+                  <label htmlFor="src-loc">Location</label>
+                </dt>
+                <dd>
+                  <input
+                    id="src-loc"
+                    value={requirements.location ?? ""}
+                    onChange={(e) =>
+                      setRequirements({
+                        ...requirements,
+                        location: e.target.value || null,
+                      })
+                    }
+                    placeholder="e.g. Tyre, South Lebanon"
+                    disabled={busy}
+                  />
+                </dd>
+              </div>
+            </dl>
+
+            <div className="tb-src-row">
+              <button type="button" className="tb-src-ghost" onClick={resetFlow}>
+                Start over
+              </button>
+              <button
+                type="button"
+                className="tb-src-cast"
+                disabled={busy}
+                onClick={() => void onConfirm()}
+              >
+                <BusyText busy={busy}>{busy ? "Searching the bay…" : "Find suppliers →"}</BusyText>
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {step === "results" && recs ? (
+          <ResultsView
+            recs={recs}
+            busy={busy}
+            onBack={() => setStep("confirm")}
+            onCreate={() => void onCreateDraft()}
+            onRestart={resetFlow}
+          />
+        ) : null}
+
+        {step === "draft" && draft ? (
+          <section className="tb-src-sheet">
+            <h2>Draft ready</h2>
+            <p className="tb-src-sheet-lede">{draft.message}</p>
+            <ul className="tb-src-berthed">
+              {draft.items.map((item) => (
+                <li key={item.id}>
+                  <strong>{item.requested_name}</strong>
+                  <span>
+                    {item.quantity && item.quantity !== "0"
+                      ? `${item.quantity} ${item.unit}`
+                      : item.unit}
+                    {item.destination ? ` · ${item.destination}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="tb-src-row">
+              <button type="button" className="tb-src-ghost" onClick={resetFlow}>
+                New letter
+              </button>
+              <button
+                type="button"
+                className="tb-src-cast"
+                disabled={busy}
+                onClick={() => void onConvertToRfq()}
+              >
+                <BusyText busy={busy}>{busy ? "Creating RFQ…" : "Create draft RFQ →"}</BusyText>
+              </button>
+              <Link href={ROUTES.procurement} className="tb-src-ghost">
+                Procurement hub
+              </Link>
+            </div>
+            <p className="tb-src-quiet">
+              Creates a draft RFQ only — nothing is published or sent to suppliers until you confirm.
+            </p>
+          </section>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function AISourcingExperience() {
+  return (
+    <Suspense
+      fallback={
+        <div className="tb-src">
+          <LoadingEntity entity="AI Sourcing" />
+        </div>
+      }
+    >
+      <AISourcingExperienceInner />
+    </Suspense>
+  );
+}
+
+function ResultsView({
+  recs,
+  busy,
+  onBack,
+  onCreate,
+  onRestart,
+}: {
+  recs: RecommendationsResult;
+  busy: boolean;
+  onBack: () => void;
+  onCreate: () => void;
+  onRestart: () => void;
+}) {
+  const [lane, setLane] = useState<"products" | "suppliers">("products");
+  const hasMatches = recs.products.length > 0;
+
+  return (
+    <section className="tb-src-sheet">
+      <div className="tb-src-sheet-top">
+        <div>
+          <h2>Who answered</h2>
+          <p>Matched from the live TradeBay catalog only.</p>
+        </div>
+        <Link href={ROUTES.suppliersDirectory} className="tb-src-ghost">
+          Saved companies
+        </Link>
+      </div>
+
+      {!hasMatches ? (
+        <div className="tb-src-empty-bay">
+          <p className="tb-src-empty-bay-title">The bay stayed quiet on this cast</p>
+          <p>Try adjusting:</p>
+          <ul>
+            {(recs.suggestions.length
+              ? recs.suggestions
+              : ["quantity", "delivery area", "category", "supplier preferences"]
+            ).map((s) => (
+              <li key={s}>{s}</li>
+            ))}
+          </ul>
+          <div className="tb-src-row">
+            <button type="button" className="tb-src-ghost" onClick={onBack}>
+              Edit details
+            </button>
+            <button type="button" className="tb-src-cast" onClick={onRestart}>
+              Write again
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="tb-src-lanes" role="tablist" aria-label="Results">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={lane === "products"}
+              data-active={lane === "products"}
+              onClick={() => setLane("products")}
+            >
+              Products <em>{recs.products.length}</em>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={lane === "suppliers"}
+              data-active={lane === "suppliers"}
+              onClick={() => setLane("suppliers")}
+            >
+              Suppliers <em>{recs.suppliers.length}</em>
+            </button>
+          </div>
+
+          <div className="tb-src-fleet">
+            {lane === "products"
+              ? recs.products.map((product) => (
+                  <ProductRecCard key={product.id} product={product} />
+                ))
+              : recs.suppliers.map((supplier) => (
+                  <SupplierRecCard key={supplier.supplier_id} supplier={supplier} />
+                ))}
+          </div>
+
+          <div className="tb-src-row">
+            <button type="button" className="tb-src-ghost" onClick={onBack}>
+              Edit details
+            </button>
+            <button
+              type="button"
+              className="tb-src-cast"
+              disabled={busy}
+              onClick={onCreate}
+             aria-busy={busy || undefined}>
+              <BusyText busy={busy}>{busy ? "Berthing draft…" : "Create sourcing draft →"}</BusyText>
+            </button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function useShortlistSaved(supplierId: string | null | undefined) {
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!supplierId) {
+      setSaved(false);
+      return;
+    }
+    const sync = () => setSaved(isSupplierSaved(supplierId));
+    sync();
+    window.addEventListener(SHORTLIST_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(SHORTLIST_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, [supplierId]);
+
+  return saved;
+}
+
+function useProductFavoriteSaved(productId: string | null | undefined) {
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!productId) {
+      setSaved(false);
+      return;
+    }
+    const sync = () => setSaved(isProductSaved(productId));
+    sync();
+    window.addEventListener(PRODUCT_FAV_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(PRODUCT_FAV_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, [productId]);
+
+  return saved;
+}
+
+function MatchCompanyActions({
+  supplierId,
+  supplierName,
+  verified,
+}: {
+  supplierId: string | null | undefined;
+  supplierName: string | null | undefined;
+  verified?: boolean;
+}) {
+  const saved = useShortlistSaved(supplierId);
+  if (!supplierId) return null;
+  const name = supplierName?.trim() || "Supplier";
+
+  return (
+    <div className="tb-src-card-acts">
+      <button
+        type="button"
+        data-active={saved || undefined}
+        onClick={() => toggleSupplier({ id: supplierId, name, verified })}
+      >
+        {saved ? "Saved" : "Save for later"}
+      </button>
+      <Link href={ROUTES.supplierProfile(supplierId)}>Profile</Link>
+      <Link href={ROUTES.supplierProducts(supplierId)}>Products</Link>
+      <Link
+        href={`${ROUTES.procurementSourcingNew}?suppliers=${encodeURIComponent(supplierId)}`}
+      >
+        Invite to RFQ
+      </Link>
+    </div>
+  );
+}
+
+function ProductMatchActions({ product }: { product: RecommendationProduct }) {
+  const productId = product.product_id;
+  const saved = useProductFavoriteSaved(productId);
+  const { success, error: toastError } = useToast();
+  const [cartPending, setCartPending] = useState(false);
+  const [inCart, setInCart] = useState(false);
+
+  useEffect(() => {
+    if (!productId) {
+      setInCart(false);
+      return;
+    }
+    let cancelled = false;
+    void cartApi
+      .get()
+      .then((cart) => {
+        if (!cancelled) {
+          setInCart(cart.items.some((item) => item.product_id === productId));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setInCart(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [productId]);
+
+  if (!productId) return null;
+
+  const qty = Math.max(1, product.moq || 1);
+
+  return (
+    <div className="tb-src-card-acts">
+      <button
+        type="button"
+        disabled={cartPending}
+        data-active={inCart || undefined}
+        onClick={() => {
+          if (inCart) {
+            openCartTray();
+            return;
+          }
+          setCartPending(true);
+          void cartApi
+            .addItem(productId, qty)
+            .then((cart) => {
+              setInCart(true);
+              success(
+                "Added to cart",
+                `${cart.item_count} item${cart.item_count === 1 ? "" : "s"} in cart`,
+              );
+            })
+            .catch((err) => {
+              toastError(
+                "Could not add",
+                err instanceof ApiError ? err.message : "Unable to add this product.",
+              );
+            })
+            .finally(() => setCartPending(false));
+        }}
+      >
+        {cartPending ? "Adding…" : inCart ? "In cart" : "Add to cart"}
+      </button>
+      <button
+        type="button"
+        data-active={saved || undefined}
+        onClick={() =>
+          toggleProductFavorite({
+            id: productId,
+            name: product.product_name || "Product",
+            image: product.primary_image_url,
+          })
+        }
+      >
+        {saved ? "Favorited" : "Add to favorite"}
+      </button>
+    </div>
+  );
+}
+
+function ProductRecCard({ product }: { product: RecommendationProduct }) {
+  const image = mediaUrl(product.primary_image_url);
+  const [broken, setBroken] = useState(false);
+  const showImage = Boolean(image) && !broken;
+
+  return (
+    <article className="tb-src-card tb-src-card-product">
+      <div className="tb-src-card-media" aria-hidden={!showImage}>
+        {showImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={image} alt="" onError={() => setBroken(true)} />
+        ) : (
+          <span className="tb-src-card-media-empty">No image</span>
+        )}
+      </div>
+      <header>
+        <div>
+          <h3>{product.product_name}</h3>
+          <p>
+            <span className="tb-verified-inline">
+              {product.supplier_name}
+              <VerifiedBadge
+                verified={Boolean(product.supplier_verified)}
+                showWhenUnverified={false}
+              />
+            </span>
+            {product.category_name ? ` · ${product.category_name}` : ""}
+          </p>
+        </div>
+        <span>{labelRelevance(product.relevance_label)}</span>
+      </header>
+      <dl>
+        <div>
+          <dt>MOQ</dt>
+          <dd>{product.moq ?? "—"}</dd>
+        </div>
+        <div>
+          <dt>Stock</dt>
+          <dd>{product.availability_status.replaceAll("_", " ")}</dd>
+        </div>
+        <div>
+          <dt>Price</dt>
+          <dd>
+            {product.unit_price
+              ? `${product.currency ?? ""} ${product.unit_price}`.trim()
+              : "Ask"}
+          </dd>
+        </div>
+      </dl>
+      {product.reasons.length ? (
+        <ul className="tb-src-why-list">
+          {product.reasons.slice(0, 3).map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      ) : null}
+      <ProductMatchActions product={product} />
+    </article>
+  );
+}
+
+function SupplierRecCard({ supplier }: { supplier: SupplierMatch }) {
+  return (
+    <article className="tb-src-card tb-src-card-company">
+      <header>
+        <div>
+          <h3 className="tb-verified-inline">
+            {supplier.supplier_name}
+            <VerifiedBadge
+              verified={Boolean(supplier.verified)}
+              showWhenUnverified={false}
+            />
+          </h3>
+          <p>
+            {supplier.product_count} matching product
+            {supplier.product_count === 1 ? "" : "s"}
+          </p>
+        </div>
+        <span>{labelRelevance(supplier.relevance_label)}</span>
+      </header>
+      {supplier.reasons.length ? (
+        <ul className="tb-src-why-list">
+          {supplier.reasons.slice(0, 3).map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      ) : null}
+      <MatchCompanyActions
+        supplierId={supplier.supplier_id}
+        supplierName={supplier.supplier_name}
+        verified={supplier.verified}
+      />
+    </article>
+  );
+}

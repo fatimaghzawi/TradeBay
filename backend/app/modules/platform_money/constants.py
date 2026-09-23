@@ -80,7 +80,6 @@ PAYABLE_STATUS_TRANSITIONS: dict[str, set[str]] = {
     PayableStatus.DISPUTED: {PayableStatus.OPEN, PayableStatus.SETTLED},
 }
 
-# A failed payout leaves its payable open so a retry can be attempted.
 PAYOUT_STATUS_TRANSITIONS: dict[str, set[str]] = {
     PayoutStatus.PENDING: {PayoutStatus.PROCESSING, PayoutStatus.FAILED},
     PayoutStatus.PROCESSING: {PayoutStatus.COMPLETED, PayoutStatus.FAILED},
@@ -91,6 +90,17 @@ SETTLEMENT_STATUS_TRANSITIONS: dict[str, set[str]] = {
     SettlementStatus.PENDING_APPROVAL: {SettlementStatus.APPROVED, SettlementStatus.CANCELLED},
     SettlementStatus.APPROVED: {SettlementStatus.PAID, SettlementStatus.FAILED},
 }
+
+
+def assert_platform_transition(
+    transitions: dict[str, set[str]], current: str, target: str, *, label: str = "status"
+) -> None:
+    from app.core.exceptions import BadRequestError
+
+    allowed = transitions.get(current, set())
+    if target not in allowed:
+        raise BadRequestError("This action isn't available for the current status")
+
 
 # Alias for scaffolded services
 SettlementBatchStatus = SettlementStatus

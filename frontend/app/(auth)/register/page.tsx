@@ -1,19 +1,15 @@
-﻿"use client";
-
+﻿import { AuthShell } from "@/components/auth/AuthShell";
 import { RegisterForm } from "@/components/auth/RegisterForm";
+import { Suspense } from "react";
+import { LoadingEntity } from "@/components/ui/LoadingState";
 
+/** Register — dock scene: warm orange wash, denser form. */
 export default function RegisterPage() {
   return (
-    <div>
-      <h1 className="font-display text-2xl font-semibold text-primary">
-        Create account
-      </h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Start with catalog, procurement, and finance in one shell.
-      </p>
-      <div className="mt-6">
+    <AuthShell scene="dock" compact>
+      <Suspense fallback={<LoadingEntity entity="form" compact />}>
         <RegisterForm />
-      </div>
-    </div>
+      </Suspense>
+    </AuthShell>
   );
 }

@@ -1,11 +1,7 @@
-﻿import { DomainPlaceholder } from "@/components/shared/DomainPlaceholder";
+﻿"use client";
 
-export default function FinancePage() {
-  return (
-    <DomainPlaceholder
-      domain="finance"
-      title="Finance"
-      description="Invoices, payments, and financial reporting."
-    />
-  );
+import { ComingSoonView } from "@/components/shared/ComingSoonView";
+
+export default function FinanceComingSoonPage() {
+  return <ComingSoonView kind="finance" title="Finance tools are coming soon" />;
 }

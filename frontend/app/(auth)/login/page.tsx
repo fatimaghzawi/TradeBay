@@ -1,19 +1,15 @@
-﻿"use client";
-
+﻿import { AuthShell } from "@/components/auth/AuthShell";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { Suspense } from "react";
+import { LoadingEntity } from "@/components/ui/LoadingState";
 
+/** Login — harbor scene: deep green film stage. */
 export default function LoginPage() {
   return (
-    <div>
-      <h1 className="font-display text-2xl font-semibold text-primary">
-        Sign in
-      </h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Access your TradeBay workspace.
-      </p>
-      <div className="mt-6">
+    <AuthShell scene="harbor">
+      <Suspense fallback={<LoadingEntity entity="form" compact />}>
         <LoginForm />
-      </div>
-    </div>
+      </Suspense>
+    </AuthShell>
   );
 }

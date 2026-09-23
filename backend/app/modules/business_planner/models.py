@@ -7,6 +7,7 @@ averaged from real marketplace prices is never confused with an AI guess.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from app.shared.types.document import MongoDocument
 from app.shared.types.ids import DocumentId, OptionalDocumentId
@@ -28,6 +29,21 @@ class BusinessPlanDocument(MongoDocument):
     sourcing_request_id: OptionalDocumentId = None
     created_at: datetime
     updated_at: datetime
+    # Extended structured plan fields (embedded documents)
+    title: str | None = None
+    preferences: dict[str, Any] | None = None
+    concept: dict[str, Any] | None = None
+    budget_allocation: dict[str, Any] | None = None
+    financial_projection: dict[str, Any] | None = None
+    market_snapshot: dict[str, Any] | None = None
+    risks: list[dict[str, Any]] | None = None
+    milestones: list[dict[str, Any]] | None = None
+    assumptions: list[dict[str, Any]] | None = None
+    budget_adjustments: list[str] | None = None
+    version: int = 1
+    parent_plan_id: OptionalDocumentId = None
+    session_id: OptionalDocumentId = None
+    progress: dict[str, Any] | None = None
 
 
 class BusinessPlanItemDocument(MongoDocument):
@@ -36,6 +52,7 @@ class BusinessPlanItemDocument(MongoDocument):
     business_plan_id: DocumentId
     category_id: OptionalDocumentId = None
     product_id: OptionalDocumentId = None
+    supplier_business_id: OptionalDocumentId = None
     item_name: str
     description: str | None = None
     quantity: Money
@@ -43,7 +60,13 @@ class BusinessPlanItemDocument(MongoDocument):
     priority: str
     estimated_unit_price: OptionalMoney = None
     estimated_total_price: OptionalMoney = None
+    target_selling_price: OptionalMoney = None
+    estimated_margin: OptionalMoney = None
+    suggested_moq: int | None = None
     reason: str | None = None
+    source_type: str = "AI_ESTIMATE"
+    supplier_name: str | None = None
+    category_name: str | None = None
     created_at: datetime
 
 
@@ -58,3 +81,25 @@ class PriceEstimateDocument(MongoDocument):
     max_price: OptionalMoney = None
     currency: str = "USD"
     calculated_at: datetime
+
+
+class BusinessPlanSessionDocument(MongoDocument):
+    user_id: DocumentId
+    status: str
+    current_step: str
+    answers: dict[str, Any]
+    preferences: dict[str, Any]
+    adaptive_questions: list[dict[str, Any]]
+    adaptive_answers: dict[str, Any]
+    plan_id: OptionalDocumentId = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class BusinessPlanMessageDocument(MongoDocument):
+    business_plan_id: DocumentId
+    user_id: DocumentId
+    role: str
+    content: str
+    plan_mutations: dict[str, Any] | None = None
+    created_at: datetime
