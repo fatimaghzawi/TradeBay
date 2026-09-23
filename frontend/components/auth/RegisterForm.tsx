@@ -94,7 +94,7 @@ export function RegisterForm() {
 
   return (
     <form
-      className="space-y-2"
+      className="space-y-1.5 sm:space-y-2"
       onSubmit={(e) => {
         e.preventDefault();
         if (!accepted) {
@@ -121,7 +121,7 @@ export function RegisterForm() {
         <p className="auth-kicker">
           {isInviteSignup ? "Invitation" : "Get started"}
         </p>
-        <h1 className="auth-display mt-1.5 text-[1.7rem] sm:text-[1.95rem]">
+        <h1 className="auth-display mt-1 text-[1.45rem] leading-tight sm:mt-1.5 sm:text-[1.95rem]">
           {isInviteSignup ? "Join your team" : "Create your account"}
         </h1>
         {isInviteSignup ? (

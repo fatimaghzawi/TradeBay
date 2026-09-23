@@ -1,8 +1,19 @@
 import type { NextConfig } from "next";
 
-/** Backend origin for local/dev proxy. Browser calls stay same-origin so auth cookies work. */
+/**
+ * Backend origin for Next.js rewrites.
+ * Browser calls stay same-origin (`/api/...`) so httpOnly auth cookies work.
+ * On Vercel this MUST be your Render URL and requires a redeploy after setting it.
+ */
 const API_PROXY_TARGET =
   process.env.API_PROXY_TARGET?.replace(/\/$/, "") || "http://127.0.0.1:8000";
+
+if (process.env.VERCEL === "1" && !process.env.API_PROXY_TARGET?.trim()) {
+  throw new Error(
+    "Set API_PROXY_TARGET on Vercel to your Render API URL " +
+      "(e.g. https://tradebay-1.onrender.com), then Redeploy.",
+  );
+}
 
 const nextConfig: NextConfig = {
   output: "standalone",

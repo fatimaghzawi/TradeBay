@@ -42,8 +42,8 @@ export function AuthShell({
   return (
     <div
       className={cn(
-        "auth-root h-svh overflow-hidden bg-[#f3f7f5]",
-        "lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)]",
+        "auth-root min-h-svh bg-[#f3f7f5]",
+        "lg:grid lg:h-svh lg:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)] lg:overflow-hidden",
       )}
     >
       {resolved === "harbor" ? (
@@ -58,35 +58,35 @@ export function AuthShell({
 
       <main
         className={cn(
-          "auth-panel relative flex h-full min-h-0 flex-col overflow-hidden px-5 sm:px-10 lg:px-12 xl:px-16",
-          compact ? "py-3 sm:py-4" : "py-5 sm:py-6",
+          "auth-panel relative flex min-h-svh flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-8 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-12 xl:px-16",
+          compact ? "py-3 sm:py-4" : "py-4 sm:py-6",
         )}
       >
         <div
           className={cn(
-            "mb-3 flex shrink-0 items-center justify-between lg:hidden",
-            compact && "mb-1.5",
+            "mb-2 flex shrink-0 items-center justify-between lg:hidden",
+            compact && "mb-1",
           )}
         >
           <Link href="/" aria-label="TradeBay home">
             <Image
               src={AUTH_LOGO}
               alt="TradeBay"
-              width={160}
-              height={42}
+              width={140}
+              height={36}
               priority
-              className="h-9 w-auto object-contain object-left"
+              className="h-8 w-auto object-contain object-left sm:h-9"
             />
           </Link>
         </div>
 
         <div
           className={cn(
-            "mx-auto flex w-full max-w-[26rem] min-h-0 flex-1 flex-col justify-center overflow-hidden",
+            "mx-auto flex w-full max-w-[26rem] flex-1 flex-col justify-start lg:min-h-0 lg:justify-center lg:overflow-y-auto",
             compact ? "py-0" : "py-1",
           )}
         >
-          <div className={cn("auth-ticket", compact && "px-4 py-4")}>{children}</div>
+          <div className={cn("auth-ticket", compact && "auth-ticket--compact")}>{children}</div>
         </div>
       </main>
     </div>
@@ -259,7 +259,7 @@ function CelebrateStage({
   plain?: boolean;
 }) {
   return (
-    <div className="auth-root auth-panel relative h-svh overflow-hidden">
+    <div className="auth-root auth-panel relative min-h-svh lg:h-svh lg:overflow-hidden">
       {!plain ? (
         <>
           <div
@@ -272,17 +272,17 @@ function CelebrateStage({
           />
         </>
       ) : null}
-      <div className="relative z-10 mx-auto flex h-full w-full max-w-lg flex-col overflow-hidden px-5 py-5 sm:px-8 sm:py-6">
-        <Link href="/" className="mb-4 inline-flex w-fit shrink-0 items-center" aria-label="TradeBay home">
+      <div className="relative z-10 mx-auto flex min-h-svh w-full max-w-lg flex-col px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8 sm:py-6 lg:h-full lg:overflow-hidden">
+        <Link href="/" className="mb-3 inline-flex w-fit shrink-0 items-center sm:mb-4" aria-label="TradeBay home">
           <Image
             src={AUTH_LOGO}
             alt="TradeBay"
-            width={160}
-            height={42}
-            className="h-9 w-auto object-contain"
+            width={140}
+            height={36}
+            className="h-8 w-auto object-contain sm:h-9"
           />
         </Link>
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden pb-6">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-start lg:justify-center lg:overflow-y-auto lg:pb-6">
           <div className="auth-ticket w-full">{children}</div>
         </div>
       </div>

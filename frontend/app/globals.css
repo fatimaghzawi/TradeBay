@@ -328,17 +328,33 @@ body > * {
   color: var(--tb-ink);
 }
 
-/* Auth screens: fixed viewport, no page scroll, calm display type */
+/* Auth screens: lock scroll only on large split layouts */
 html:has(.auth-root),
 body:has(.auth-root) {
-  height: 100%;
-  overflow: hidden;
+  height: auto;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+@media (min-width: 1024px) {
+  html:has(.auth-root),
+  body:has(.auth-root) {
+    height: 100%;
+    overflow: hidden;
+  }
 }
 
 .auth-root {
-  height: 100svh;
-  max-height: 100svh;
-  overflow: hidden;
+  min-height: 100svh;
+}
+
+@media (min-width: 1024px) {
+  .auth-root {
+    height: 100svh;
+    max-height: 100svh;
+    overflow: hidden;
+  }
 }
 
 .auth-root .auth-display {
@@ -687,7 +703,7 @@ html.dark body button[type="submit"]:not(.tb-navbar-link):not([data-tone="danger
 .tb-navbar {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: 100;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--tb-surface) 96%, transparent), color-mix(in srgb, var(--tb-surface) 88%, transparent));
   box-shadow: 0 18px 40px -30px color-mix(in srgb, var(--tb-primary) 55%, transparent);
@@ -695,33 +711,35 @@ html.dark body button[type="submit"]:not(.tb-navbar-link):not([data-tone="danger
   border-bottom: 1px solid color-mix(in srgb, var(--tb-border) 70%, transparent);
 }
 
-/* Mobile primary nav drawer */
+/* Mobile primary nav drawer — above page cards */
 .tb-navbar-drawer {
   position: fixed;
-  inset: var(--tb-topbar-height) 0 0;
-  z-index: 40;
+  inset: 0;
+  z-index: 400;
   display: flex;
   flex-direction: column;
+  padding-top: var(--tb-topbar-height);
 }
 
 .tb-navbar-drawer__scrim {
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(8, 18, 14, 0.48);
+  background: rgba(8, 18, 14, 0.55);
   cursor: pointer;
 }
 
 .tb-navbar-drawer__panel {
   position: relative;
   z-index: 1;
-  max-height: min(78vh, 36rem);
+  max-height: min(82dvh, 40rem);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0.85rem 1rem 1.25rem;
+  margin: 0;
+  padding: 0.85rem 1rem 1.35rem;
   background: var(--tb-surface);
   border-bottom: 1px solid var(--tb-line);
-  box-shadow: 0 24px 48px -28px rgba(8, 18, 14, 0.55);
+  box-shadow: 0 24px 48px -20px rgba(8, 18, 14, 0.55);
   animation: tb-navbar-drawer-in 0.22s ease both;
 }
 
@@ -802,7 +820,7 @@ html.dark body button[type="submit"]:not(.tb-navbar-link):not([data-tone="danger
 .tb-space-sidebar-drawer {
   position: fixed;
   inset: 0;
-  z-index: 55;
+  z-index: 410;
   display: flex;
 }
 
@@ -899,6 +917,31 @@ html.dark .tb-space-sidebar-panel {
 html.dark .tb-navbar-drawer__scrim,
 html.dark .tb-space-sidebar-scrim {
   background: rgba(0, 0, 0, 0.62);
+}
+
+/* Admin / platform mobile sidebar drawer */
+.tb-app-sidebar-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 420;
+}
+
+.tb-app-sidebar-drawer__scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(8, 18, 14, 0.55);
+  cursor: pointer;
+}
+
+.tb-app-sidebar-drawer__panel {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  height: 100%;
+  max-width: min(var(--tb-sidebar-width, 17rem), 88vw);
+  box-shadow: 18px 0 40px -20px rgba(8, 18, 14, 0.55);
+  animation: tb-space-drawer-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .tb-logo {
@@ -7221,7 +7264,40 @@ html body .tb-split input[data-state="error"] {
   background: #ffffff;
   box-shadow: 0 4px 18px -8px rgba(16, 24, 40, 0.12);
   backdrop-filter: none;
-  padding: 1.5rem 1.35rem 1.35rem;
+  padding: 1.15rem 1rem 1.1rem;
+}
+
+.auth-root .auth-ticket--compact {
+  padding: 0.95rem 0.9rem 1rem;
+}
+
+@media (min-width: 640px) {
+  .auth-root .auth-ticket {
+    padding: 1.5rem 1.35rem 1.35rem;
+  }
+
+  .auth-root .auth-ticket--compact {
+    padding: 1.15rem 1.1rem 1.2rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .auth-root .auth-display {
+    font-size: 1.4rem;
+  }
+
+  .auth-root .auth-kicker {
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+  }
+
+  .auth-root .tb-field {
+    min-height: 2.5rem;
+  }
+
+  .auth-root form.space-y-2 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.45rem;
+  }
 }
 
 .auth-root .auth-ticket::before {
@@ -26077,5 +26153,35 @@ html.dark [aria-checked="true"] {
 
   .tb-proc-lane {
     padding: 0.85rem 0.9rem;
+  }
+}
+
+/* === Mobile-first pass v2 (auth denser + overlays on top) === */
+@media (max-width: 639px) {
+  .tb-space-bar {
+    position: sticky;
+    top: var(--tb-topbar-height);
+    z-index: 90;
+  }
+
+  .tb-sign--page .tb-sign__title {
+    font-size: clamp(1.85rem, 9vw, 2.6rem);
+  }
+
+  .tb-sign {
+    padding: 1rem 0.75rem 1.1rem;
+  }
+
+  .tb-mkt-card-media {
+    aspect-ratio: 1 / 1;
+  }
+
+  .tb-inv-page {
+    gap: 0.85rem;
+  }
+
+  main.auth-panel {
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
   }
 }

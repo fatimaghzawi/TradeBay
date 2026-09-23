@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/AuthProvider";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 function NavLink({
   item,
@@ -56,6 +57,7 @@ export function AppSidebar({ nav }: { nav: WorkspaceNav }) {
   const { mobileNavOpen, setMobileNavOpen } = useShell();
   const { permissions } = useAuth();
   const close = () => setMobileNavOpen(false);
+  const [mounted, setMounted] = useState(false);
   const primary = useMemo(
     () => filterNavItems(nav.primary, (code) => permissions.includes(code)),
     [permissions, nav.primary],
@@ -66,6 +68,10 @@ export function AppSidebar({ nav }: { nav: WorkspaceNav }) {
   );
   const grouped = useMemo(() => groupItems(primary), [primary]);
   const showGroups = nav.kind === "platform" && grouped.some((g) => g.group);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const panel = (
     <aside className="tb-app-sidebar relative flex h-screen w-[var(--tb-sidebar-width)] shrink-0 flex-col overflow-hidden">
@@ -112,17 +118,20 @@ export function AppSidebar({ nav }: { nav: WorkspaceNav }) {
     <>
       <div className="relative z-20 hidden shrink-0 lg:block">{panel}</div>
 
-      {mobileNavOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="Close navigation"
-            className="absolute inset-0 bg-black/50"
-            onClick={close}
-          />
-          <div className="absolute inset-y-0 left-0 shadow-2xl">{panel}</div>
-        </div>
-      ) : null}
+      {mounted && mobileNavOpen
+        ? createPortal(
+            <div className="tb-app-sidebar-drawer lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
+              <button
+                type="button"
+                aria-label="Close navigation"
+                className="tb-app-sidebar-drawer__scrim"
+                onClick={close}
+              />
+              <div className="tb-app-sidebar-drawer__panel">{panel}</div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
