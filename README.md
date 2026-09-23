@@ -42,6 +42,18 @@ npm install
 npm run dev
 ```
 
+## Demo credentials
+
+Seeded accounts for local / demo environments (not for production):
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Supplier | `hassan@tyrefresh.com` | `TradeBay123!` |
+| Buyer | `ziad@mountainspices.com` | `TradeBay123!` |
+| Platform admin | `admin@tradebay.com` | `AdminPass123!` |
+
+Admin password can be overridden with `PLATFORM_ADMIN_PASSWORD` in `.env`.
+
 ## Configuration
 
 Copy `.env.example` to `.env`. Required: `SECRET_KEY`, `JWT_SECRET_KEY`, `MONGODB_URI`, `MONGODB_DATABASE`, `CORS_ORIGINS`.
