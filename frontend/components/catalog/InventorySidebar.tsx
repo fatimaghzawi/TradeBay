@@ -1,6 +1,7 @@
 "use client";
 
 import { NavIcon } from "@/components/layout/NavIcon";
+import { SpaceSidebarShell } from "@/components/layout/SpaceSidebarShell";
 import {
   BUYER_INVENTORY_NAV,
   BUYER_INVENTORY_NAV_GROUPS,
@@ -47,6 +48,7 @@ export function InventorySidebar() {
   const monogram = (business?.name ?? "TB").slice(0, 2).toUpperCase();
 
   return (
+    <SpaceSidebarShell label={isSupplier ? "Inventory" : "Marketplace"}>
     <aside className="tb-id-sidebar tb-inv-sidebar">
       <div className="tb-id-sidebar-inner">
         <div className="tb-inv-sidebar-brand">
@@ -100,5 +102,6 @@ export function InventorySidebar() {
         </nav>
       </div>
     </aside>
+    </SpaceSidebarShell>
   );
 }

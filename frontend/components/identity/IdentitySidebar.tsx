@@ -1,6 +1,7 @@
 "use client";
 
 import { NavIcon } from "@/components/layout/NavIcon";
+import { SpaceSidebarShell } from "@/components/layout/SpaceSidebarShell";
 import {
   COMPANY_NAV_GROUPS,
   COMPANY_SPACE_NAV,
@@ -43,6 +44,7 @@ export function IdentitySidebar() {
   }, [hasPermission]);
 
   return (
+    <SpaceSidebarShell label="Company">
     <aside className="tb-id-sidebar">
       <div className="tb-id-sidebar-inner">
         <div className="tb-id-sidebar-brand">
@@ -97,5 +99,6 @@ export function IdentitySidebar() {
         </nav>
       </div>
     </aside>
+    </SpaceSidebarShell>
   );
 }

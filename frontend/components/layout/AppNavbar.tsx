@@ -347,9 +347,18 @@ export function AppNavbar({
     setMobileNavOpen(false);
   }, [pathname, setMobileNavOpen]);
 
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileNavOpen]);
+
   return (
     <header className="tb-navbar">
-      <div className="mx-auto flex h-[var(--tb-topbar-height)] max-w-[92rem] items-center gap-5 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-[var(--tb-topbar-height)] max-w-[92rem] items-center gap-2 px-3 sm:gap-4 sm:px-6 lg:gap-5 lg:px-8">
         <Logo compact href={nav.kind === "platform" ? ROUTES.admin.home : ROUTES.dashboard} />
         <span className="hidden h-7 w-px bg-[var(--tb-line)] lg:block" aria-hidden />
 
@@ -359,8 +368,10 @@ export function AppNavbar({
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2.5">
-          <FavoritesButton />
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
+          <span className="tb-navbar-fav">
+            <FavoritesButton />
+          </span>
           <CartButton />
           <ChatBell />
           <NotificationBell />
@@ -394,17 +405,27 @@ export function AppNavbar({
           </div>
           <button
             type="button"
-            aria-label="Open navigation"
+            aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
+            aria-expanded={mobileNavOpen}
             onClick={toggleMobileNav}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--tb-border)] bg-[var(--tb-surface)] text-[var(--tb-ink)] lg:hidden"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--tb-border)] bg-[var(--tb-surface)] text-[var(--tb-ink)] lg:hidden"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-              <path
-                d="M3 5h12M3 9h12M3 13h12"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-              />
+              {mobileNavOpen ? (
+                <path
+                  d="M4.5 4.5l9 9M13.5 4.5l-9 9"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                />
+              ) : (
+                <path
+                  d="M3 5h12M3 9h12M3 13h12"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                />
+              )}
             </svg>
           </button>
         </div>
@@ -413,79 +434,90 @@ export function AppNavbar({
       {showCompanySpace && inCompany ? <CompanySpaceBar items={companyItems} /> : null}
 
       {mobileNavOpen ? (
-        <div className="border-t border-[var(--tb-line)] bg-[var(--tb-surface)] px-4 py-4 lg:hidden">
-          <nav className="flex flex-col">
-            {items.map((item) =>
-              item.children?.length ? (
-                <div key={item.key} className="mt-2">
-                  <p className="tb-nav-fly__mobile-kicker">{item.label}</p>
-                  <div className="tb-nav-fly__list">
-                    {item.children.map((child) => (
-                      <Link
-                        key={child.key}
-                        href={child.href}
-                        title={child.hint || child.label}
-                        onClick={close}
-                        className="tb-nav-fly__link"
-                      >
-                        <span className="tb-nav-fly__icon" aria-hidden>
-                          <NavIcon name={child.icon} />
-                        </span>
-                        <span className="tb-nav-fly__label">{child.label}</span>
-                        <span className="tb-nav-fly__go" aria-hidden>
-                          →
-                        </span>
-                      </Link>
-                    ))}
+        <div className="tb-navbar-drawer lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
+          <button
+            type="button"
+            className="tb-navbar-drawer__scrim"
+            aria-label="Close navigation"
+            onClick={close}
+          />
+          <div className="tb-navbar-drawer__panel">
+            <nav className="flex flex-col">
+              {items.map((item) =>
+                item.children?.length ? (
+                  <div key={item.key} className="mt-2">
+                    <p className="tb-nav-fly__mobile-kicker">{item.label}</p>
+                    <div className="tb-nav-fly__list">
+                      {item.children.map((child) => (
+                        <Link
+                          key={child.key}
+                          href={child.href}
+                          title={child.hint || child.label}
+                          onClick={close}
+                          className="tb-nav-fly__link"
+                        >
+                          <span className="tb-nav-fly__icon" aria-hidden>
+                            <NavIcon name={child.icon} />
+                          </span>
+                          <span className="tb-nav-fly__label">{child.label}</span>
+                          <span className="tb-nav-fly__go" aria-hidden>
+                            →
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  onClick={close}
-                  className={cn(
-                    "border-b border-[var(--tb-line)] py-3 font-[family-name:var(--font-outfit)] text-sm font-semibold text-[var(--tb-ink)]",
-                    item.key === "ai-sourcing" && "tb-navbar-bay-mobile",
-                  )}
-                >
-                  {item.key === "ai-sourcing" ? (
-                    <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--tb-accent)] text-xs text-white">
-                      ✦
-                    </span>
-                  ) : null}
-                  {item.label}
-                  {item.key === "ai-sourcing" && item.hint ? (
-                    <span className="mt-1 block text-xs font-medium text-[var(--tb-muted-fg)]">
-                      {item.hint}
-                    </span>
-                  ) : null}
-                </Link>
-              ),
-            )}
-          </nav>
-          <div className="mt-4 flex flex-wrap items-center gap-2 sm:hidden">
+                ) : (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    onClick={close}
+                    className={cn(
+                      "border-b border-[var(--tb-line)] py-3 font-[family-name:var(--font-outfit)] text-sm font-semibold text-[var(--tb-ink)]",
+                      item.key === "ai-sourcing" && "tb-navbar-bay-mobile",
+                    )}
+                  >
+                    {item.key === "ai-sourcing" ? (
+                      <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--tb-accent)] text-xs text-white">
+                        ✦
+                      </span>
+                    ) : null}
+                    {item.label}
+                    {item.key === "ai-sourcing" && item.hint ? (
+                      <span className="mt-1 block text-xs font-medium text-[var(--tb-muted-fg)]">
+                        {item.hint}
+                      </span>
+                    ) : null}
+                  </Link>
+                ),
+              )}
+            </nav>
             {business && business.type !== "platform" ? (
-              <Link href={ROUTES.businesses} className="tb-nav-biz is-mobile" onClick={close}>
-                <span className="tb-nav-biz__mark" aria-hidden>
-                  {(business.name || "TB")
-                    .split(/\s+/)
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((p) => p[0]?.toUpperCase() ?? "")
-                    .join("") || "TB"}
-                </span>
-                <span className="tb-nav-biz__copy">
-                  <span className="tb-nav-biz__name">{business.name}</span>
-                  {business.email_domain ? (
-                    <span className="tb-nav-biz__domain">
-                      <em>@</em>
-                      {business.email_domain}
-                    </span>
-                  ) : null}
-                </span>
-              </Link>
+              <div className="mt-4">
+                <Link href={ROUTES.businesses} className="tb-nav-biz is-mobile" onClick={close}>
+                  <span className="tb-nav-biz__mark" aria-hidden>
+                    {(business.name || "TB")
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((p) => p[0]?.toUpperCase() ?? "")
+                      .join("") || "TB"}
+                  </span>
+                  <span className="tb-nav-biz__copy">
+                    <span className="tb-nav-biz__name">{business.name}</span>
+                    {business.email_domain ? (
+                      <span className="tb-nav-biz__domain">
+                        <em>@</em>
+                        {business.email_domain}
+                      </span>
+                    ) : null}
+                  </span>
+                </Link>
+              </div>
             ) : null}
+            <div className="mt-4 flex flex-wrap gap-2 sm:hidden">
+              <FavoritesButton />
+            </div>
           </div>
         </div>
       ) : null}

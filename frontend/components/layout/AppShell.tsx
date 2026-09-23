@@ -8,6 +8,7 @@ import { IdentitySidebar } from "@/components/identity/IdentitySidebar";
 import { InventorySidebar } from "@/components/catalog/InventorySidebar";
 import { CommerceSidebar } from "@/components/procurement/CommerceSidebar";
 import { ShellProvider } from "@/components/layout/ShellContext";
+import { SpaceSectionsBar } from "@/components/layout/SpaceSectionsBar";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { ROUTES } from "@/lib/constants";
 import {
@@ -21,6 +22,18 @@ import { useAuth } from "@/providers/AuthProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
+
+function spaceLabel(
+  isIdentity: boolean,
+  isInventory: boolean,
+  isCommerce: boolean,
+  isSupplier: boolean,
+) {
+  if (isIdentity) return "Company sections";
+  if (isInventory) return isSupplier ? "Inventory sections" : "Marketplace sections";
+  if (isCommerce) return isSupplier ? "Fulfilment sections" : "Procurement sections";
+  return "Sections";
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -36,6 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const useCommerceSidebar =
     !useSidebar && !useIdentitySidebar && !useInventorySidebar && isCommerceSpacePath(pathname);
   const useSpaceSidebar = useIdentitySidebar || useInventorySidebar || useCommerceSidebar;
+  const isSupplier = business?.type === "supplier";
 
   return (
     <ShellProvider>
@@ -72,6 +86,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           {useSidebar ? (
             <AppTopBar key={`top-${business?.id ?? "no-business"}`} nav={nav} />
           ) : null}
+          {useSpaceSidebar ? (
+            <SpaceSectionsBar
+              label={spaceLabel(
+                useIdentitySidebar,
+                useInventorySidebar,
+                useCommerceSidebar,
+                isSupplier,
+              )}
+            />
+          ) : null}
           <div className={useSpaceSidebar ? "tb-id-shell" : "contents"}>
             {useIdentitySidebar ? (
               <Suspense fallback={<div className="hidden w-[15.75rem] shrink-0 lg:block" />}>
@@ -88,7 +112,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <CommerceSidebar />
               </Suspense>
             ) : null}
-            <main className="relative min-w-0 flex-1 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-8">
+            <main className="relative min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-6 sm:py-5 lg:px-8">
               <div className="relative mx-auto w-full max-w-[92rem]">
                 {showVerifyBanner ? (
                   <div className="mb-5">
