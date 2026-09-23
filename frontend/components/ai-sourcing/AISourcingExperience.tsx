@@ -86,6 +86,34 @@ function AISourcingExperienceInner() {
     setStep("describe");
   }, [promptFromQuery]);
 
+  // From Ask the Bay / deep links: auto-run analyze once the prompt is filled.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!promptFromQuery || autoStarted.current || resuming) return;
+    if (searchParams.get("request")) return;
+    const trimmed = promptFromQuery.trim();
+    if (trimmed.length < 12) return;
+    autoStarted.current = true;
+    setDescription(trimmed);
+    setError(null);
+    setBusy(true);
+    void aiSourcingApi
+      .analyze(trimmed)
+      .then((result) => {
+        setRequestId(result.sourcing_request_id);
+        setRequirements(result.requirements);
+        setStep("confirm");
+      })
+      .catch((err) => {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "We couldn't understand your description right now. Please try again.",
+        );
+      })
+      .finally(() => setBusy(false));
+  }, [promptFromQuery, resuming, searchParams]);
+
   useEffect(() => {
     const id = searchParams.get("request");
     if (!id) {

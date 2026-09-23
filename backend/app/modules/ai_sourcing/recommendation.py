@@ -25,9 +25,17 @@ def _tokens(text: str) -> set[str]:
 
 
 def _overlap_ratio(a: set[str], b: set[str]) -> float:
+    """Coverage of *query* set `a` against `b` (not diluted when `a` is small)."""
     if not a or not b:
         return 0.0
     return len(a & b) / len(a)
+
+
+def _best_overlap(a: set[str], b: set[str]) -> float:
+    """Symmetric-ish score: max of a→b and b→a coverage."""
+    if not a or not b:
+        return 0.0
+    return max(_overlap_ratio(a, b), _overlap_ratio(b, a))
 
 
 def relevance_label(score: float) -> str:
@@ -74,6 +82,7 @@ class RecommendationEngine:
         min_results: int = 8,
     ) -> list[ScoredCandidate]:
         need_terms = self._requirement_terms(requirements)
+        focus_terms = self._focus_terms(requirements)
         qty_hint = self._primary_quantity(requirements)
         results: list[ScoredCandidate] = []
         scored_ids: set[str] = set()
@@ -88,6 +97,7 @@ class RecommendationEngine:
                 verified_business_ids=verified_business_ids,
                 requirements=requirements,
                 need_terms=need_terms,
+                focus_terms=focus_terms,
                 qty_hint=qty_hint,
                 similar=False,
             )
@@ -114,6 +124,7 @@ class RecommendationEngine:
                     verified_business_ids=verified_business_ids,
                     requirements=requirements,
                     need_terms=need_terms,
+                    focus_terms=focus_terms,
                     qty_hint=qty_hint,
                     similar=True,
                 )
@@ -139,6 +150,7 @@ class RecommendationEngine:
         verified_business_ids: set[str],
         requirements: ProcurementRequirements,
         need_terms: set[str],
+        focus_terms: set[str],
         qty_hint: float | None,
         similar: bool,
     ) -> ScoredCandidate | None:
@@ -166,7 +178,7 @@ class RecommendationEngine:
                 price=price,
                 category_name=category_name,
                 requirements=requirements,
-                need_terms=need_terms,
+                need_terms=focus_terms or need_terms,
             )
         return self._score_product(
             product=product,
@@ -176,19 +188,49 @@ class RecommendationEngine:
             category_name=category_name,
             requirements=requirements,
             need_terms=need_terms,
+            focus_terms=focus_terms,
             qty_hint=qty_hint,
             verified=True,
         )
 
-    def _requirement_terms(self, requirements: ProcurementRequirements) -> set[str]:
+    def _focus_terms(self, requirements: ProcurementRequirements) -> set[str]:
+        """High-signal terms from products/categories/qty only — used for ranking."""
         bag: set[str] = set()
         for item in requirements.product_requirements + requirements.categories:
             bag |= _tokens(item)
+            # Stem-ish: beverages → beverage
+            for token in list(_tokens(item)):
+                if token.endswith("s") and len(token) > 4:
+                    bag.add(token[:-1])
         for qty in requirements.quantities:
             bag |= _tokens(qty.product)
+        return bag
+
+    def _requirement_terms(self, requirements: ProcurementRequirements) -> set[str]:
+        bag = self._focus_terms(requirements)
         if requirements.business_type:
             bag |= _tokens(requirements.business_type)
-        bag |= _tokens(requirements.business_description[:400])
+        # Soft context from the brief — capped so it cannot drown product keywords
+        soft = _tokens(requirements.business_description[:240])
+        # Drop ultra-common filler that pollutes overlap
+        filler = {
+            "looking",
+            "need",
+            "want",
+            "business",
+            "company",
+            "please",
+            "help",
+            "finding",
+            "partners",
+            "suppliers",
+            "supplier",
+            "usually",
+            "every",
+            "month",
+            "lebanon",
+        }
+        bag |= {t for t in soft if t not in filler and len(t) > 3}
         return bag
 
     def _primary_quantity(self, requirements: ProcurementRequirements) -> float | None:
@@ -207,6 +249,7 @@ class RecommendationEngine:
         category_name: str | None,
         requirements: ProcurementRequirements,
         need_terms: set[str],
+        focus_terms: set[str],
         qty_hint: float | None,
         verified: bool,
     ) -> ScoredCandidate:
@@ -215,19 +258,27 @@ class RecommendationEngine:
         name_tokens = _tokens(name)
         desc_tokens = _tokens(description)
         cat_tokens = _tokens(category_name or "")
+        query = focus_terms or need_terms
 
-        name_score = _overlap_ratio(need_terms, name_tokens)
-        desc_score = _overlap_ratio(need_terms, desc_tokens)
-        cat_score = _overlap_ratio(need_terms, cat_tokens)
+        name_score = _best_overlap(query, name_tokens)
+        desc_score = _best_overlap(query, desc_tokens)
+        cat_score = _best_overlap(query, cat_tokens)
 
         req_blob = " ".join(requirements.product_requirements + requirements.categories).lower()
         if req_blob and (
             req_blob in name.lower()
             or any(r.lower() in name.lower() for r in requirements.product_requirements)
+            or any(
+                r.lower().rstrip("s") in name.lower()
+                for r in requirements.product_requirements
+                if len(r) > 3
+            )
         ):
             name_score = max(name_score, 0.75)
         if category_name and any(
-            r.lower() in category_name.lower() or category_name.lower() in r.lower()
+            r.lower() in category_name.lower()
+            or category_name.lower() in r.lower()
+            or r.lower().rstrip("s") in category_name.lower()
             for r in (requirements.categories + requirements.product_requirements)
         ):
             cat_score = max(cat_score, 0.8)
@@ -237,9 +288,11 @@ class RecommendationEngine:
         reasons: list[str] = []
 
         for req in requirements.product_requirements:
+            req_tokens = _tokens(req)
             if (
-                _overlap_ratio(_tokens(req), name_tokens | cat_tokens | desc_tokens) >= 0.34
+                _best_overlap(req_tokens, name_tokens | cat_tokens | desc_tokens) >= 0.34
                 or req.lower() in name.lower()
+                or req.lower().rstrip("s") in name.lower()
             ):
                 matched.append(req)
                 reasons.append(f"Product matches your “{req}” requirement")
@@ -303,7 +356,7 @@ class RecommendationEngine:
         if requirements.delivery_requirements:
             unmatched.append("delivery area (not confirmed in catalog data)")
 
-        if name_score < 0.15 and cat_score < 0.15 and desc_score < 0.15 and not matched:
+        if name_score < 0.12 and cat_score < 0.12 and desc_score < 0.12 and not matched:
             return ScoredCandidate(
                 product=product,
                 supplier=supplier,
@@ -340,7 +393,7 @@ class RecommendationEngine:
         requirements: ProcurementRequirements,
         need_terms: set[str],
     ) -> ScoredCandidate:
-        """Softer ranking for nearby / related catalog picks."""
+        """Related picks only — must share focus terms with the ask (never random catalog)."""
         name = str(product.get("name") or "")
         description = str(product.get("description") or "")
         name_tokens = _tokens(name)
@@ -348,27 +401,63 @@ class RecommendationEngine:
         cat_tokens = _tokens(category_name or "")
         pool = name_tokens | desc_tokens | cat_tokens
 
-        shared = need_terms & pool if need_terms else set()
-        name_score = _overlap_ratio(need_terms, name_tokens) if need_terms else 0.0
-        desc_score = _overlap_ratio(need_terms, desc_tokens) if need_terms else 0.0
-        cat_score = _overlap_ratio(need_terms, cat_tokens) if need_terms else 0.0
+        empty = ScoredCandidate(
+            product=product,
+            supplier=supplier,
+            inventory=inventory,
+            price=price,
+            category_name=category_name,
+            score=0.0,
+            availability=AvailabilityStatus.UNKNOWN,
+            similar=True,
+        )
+        if not need_terms:
+            return empty
 
-        score = 0.18 + WEIGHT_VERIFIED * 0.65
-        reasons = [
-            "Similar to your brief — related listing from a verified supplier",
-            "Supplier is verified on TradeBay",
-        ]
+        shared = need_terms & pool
+        # Also allow stem matches: cement ↔ cements, beverage ↔ beverages
+        stemmed_need = set(need_terms)
+        for t in list(need_terms):
+            if t.endswith("s") and len(t) > 4:
+                stemmed_need.add(t[:-1])
+            else:
+                stemmed_need.add(t + "s")
+        shared |= stemmed_need & pool
+
+        category_hit = False
+        if category_name:
+            cat_l = category_name.lower()
+            category_hit = any(
+                r.lower() in cat_l or cat_l in r.lower() or r.lower().rstrip("s") in cat_l
+                for r in (requirements.categories + requirements.product_requirements)
+                if r
+            )
+
+        if not shared and not category_hit:
+            return empty
+
+        name_score = _best_overlap(need_terms, name_tokens)
+        desc_score = _best_overlap(need_terms, desc_tokens)
+        cat_score = _best_overlap(need_terms, cat_tokens)
+        if category_hit:
+            cat_score = max(cat_score, 0.55)
+
+        score = 0.2 + WEIGHT_VERIFIED * 0.5
+        reasons = ["Similar to your brief — related listing from a verified supplier"]
         matched: list[str] = []
 
         if shared:
-            score += 0.12 + 0.35 * max(name_score, desc_score, cat_score)
+            score += 0.15 + 0.4 * max(name_score, desc_score, cat_score)
             sample = sorted(shared)[:3]
-            reasons.insert(0, f"Shares terms with your brief: {', '.join(sample)}")
+            reasons.insert(0, f"Related to your ask: {', '.join(sample)}")
             matched.extend(sample)
+        elif category_hit:
+            score += 0.2
+            reasons.insert(0, f"Same category family as your ask ({category_name})")
+            if category_name:
+                matched.append(category_name)
 
-        if category_name:
-            score += WEIGHT_CATEGORY * max(cat_score, 0.25)
-            reasons.append(f"Listed under {category_name}")
+        reasons.append("Supplier is verified on TradeBay")
 
         availability = AvailabilityStatus.UNKNOWN
         if inventory is not None:
@@ -380,19 +469,11 @@ class RecommendationEngine:
                 availability = (
                     AvailabilityStatus.IN_STOCK if available >= 20 else AvailabilityStatus.LIMITED
                 )
-                score += WEIGHT_INVENTORY * 0.8
+                score += WEIGHT_INVENTORY * 0.6
                 reasons.append("Inventory shows available stock")
             else:
                 availability = AvailabilityStatus.OUT_OF_STOCK
 
-        if requirements.business_type and (
-            requirements.business_type.lower() in name.lower()
-            or requirements.business_type.lower() in (category_name or "").lower()
-        ):
-            score += 0.08
-            reasons.append(f"Fits {requirements.business_type} sourcing")
-
-        # Keep similar scores in the partial band so exact matches stay on top
         score = min(score, 0.44)
 
         return ScoredCandidate(
@@ -403,7 +484,11 @@ class RecommendationEngine:
             category_name=category_name,
             score=round(score, 4),
             matched=matched,
-            unmatched=list(requirements.product_requirements),
+            unmatched=[
+                r
+                for r in requirements.product_requirements
+                if r.lower() not in {m.lower() for m in matched}
+            ],
             reasons=self._unique_reasons(reasons),
             availability=availability,
             similar=True,

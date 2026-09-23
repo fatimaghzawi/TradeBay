@@ -34,25 +34,142 @@ class AIProvider(ABC):
         raise NotImplementedError
 
 
+# Plural-safe patterns: "beverage" and "beverages" both match.
 _PRODUCT_HINTS: list[tuple[re.Pattern[str], str, str]] = [
-    (re.compile(r"\b(beverage|drink|soft drink|soda|juice|water|bottled water)\b", re.I), "beverages", "Beverages"),
-    (re.compile(r"\b(clean(?:ing)?|detergent|soap|disinfectant|household)\b", re.I), "cleaning products", "Cleaning"),
-    (re.compile(r"\b(snack|chips|biscuit|candy|chocolate)\b", re.I), "snacks", "Snacks"),
-    (re.compile(r"\b(dairy|milk|cheese|yogurt)\b", re.I), "dairy", "Dairy"),
-    (re.compile(r"\b(fruit|vegetable|produce|fresh)\b", re.I), "fresh produce", "Produce"),
-    (re.compile(r"\b(rice|grain|pasta|oil|pantry|grocery)\b", re.I), "grocery staples", "Grocery"),
-    (re.compile(r"\b(meat|poultry|chicken|beef)\b", re.I), "meat", "Meat"),
-    (re.compile(r"\b(electronics|cable|charger|device)\b", re.I), "electronics", "Electronics"),
-    (re.compile(r"\b(build(?:ing)?|cement|steel|hardware|construction)\b", re.I), "construction materials", "Construction"),
+    (
+        re.compile(
+            r"\b(beverages?|drinks?|soft[\s-]?drinks?|sodas?|juices?|"
+            r"bottled\s+waters?|mineral\s+waters?|waters?)\b",
+            re.I,
+        ),
+        "beverages",
+        "Beverages",
+    ),
+    (
+        re.compile(
+            r"\b(clean(?:ing|ers?)?|detergents?|soaps?|disinfectants?|"
+            r"household\s+clean(?:ing|ers?)?)\b",
+            re.I,
+        ),
+        "cleaning products",
+        "Cleaning",
+    ),
+    (
+        re.compile(r"\b(snacks?|chips?|biscuits?|cand(?:y|ies)|chocolates?)\b", re.I),
+        "snacks",
+        "Snacks",
+    ),
+    (
+        re.compile(r"\b(dairy|milks?|cheeses?|yogurts?|labneh)\b", re.I),
+        "dairy",
+        "Dairy",
+    ),
+    (
+        re.compile(r"\b(fruits?|vegetables?|produce|fresh\s+produce)\b", re.I),
+        "fresh produce",
+        "Produce",
+    ),
+    (
+        re.compile(
+            r"\b(rices?|grains?|pastas?|oils?|olive\s+oils?|pantry|"
+            r"grocer(?:y|ies)|staples?|spices?|seasonings?)\b",
+            re.I,
+        ),
+        "grocery staples",
+        "Grocery",
+    ),
+    (
+        re.compile(r"\b(meats?|poultry|chickens?|beef|lamb)\b", re.I),
+        "meat",
+        "Meat",
+    ),
+    (
+        re.compile(
+            r"\b(electronics?|cables?|chargers?|devices?|appliances?)\b",
+            re.I,
+        ),
+        "electronics",
+        "Electronics",
+    ),
+    (
+        re.compile(
+            r"\b(build(?:ing)?|cements?|steels?|hardwares?|construction|"
+            r"building\s+materials?)\b",
+            re.I,
+        ),
+        "construction materials",
+        "Construction",
+    ),
+    (
+        re.compile(
+            r"\b(pharma(?:cy|ceuticals?)?|medicines?|drugs?|medical\s+supplies?|"
+            r"packaging)\b",
+            re.I,
+        ),
+        "pharmacy supplies",
+        "Pharmacy",
+    ),
+    (
+        re.compile(
+            r"\b(kitchen|housewares?|cookware|food[\s-]?service|hospitality\s+supplies?)\b",
+            re.I,
+        ),
+        "kitchen housewares",
+        "Housewares",
+    ),
+    (
+        re.compile(r"\b(papers?|packaging|plastics?|disposables?)\b", re.I),
+        "packaging materials",
+        "Packaging",
+    ),
 ]
 
 _BUSINESS_TYPES: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"\bsupermarket|grocery store|mini[- ]?market\b", re.I), "supermarket"),
-    (re.compile(r"\brestaurant|cafe|hotel|hospitality\b", re.I), "hospitality"),
+    (re.compile(r"\bsupermarket|grocery\s+store|mini[\s-]?market\b", re.I), "supermarket"),
+    (re.compile(r"\brestaurant|cafe|hôtel|hotel|hospitality|catering\b", re.I), "hospitality"),
     (re.compile(r"\bpharmacy|drugstore\b", re.I), "pharmacy"),
     (re.compile(r"\bwholesaler|distributor\b", re.I), "wholesaler"),
+    (re.compile(r"\bcontractor|construction\s+compan\w*\b", re.I), "contractor"),
     (re.compile(r"\bretaile?r|shop|store\b", re.I), "retailer"),
 ]
+
+# Capture free-form product lists: "looking for X, Y, and Z"
+_NEED_LIST = re.compile(
+    r"(?:looking\s+for|need(?:ing)?|want(?:ing)?|source|sourcing|buy(?:ing)?|"
+    r"suppliers?\s+(?:of|for)|restock(?:ing)?)\s+"
+    r"(.+?)(?:\.|$|\b(?:every|each|monthly|weekly|who|that|with|from|in\s+[A-Z]))",
+    re.I | re.S,
+)
+
+_STOP = frozenset(
+    {
+        "and",
+        "or",
+        "the",
+        "a",
+        "an",
+        "for",
+        "my",
+        "our",
+        "to",
+        "in",
+        "of",
+        "with",
+        "who",
+        "can",
+        "bulk",
+        "suppliers",
+        "supplier",
+        "products",
+        "product",
+        "some",
+        "good",
+        "best",
+        "local",
+        "verified",
+        "reliable",
+    }
+)
 
 
 class StubAIProvider(AIProvider):
@@ -81,6 +198,10 @@ class StubAIProvider(AIProvider):
                     products.append(product)
                 if category not in categories:
                     categories.append(category)
+
+        for phrase in self._extract_need_phrases(text):
+            if phrase not in products:
+                products.append(phrase)
 
         # Optional RAG vocabulary: surface catalog product/category names that
         # overlap the buyer's wording (still no invented prices or suppliers).
@@ -113,14 +234,20 @@ class StubAIProvider(AIProvider):
 
         location = None
         loc_match = re.search(
-            r"\b(?:in|from|based in|deliver(?:y)? to)\s+([A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*(?:,?\s*Lebanon)?)",
+            r"\b(?:in|from|based in|deliver(?:y)? to)\s+"
+            r"([A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*(?:,?\s*Lebanon)?)",
             text,
         )
         if loc_match:
             location = loc_match.group(1).strip(" .,")
-        elif re.search(r"\b(south lebanon|beirut|tyre|tripoli|saida|bekkaa?)\b", text, re.I):
-            m = re.search(r"\b(south lebanon|beirut|tyre|tripoli|saida|bekkaa?)\b", text, re.I)
-            location = m.group(1).title() if m else None
+        else:
+            m = re.search(
+                r"\b(south lebanon|mount lebanon|beirut|tyre|tripoli|saida|sidon|bekkaa?|zahle|jounieh)\b",
+                text,
+                re.I,
+            )
+            if m:
+                location = m.group(1).title()
 
         frequency = None
         if re.search(r"\b(every month|monthly)\b", text, re.I):
@@ -132,10 +259,7 @@ class StubAIProvider(AIProvider):
 
         delivery = None
         if re.search(r"\bdeliver", text, re.I):
-            if location:
-                delivery = f"Delivery to {location}"
-            else:
-                delivery = "Delivery required"
+            delivery = f"Delivery to {location}" if location else "Delivery required"
 
         prefs: list[str] = []
         if re.search(r"\bbulk\b", text, re.I):
@@ -147,7 +271,8 @@ class StubAIProvider(AIProvider):
 
         quantities: list[QuantityRequirement] = []
         for qty_match in re.finditer(
-            r"(\d[\d,]*(?:\.\d+)?)\s*(kg|tons?|cases?|units?|cartons?|liters?|l)\s+(?:of\s+)?([a-z][a-z\s-]{2,40})",
+            r"(\d[\d,]*(?:\.\d+)?)\s*(kg|tons?|cases?|units?|cartons?|liters?|l)\s+"
+            r"(?:of\s+)?([a-z][a-z\s-]{2,40})",
             text,
             re.I,
         ):
@@ -176,20 +301,12 @@ class StubAIProvider(AIProvider):
         if "budget" not in text.lower() and "price" not in text.lower():
             missing.append("preferred budget")
 
-        summary_bits = []
-        if business_type:
-            summary_bits.append(f"a {business_type}")
-        if products:
-            summary_bits.append("sourcing " + ", ".join(products[:4]))
-        if location:
-            summary_bits.append(f"in {location}")
-
         return ProcurementRequirements(
             business_type=business_type,
             business_description=text,
             location=location,
-            product_requirements=products,
-            categories=categories,
+            product_requirements=products[:12],
+            categories=categories[:12],
             quantities=quantities,
             purchase_frequency=frequency,
             delivery_requirements=delivery,
@@ -197,6 +314,51 @@ class StubAIProvider(AIProvider):
             budget_range=None,
             missing_information=missing,
         )
+
+    @staticmethod
+    def _extract_need_phrases(text: str) -> list[str]:
+        """Pull concrete items from 'looking for X, Y and Z' style clauses."""
+        found: list[str] = []
+        for match in _NEED_LIST.finditer(text):
+            chunk = match.group(1)
+            # Stop at delivery / frequency / "for my …" clauses
+            chunk = re.split(
+                r"\b(?:every|monthly|weekly|who|that|with|from|delivered|deliver|"
+                r"for\s+(?:my|our|a|the))\b",
+                chunk,
+                maxsplit=1,
+                flags=re.I,
+            )[0]
+            parts = re.split(r",|/|\band\b|\bor\b", chunk, flags=re.I)
+            for part in parts:
+                cleaned = re.sub(r"[^a-zA-Z0-9\s\-]", " ", part)
+                cleaned = re.sub(r"\s+", " ", cleaned).strip(" -")
+                if len(cleaned) < 3 or len(cleaned) > 48:
+                    continue
+                tokens = [t for t in cleaned.lower().split() if t not in _STOP]
+                if not tokens:
+                    continue
+                # Prefer multi-word product phrases; skip vague singles
+                if len(tokens) == 1 and tokens[0] in {
+                    "food",
+                    "help",
+                    "partners",
+                    "company",
+                    "stuff",
+                    "things",
+                    "items",
+                }:
+                    continue
+                # Skip vague partner/help phrases that aren't catalog products
+                if any(
+                    bad in tokens
+                    for bad in ("help", "partners", "partner", "nearby", "somewhere")
+                ):
+                    continue
+                label = cleaned.lower()
+                if label not in found:
+                    found.append(label)
+        return found[:8]
 
 
 class OpenAICompatibleProvider(AIProvider):
@@ -221,11 +383,18 @@ class OpenAICompatibleProvider(AIProvider):
         schema = ProcurementRequirements.model_json_schema()
         system = (
             "You extract procurement requirements for TradeBay, a Lebanese B2B wholesale marketplace. "
-            "Return ONLY JSON matching the schema. Extract only facts supported by the buyer's text. "
-            "Do not invent suppliers, products, prices, MOQs, ratings, or verification. "
-            "If catalog context is provided, use it only to align product/category wording with "
-            "real marketplace vocabulary — never invent listings from it. "
-            "Put unknowns in missing_information."
+            "Return ONLY JSON matching the schema. Rules:\n"
+            "1) Extract only facts supported by the buyer's text — never invent suppliers, prices, MOQs, "
+            "ratings, stock, or verification.\n"
+            "2) product_requirements must be short searchable product phrases buyers would type "
+            "(e.g. 'beverages', 'cleaning products', 'olive oil', 'cement') — include plurals as the "
+            "common catalog form and split compound asks into separate items.\n"
+            "3) categories should be marketplace category labels when clear "
+            "(Beverages, Cleaning, Grocery, Construction, etc.).\n"
+            "4) If catalog context is provided, use it only to align wording with real catalog "
+            "vocabulary — never invent listings from it.\n"
+            "5) Put unknowns in missing_information (location, quantities, frequency, budget).\n"
+            "6) Prefer concrete product nouns over vague words like 'partners' or 'supplies'."
         )
         context_block = ""
         if context and context.strip():
@@ -267,7 +436,8 @@ class OpenAICompatibleProvider(AIProvider):
                 data = json.loads(content)
                 if isinstance(data, dict) and "business_description" not in data:
                     data["business_description"] = business_description.strip()
-                return ProcurementRequirements.model_validate(data)
+                reqs = ProcurementRequirements.model_validate(data)
+                return self._normalize_requirements(reqs, business_description.strip())
         except AIProviderError:
             raise
         except Exception as exc:
@@ -275,6 +445,35 @@ class OpenAICompatibleProvider(AIProvider):
             raise AIProviderError(
                 "We couldn't understand your description right now. Please try again or enter your requirements manually."
             ) from exc
+
+    @staticmethod
+    def _normalize_requirements(
+        reqs: ProcurementRequirements,
+        original: str,
+    ) -> ProcurementRequirements:
+        """Dedupe and trim product lists so catalog search stays precise."""
+        products: list[str] = []
+        for item in reqs.product_requirements:
+            cleaned = re.sub(r"\s+", " ", (item or "").strip())
+            if len(cleaned) < 2:
+                continue
+            key = cleaned.lower()
+            if key not in {p.lower() for p in products}:
+                products.append(cleaned)
+        categories: list[str] = []
+        for item in reqs.categories:
+            cleaned = re.sub(r"\s+", " ", (item or "").strip())
+            if len(cleaned) < 2:
+                continue
+            if cleaned.lower() not in {c.lower() for c in categories}:
+                categories.append(cleaned)
+        return reqs.model_copy(
+            update={
+                "business_description": reqs.business_description or original,
+                "product_requirements": products[:16],
+                "categories": categories[:16],
+            }
+        )
 
 
 class FallbackAIProvider(AIProvider):
@@ -302,8 +501,22 @@ class FallbackAIProvider(AIProvider):
 
 
 def get_ai_provider(settings: Settings | None = None) -> AIProvider:
+    """Always use the configured LLM provider — no heuristic stub fallback."""
     cfg = settings or get_settings()
-    provider = (cfg.ai_provider or "stub").strip().lower()
-    if provider in {"openai", "openai_compatible", "llm"}:
-        return FallbackAIProvider(OpenAICompatibleProvider(cfg), StubAIProvider())
-    return StubAIProvider()
+    provider = (cfg.ai_provider or "openai").strip().lower()
+    has_key = bool(cfg.ai_api_key and cfg.ai_api_key.get_secret_value().strip())
+
+    if provider in {"heuristic", "stub", "none", "off"}:
+        # Explicit offline mode for unit tests / local demos without a key.
+        if provider in {"heuristic", "stub"}:
+            return StubAIProvider()
+        raise AIProviderError(
+            "AI is disabled. Set AI_PROVIDER=openai and AI_API_KEY to use Ask the Bay."
+        )
+
+    if not has_key:
+        raise AIProviderError(
+            "AI_API_KEY is required. Configure OpenAI on the server to use Ask the Bay."
+        )
+
+    return OpenAICompatibleProvider(cfg)

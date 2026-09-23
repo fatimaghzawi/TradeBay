@@ -42,6 +42,21 @@ from app.modules.catalog.constants import ProductStatus
 from app.modules.identity.constants import BusinessAccountType
 from app.shared.utils.objectid import parse_object_id
 
+# Expand catalog search so "beverages" also finds juice/water/etc.
+_SEARCH_SYNONYMS: dict[str, list[str]] = {
+    "beverages": ["beverage", "drink", "drinks", "soda", "juice", "water", "bottled"],
+    "beverage": ["beverages", "drink", "drinks", "soda", "juice", "water"],
+    "cleaning products": ["cleaning", "cleaner", "detergent", "soap", "disinfectant"],
+    "cleaning": ["cleaner", "detergent", "soap", "household"],
+    "grocery staples": ["grocery", "rice", "oil", "pasta", "spice", "pantry", "olive"],
+    "construction materials": ["construction", "cement", "steel", "hardware", "building"],
+    "pharmacy supplies": ["pharmacy", "medicine", "medical", "pharma", "packaging"],
+    "kitchen housewares": ["kitchen", "housewares", "cookware", "utensil"],
+    "snacks": ["snack", "chips", "biscuit", "candy", "chocolate"],
+    "dairy": ["milk", "cheese", "yogurt", "labneh"],
+    "meat": ["poultry", "chicken", "beef", "lamb"],
+}
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -288,7 +303,7 @@ class AISourcingService:
             categories_by_id=candidates["categories"],
             verified_business_ids=candidates["verified_ids"],
             limit=min(limit, RECOMMENDATION_LIMIT),
-            min_results=8,
+            min_results=0,
         )
 
         await self.recommendations.delete_for_request(doc["_id"])
@@ -374,15 +389,22 @@ class AISourcingService:
                 ]
             )
         )
-        # Also search individual tokens so "cleaning products" matches "cleaner"
+        # Synonym expansion + individual tokens so "cleaning products" matches "cleaner"
         token_terms: list[str] = []
+        expanded: list[str] = []
         for term in search_terms:
+            expanded.append(term)
+            for syn in _SEARCH_SYNONYMS.get(term.lower(), []):
+                expanded.append(syn)
             for token in re.findall(r"[a-z0-9]+", term.lower()):
                 if len(token) > 2 and token not in token_terms:
                     token_terms.append(token)
+                for syn in _SEARCH_SYNONYMS.get(token, []):
+                    if syn not in token_terms:
+                        token_terms.append(syn)
 
         or_clauses: list[dict[str, Any]] = []
-        for cleaned in [*search_terms, *token_terms]:
+        for cleaned in [*expanded, *token_terms]:
             text = cleaned.strip()
             if len(text) < 2:
                 continue
@@ -394,11 +416,17 @@ class AISourcingService:
         category_docs = await categories_col.find({"is_active": True}).to_list(length=200)
         categories_by_id = {str(c["_id"]): c for c in category_docs}
         category_ids: list[ObjectId] = []
+        match_against = [
+            *requirements.categories,
+            *requirements.product_requirements,
+            *expanded,
+            *token_terms,
+        ]
         for cat in category_docs:
             name = str(cat.get("name") or "").lower()
             if any(
                 term.lower() in name or name in term.lower()
-                for term in requirements.categories + requirements.product_requirements + token_terms
+                for term in match_against
                 if term
             ):
                 category_ids.append(cat["_id"])
@@ -407,40 +435,24 @@ class AISourcingService:
         or_filters: list[dict[str, Any]] = list(or_clauses)
         if category_ids:
             or_filters.append({"category_id": {"$in": category_ids}})
-        if or_filters:
-            query["$or"] = or_filters
+        if not or_filters:
+            # No extractable needs → empty haul (do not return random catalog).
+            return {
+                "products": [],
+                "suppliers": {},
+                "inventories": {},
+                "prices": {},
+                "categories": categories_by_id,
+                "verified_ids": set(),
+                "images": {},
+            }
+        query["$or"] = or_filters
 
         cursor = products_col.find(query).sort("updated_at", -1).limit(PRODUCT_CANDIDATE_LIMIT)
         products = await cursor.to_list(length=PRODUCT_CANDIDATE_LIMIT)
 
-        # Broaden the pool for similar recommendations when the net came back thin
-        if len(products) < 12:
-            verified_profiles = await profiles_col.find(
-                {"verification_status": "verified"}
-            ).to_list(length=120)
-            verified_biz_ids = [
-                p["business_account_id"] for p in verified_profiles if p.get("business_account_id")
-            ]
-            if verified_biz_ids:
-                broaden = (
-                    await products_col.find(
-                        {
-                            "status": ProductStatus.ACTIVE,
-                            "business_account_id": {"$in": verified_biz_ids},
-                        }
-                    )
-                    .sort("updated_at", -1)
-                    .limit(PRODUCT_CANDIDATE_LIMIT)
-                    .to_list(length=PRODUCT_CANDIDATE_LIMIT)
-                )
-                seen = {str(p["_id"]) for p in products}
-                for row in broaden:
-                    rid = str(row["_id"])
-                    if rid not in seen:
-                        products.append(row)
-                        seen.add(rid)
-                    if len(products) >= PRODUCT_CANDIDATE_LIMIT:
-                        break
+        # Never broaden to the entire verified catalog — that mixed unrelated categories
+        # (e.g. food into a construction ask). Similar ranking stays inside this query pool.
 
         business_ids = list({p["business_account_id"] for p in products if p.get("business_account_id")})
         verified_ids: set[str] = set()

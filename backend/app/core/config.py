@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = False
     rate_limit_per_minute: int = 60
 
-    ai_provider: str = "stub"
+    ai_provider: str = "openai"
     ai_api_key: SecretStr | None = None
     ai_timeout_seconds: int = 30
     ai_model: str | None = None

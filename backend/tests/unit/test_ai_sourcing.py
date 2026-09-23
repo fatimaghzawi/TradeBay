@@ -161,55 +161,81 @@ def test_verified_matching_product_is_recommended() -> None:
     assert any("verified" in r.lower() for r in ranked[0].reasons)
 
 
-def test_similar_recommendations_fill_thin_exact_haul() -> None:
-    """When nothing exact matches, verified catalog picks still surface as similar."""
+def test_similar_recommendations_require_topic_overlap() -> None:
+    """Unrelated catalog (food) must not fill a specialty ask; related items can."""
     engine = RecommendationEngine()
     requirements = ProcurementRequirements(
         business_description="I need rare volcanic glass beads for a boutique",
         product_requirements=["volcanic glass beads"],
         categories=["Specialty crafts"],
     )
-    product_id = ObjectId()
+    food_id = ObjectId()
+    craft_id = ObjectId()
     business_id = ObjectId()
-    cat_id = ObjectId()
+    food_cat = ObjectId()
+    craft_cat = ObjectId()
     ranked = engine.rank(
         requirements=requirements,
         products=[
             {
-                "_id": product_id,
+                "_id": food_id,
                 "business_account_id": business_id,
-                "category_id": cat_id,
+                "category_id": food_cat,
                 "name": "Olive Oil Extra Virgin 5L",
                 "description": "Cold pressed Lebanese oil for food service",
                 "status": "active",
                 "moq": 10,
                 "unit": "can",
                 "origin": "Lebanon",
-            }
+            },
+            {
+                "_id": craft_id,
+                "business_account_id": business_id,
+                "category_id": craft_cat,
+                "name": "Colored Glass Bead Assortment",
+                "description": "Decorative glass beads for craft boutiques",
+                "status": "active",
+                "moq": 5,
+                "unit": "pack",
+                "origin": "Lebanon",
+            },
         ],
-        suppliers_by_business={str(business_id): {"_id": business_id, "name": "Levant Oils"}},
+        suppliers_by_business={str(business_id): {"_id": business_id, "name": "Levant Crafts"}},
         inventories_by_product={
-            str(product_id): {"available_quantity": Decimal("80"), "product_id": product_id}
+            str(food_id): {"available_quantity": Decimal("80"), "product_id": food_id},
+            str(craft_id): {"available_quantity": Decimal("40"), "product_id": craft_id},
         },
         prices_by_product={
-            str(product_id): [
+            str(food_id): [
                 {
                     "unit_price": Decimal("28"),
                     "currency": "USD",
                     "is_active": True,
                     "min_quantity": 10,
                 }
-            ]
+            ],
+            str(craft_id): [
+                {
+                    "unit_price": Decimal("12"),
+                    "currency": "USD",
+                    "is_active": True,
+                    "min_quantity": 5,
+                }
+            ],
         },
-        categories_by_id={str(cat_id): {"_id": cat_id, "name": "Grocery"}},
+        categories_by_id={
+            str(food_cat): {"_id": food_cat, "name": "Grocery"},
+            str(craft_cat): {"_id": craft_cat, "name": "Specialty crafts"},
+        },
         verified_business_ids={str(business_id)},
         limit=10,
         min_results=4,
     )
-    assert len(ranked) >= 1
-    assert ranked[0].similar is True
+    ids = {str(r.product["_id"]) for r in ranked}
+    assert str(food_id) not in ids
+    assert str(craft_id) in ids
     assert ranked[0].score > 0
-    assert any("similar" in r.lower() for r in ranked[0].reasons)
+
     engine = RecommendationEngine()
     requirements = ProcurementRequirements(
         business_description="Need water",
