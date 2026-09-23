@@ -22,16 +22,21 @@ from app.core.middleware import (
 )
 from app.db.health import mongodb_is_healthy
 from app.db.mongodb import mongo_manager
-from app.modules.catalog.storage import CATEGORY_UPLOAD_DIR, PRODUCT_UPLOAD_DIR, UPLOAD_ROOT
+from app.modules.catalog.storage import CATEGORY_UPLOAD_DIR, PRODUCT_UPLOAD_DIR
 from app.modules.identity.storage import BUSINESS_UPLOAD_DIR
+from app.core.paths import UPLOAD_ROOT
 from app.shared.schemas.response import success
 
 logger = get_logger(__name__)
 
 
 def _configure_sentry(settings: Settings) -> None:
-    dsn = (settings.sentry_dsn or "").strip()
-    if not dsn:
+    dsn = (settings.sentry_dsn or "").strip().strip("\"'")
+    # Render often sets SENTRY_DSN="" — treat blank / placeholder as disabled.
+    if not dsn or dsn.lower() in {"none", "null", "undefined"}:
+        return
+    if "://" not in dsn:
+        logger.warning("sentry_dsn_invalid", reason="missing_scheme")
         return
     try:
         import sentry_sdk
@@ -40,16 +45,20 @@ def _configure_sentry(settings: Settings) -> None:
     except ImportError:
         logger.warning("sentry_sdk_missing")
         return
-    sentry_sdk.init(
-        dsn=dsn,
-        environment=str(settings.app_env),
-        traces_sample_rate=0.1 if settings.is_production else 0.0,
-        send_default_pii=False,
-        integrations=[
-            StarletteIntegration(transaction_style="endpoint"),
-            FastApiIntegration(transaction_style="endpoint"),
-        ],
-    )
+    try:
+        sentry_sdk.init(
+            dsn=dsn,
+            environment=str(settings.app_env),
+            traces_sample_rate=0.1 if settings.is_production else 0.0,
+            send_default_pii=False,
+            integrations=[
+                StarletteIntegration(transaction_style="endpoint"),
+                FastApiIntegration(transaction_style="endpoint"),
+            ],
+        )
+    except Exception:
+        logger.exception("sentry_init_failed")
+        return
     logger.info("sentry_configured", environment=str(settings.app_env))
 
 

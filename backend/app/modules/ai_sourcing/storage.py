@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import UploadFile
 
 from app.core.exceptions import BadRequestError
-from app.modules.catalog.storage import UPLOAD_ROOT
+from app.core.paths import UPLOAD_ROOT
 
 SOURCING_UPLOAD_DIR = UPLOAD_ROOT / "ai-sourcing"
 

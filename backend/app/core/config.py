@@ -64,6 +64,15 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = None
     otel_exporter_otlp_endpoint: str | None = None
 
+    @field_validator("sentry_dsn", "otel_exporter_otlp_endpoint", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, value: object) -> object:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip().strip("\"'"):
+            return None
+        return value
+
     @field_validator("cookie_samesite")
     @classmethod
     def validate_samesite(cls, value: str) -> str:

@@ -9,10 +9,10 @@ from pathlib import Path
 from fastapi import UploadFile
 
 from app.core.exceptions import BadRequestError
+from app.core.paths import UPLOAD_ROOT
 
 # backend/uploads/products/{product_id}/{file}
 # backend/uploads/categories/{category_id}/{file}
-UPLOAD_ROOT = Path(__file__).resolve().parents[3] / "uploads"
 PRODUCT_UPLOAD_DIR = UPLOAD_ROOT / "products"
 CATEGORY_UPLOAD_DIR = UPLOAD_ROOT / "categories"
 

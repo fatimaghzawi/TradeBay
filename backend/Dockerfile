@@ -21,9 +21,18 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload
 
 FROM deps AS production
 COPY app ./app
-RUN useradd --create-home --uid 10001 appuser
+RUN useradd --create-home --uid 10001 appuser \
+    && mkdir -p \
+        /home/appuser/uploads/products \
+        /home/appuser/uploads/categories \
+        /home/appuser/uploads/businesses \
+        /home/appuser/uploads/verification \
+        /home/appuser/uploads/delivery-evidence \
+        /home/appuser/uploads/ai-sourcing \
+    && chown -R appuser:appuser /home/appuser/uploads
 USER appuser
+ENV PORT=8000 \
+    UPLOAD_ROOT=/home/appuser/uploads
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# Render injects $PORT — bind to it so the platform health check succeeds.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]

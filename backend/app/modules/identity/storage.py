@@ -9,9 +9,9 @@ from pathlib import Path
 from fastapi import UploadFile
 
 from app.core.exceptions import BadRequestError, NotFoundError
+from app.core.paths import UPLOAD_ROOT
 from app.modules.identity.constants import REQUIRED_SUPPLIER_DOCUMENT_TYPES
 
-UPLOAD_ROOT = Path(__file__).resolve().parents[3] / "uploads"
 BUSINESS_UPLOAD_DIR = UPLOAD_ROOT / "businesses"
 
 ALLOWED_CONTENT_TYPES = frozenset(

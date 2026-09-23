@@ -9,8 +9,8 @@ from pathlib import Path
 from fastapi import UploadFile
 
 from app.core.exceptions import BadRequestError, NotFoundError
+from app.core.paths import UPLOAD_ROOT
 
-UPLOAD_ROOT = Path(__file__).resolve().parents[3] / "uploads"
 EVIDENCE_DIR = UPLOAD_ROOT / "delivery-evidence"
 
 ALLOWED_CONTENT_TYPES = frozenset(
