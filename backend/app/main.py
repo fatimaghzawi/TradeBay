@@ -135,6 +135,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         StaticFiles(directory=str(BUSINESS_UPLOAD_DIR)),
         name="business_uploads",
     )
+    @app.get("/", tags=["Health"], summary="API root")
+    async def root() -> dict[str, Any]:
+        return success(
+            {
+                "app": settings.app_name,
+                "status": "ok",
+                "health": "/health",
+                "ready": "/ready",
+                "api": "/api/v1",
+            }
+        )
+
     @app.get("/health", tags=["Health"], summary="Liveness probe")
     async def health() -> dict[str, Any]:
         return success(
