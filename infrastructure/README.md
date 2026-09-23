@@ -1,2 +1,0 @@
-# TradeBay Infrastructure
-

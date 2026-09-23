@@ -6,7 +6,6 @@ build-backend = "hatchling.build"
 name = "tradebay-backend"
 version = "0.1.0"
 description = "TradeBay modular monolith API"
-readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Proprietary" }
 authors = [{ name = "TradeBay" }]

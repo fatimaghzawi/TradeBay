@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
-COPY pyproject.toml README.md ./
+COPY pyproject.toml ./
 RUN pip install --upgrade pip && pip install .
 
 FROM deps AS development
