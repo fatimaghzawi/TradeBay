@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminLebanonMap } from "@/components/admin/AdminLebanonMap";
 import { DirectoryMast } from "@/components/shared/DirectoryMast";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { ApiError } from "@/lib/api/client";
@@ -22,71 +23,6 @@ type OpsSnapshot = {
   suppliers: number;
   pendingSuppliers: number;
 };
-
-const LEBANON_CITIES = [
-  { name: "Beirut", count: 1240, x: 48, y: 42 },
-  { name: "Tripoli", count: 426, x: 46, y: 18 },
-  { name: "Zahle", count: 312, x: 58, y: 38 },
-  { name: "Saida", count: 278, x: 44, y: 58 },
-  { name: "Tyre", count: 198, x: 42, y: 78 },
-  { name: "Nabatieh", count: 164, x: 52, y: 72 },
-] as const;
-
-function LebanonFootprintMap() {
-  const [selected, setSelected] = useState<string | null>(null);
-  const active = LEBANON_CITIES.find((city) => city.name === selected) ?? null;
-
-  function toggle(name: string) {
-    setSelected((current) => (current === name ? null : name));
-  }
-
-  return (
-    <div className="tb-cc-map__body">
-      <div className="tb-cc-map__canvas">
-        <Image
-          src="/images/admin/lebanon-map.png"
-          alt=""
-          fill
-          sizes="420px"
-          className="object-contain"
-        />
-        {LEBANON_CITIES.map((city) => (
-          <button
-            key={city.name}
-            type="button"
-            className="tb-cc-map__pin"
-            data-active={selected === city.name || undefined}
-            style={{ left: `${city.x}%`, top: `${city.y}%` }}
-            aria-pressed={selected === city.name}
-            aria-label={`${city.name}, ${city.count.toLocaleString()} businesses`}
-            onClick={() => toggle(city.name)}
-          />
-        ))}
-        {active ? (
-          <p className="tb-cc-map__tip" style={{ left: `${active.x}%`, top: `${active.y}%` }}>
-            <strong>{active.name}</strong>
-            <span>{active.count.toLocaleString()} businesses</span>
-          </p>
-        ) : null}
-      </div>
-      <ul className="tb-cc-map__list">
-        {LEBANON_CITIES.map((city) => (
-          <li key={city.name}>
-            <button
-              type="button"
-              data-active={selected === city.name || undefined}
-              aria-pressed={selected === city.name}
-              onClick={() => toggle(city.name)}
-            >
-              <span>{city.name}</span>
-              <strong>{city.count.toLocaleString()}</strong>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 const CATEGORIES = [
   { name: "Electronics", pct: 28 },
@@ -218,6 +154,8 @@ export function AdminCommandCenter() {
   const [pendingRows, setPendingRows] = useState<Business[]>([]);
   const [recentUsers, setRecentUsers] = useState<PlatformUser[]>([]);
   const [recentBusinesses, setRecentBusinesses] = useState<Business[]>([]);
+  const [mapBusinesses, setMapBusinesses] = useState<Business[]>([]);
+  const [mapTruncated, setMapTruncated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [queueTab, setQueueTab] = useState<"suppliers" | "businesses" | "products">(
@@ -288,14 +226,14 @@ export function AdminCommandCenter() {
             }),
         canBusinesses
           ? identityApi
-              .listPlatformBusinesses({ page: 1, page_size: 6 })
+              .listPlatformBusinesses({ page: 1, page_size: 100 })
               .catch(() => ({
                 data: [] as Business[],
-                meta: { total: 0, page: 1, page_size: 6 },
+                meta: { total: 0, page: 1, page_size: 100 },
               }))
           : Promise.resolve({
               data: [] as Business[],
-              meta: { total: 0, page: 1, page_size: 6 },
+              meta: { total: 0, page: 1, page_size: 100 },
             }),
         canMoney ? platformMoneyApi.overview().catch(() => null) : Promise.resolve(null),
       ]);
@@ -308,7 +246,9 @@ export function AdminCommandCenter() {
       });
       setPendingRows(pendingPage.data);
       setRecentUsers(usersPage.data);
-      setRecentBusinesses(businessesPage.data);
+      setRecentBusinesses(businessesPage.data.slice(0, 6));
+      setMapBusinesses(businessesPage.data);
+      setMapTruncated((businessesPage.meta?.total ?? businessesPage.data.length) > businessesPage.data.length);
       setMoney(moneyOverview);
       setError(null);
     } catch (err) {
@@ -490,7 +430,7 @@ export function AdminCommandCenter() {
             <h2>TradeBay Across Lebanon</h2>
             <span>Live footprint</span>
           </header>
-          <LebanonFootprintMap />
+          <AdminLebanonMap businesses={mapBusinesses} truncated={mapTruncated} />
         </article>
 
         <article className="tb-cc-panel tb-cc-activity">
