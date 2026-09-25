@@ -105,14 +105,6 @@ const TOP_SUPPLIERS = [
   { name: "Tyre Fresh", orders: 210 },
 ] as const;
 
-const HEALTH = [
-  { name: "API", status: "Operational" },
-  { name: "Database", status: "Operational" },
-  { name: "Payments", status: "Operational" },
-  { name: "Email", status: "Operational" },
-  { name: "Storage", status: "Operational" },
-] as const;
-
 function cityOf(b: Business) {
   return b.address?.city || b.address?.governorate || "Lebanon";
 }
@@ -216,31 +208,6 @@ function ActivityChart({ series }: { series: number[] }) {
         strokeLinejoin="round"
       />
     </svg>
-  );
-}
-
-function UsageRing({ pct }: { pct: number }) {
-  const r = 42;
-  const c = 2 * Math.PI * r;
-  const offset = c * (1 - Math.min(1, Math.max(0, pct / 100)));
-  return (
-    <div className="tb-cc-ring" aria-label={`${pct}% storage used`}>
-      <svg viewBox="0 0 108 108">
-        <circle cx="54" cy="54" r={r} className="tb-cc-ring__track" />
-        <circle
-          cx="54"
-          cy="54"
-          r={r}
-          className="tb-cc-ring__value"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-        />
-      </svg>
-      <div className="tb-cc-ring__label">
-        <strong>{pct}%</strong>
-        <span>Storage</span>
-      </div>
-    </div>
   );
 }
 
@@ -554,30 +521,6 @@ export function AdminCommandCenter() {
           </div>
           <ActivityChart series={activitySeries} />
         </article>
-
-        <div className="tb-cc-side">
-          <article className="tb-cc-panel">
-            <header className="tb-cc-panel__head">
-              <h2>Platform Health</h2>
-            </header>
-            <ul className="tb-cc-health">
-              {HEALTH.map((row) => (
-                <li key={row.name}>
-                  <span className="tb-cc-health__dot" />
-                  <strong>{row.name}</strong>
-                  <em>{row.status}</em>
-                </li>
-              ))}
-            </ul>
-          </article>
-          <article className="tb-cc-panel tb-cc-usage">
-            <header className="tb-cc-panel__head">
-              <h2>System Usage</h2>
-            </header>
-            <UsageRing pct={68} />
-            <p>68 GB of 100 GB used</p>
-          </article>
-        </div>
       </section>
 
       <section className="tb-cc-ops">
@@ -751,7 +694,6 @@ export function AdminCommandCenter() {
         <Link href={ROUTES.admin.suppliers}>Verify Supplier</Link>
         <Link href={ROUTES.admin.finance}>Review Payouts</Link>
         <Link href={ROUTES.admin.users}>Manage Users</Link>
-        <Link href={ROUTES.admin.settings}>Send Announcement</Link>
         <p className="tb-cc-actions__who">
           Signed in as <strong>{displayName}</strong>
         </p>
