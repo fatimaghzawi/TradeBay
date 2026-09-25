@@ -1,4 +1,3 @@
-"""Idempotent startup seed: permissions, platform tenant, admin login, and settings."""
 
 from __future__ import annotations
 
@@ -48,16 +47,15 @@ logger = get_logger(__name__)
 
 PLATFORM_BUSINESS_NAME = "TradeBay"
 PLATFORM_ADMIN_EMAIL = "admin@tradebay.com"
-PLATFORM_ADMIN_PASSWORD = "AdminPass123!"  # override via PLATFORM_ADMIN_PASSWORD env in real deploys
+PLATFORM_ADMIN_PASSWORD = "AdminPass123!"                                                            
 _permission_index_cache: dict[str, ObjectId] | None = None
-
 
 def _platform_admin_password() -> str:
     import os
 
     return (os.environ.get("PLATFORM_ADMIN_PASSWORD") or PLATFORM_ADMIN_PASSWORD).strip()
 
-# Demo SKUs shown on the public landing rail until a supplier flags others.
+                                                                           
 _FEATURED_LANDING_SKUS = (
     "LEV-OIL-1L",
     "ZFI-HONEY",
@@ -66,7 +64,6 @@ _FEATURED_LANDING_SKUS = (
     "TYR-FISH-ICE",
     "MSP-TEA-HERB",
 )
-
 
 async def seed_startup() -> None:
     await seed_permissions()
@@ -85,9 +82,7 @@ async def seed_startup() -> None:
         platform_admin=platform_admin,
     )
 
-
 async def seed_featured_landing_products() -> int:
-    """Flag known demo SKUs as featured when none are marked yet."""
     products = mongo_manager.collection(CollectionName.PRODUCTS)
     already = await products.count_documents({"is_featured": True})
     if already:
@@ -98,11 +93,9 @@ async def seed_featured_landing_products() -> int:
     )
     return int(result.modified_count)
 
-
 async def seed_existing_trading_business_roles(
     permission_index: dict[str, ObjectId] | None = None,
 ) -> int:
-    """Ensure every buyer/supplier business has system roles + up-to-date grants."""
     index = permission_index or await _permission_index()
     businesses = BusinessRepository()
     rows = await businesses.find_many(
@@ -112,7 +105,6 @@ async def seed_existing_trading_business_roles(
     for business in rows:
         await _seed_roles_for_business(business["_id"], TRADING_SYSTEM_ROLES, index)
     return len(rows)
-
 
 async def seed_permissions() -> None:
     global _permission_index_cache
@@ -134,7 +126,6 @@ async def seed_permissions() -> None:
                 pass
     _permission_index_cache = None
 
-
 async def seed_trading_roles(
     business_account_id: ObjectId,
     *,
@@ -142,7 +133,6 @@ async def seed_trading_roles(
     session: MongoSession = None,
     fresh: bool = False,
 ) -> dict[str, dict[str, Any]]:
-    """Create the five undeletable system roles for a trading company."""
     index = permission_index or await _permission_index()
     return await _seed_roles_for_business(
         business_account_id,
@@ -152,7 +142,6 @@ async def seed_trading_roles(
         fresh=fresh,
     )
 
-
 async def seed_platform_business(
     permission_index: dict[str, ObjectId] | None = None,
 ) -> dict[str, Any]:
@@ -160,19 +149,24 @@ async def seed_platform_business(
     existing = await businesses.find_one({"type": BusinessAccountType.PLATFORM})
     now = utc_now()
     if existing is None:
-        existing = await businesses.create(
-            {
-                "name": PLATFORM_BUSINESS_NAME,
-                "type": BusinessAccountType.PLATFORM,
-                "status": BusinessAccountStatus.VERIFIED,
-                "legal_name": PLATFORM_BUSINESS_NAME,
-                "tax_number": None,
-                "logo_url": "/images/logos/tradebay.svg",
-                "address": None,
-                "created_at": now,
-                "updated_at": now,
-            }
-        )
+        try:
+            existing = await businesses.create(
+                {
+                    "name": PLATFORM_BUSINESS_NAME,
+                    "type": BusinessAccountType.PLATFORM,
+                    "status": BusinessAccountStatus.VERIFIED,
+                    "legal_name": PLATFORM_BUSINESS_NAME,
+                    "tax_number": None,
+                    "logo_url": "/images/logos/tradebay.svg",
+                    "address": None,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            )
+        except DuplicateKeyError:
+            existing = await businesses.find_one({"type": BusinessAccountType.PLATFORM})
+            if existing is None:
+                raise
     elif not existing.get("logo_url"):
         existing = (
             await businesses.update(
@@ -185,13 +179,7 @@ async def seed_platform_business(
     await _seed_roles_for_business(existing["_id"], PLATFORM_SYSTEM_ROLES, index)
     return existing
 
-
 async def seed_platform_admin(platform: dict[str, Any] | None) -> str:
-    """Ensure the local platform admin login exists (skipped in production/test).
-
-    Creates the user and Platform Admin membership when missing. Does not reset
-    an existing password on every API restart.
-    """
     settings = get_settings()
     if settings.is_production or settings.is_test or platform is None:
         return "skipped"
@@ -203,21 +191,26 @@ async def seed_platform_admin(platform: dict[str, Any] | None) -> str:
     user = await users.get_by_email(email)
     created_user = False
     if user is None:
-        user = await users.create(
-            {
-                "email": email,
-                "personal_email": email,
-                "password_hash": hash_password(_platform_admin_password()),
-                "first_name": "Platform",
-                "last_name": "Admin",
-                "phone": None,
-                "status": UserStatus.ACTIVE,
-                "email_verified_at": now,
-                "created_at": now,
-                "updated_at": now,
-            }
-        )
-        created_user = True
+        try:
+            user = await users.create(
+                {
+                    "email": email,
+                    "personal_email": email,
+                    "password_hash": hash_password(_platform_admin_password()),
+                    "first_name": "Platform",
+                    "last_name": "Admin",
+                    "phone": None,
+                    "status": UserStatus.ACTIVE,
+                    "email_verified_at": now,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            )
+            created_user = True
+        except DuplicateKeyError:
+            user = await users.get_by_email(email)
+            if user is None:
+                raise
     role = await roles.find_one(
         {"business_account_id": platform["_id"], "name": SYSTEM_ROLE_PLATFORM_ADMIN}
     )
@@ -225,17 +218,20 @@ async def seed_platform_admin(platform: dict[str, Any] | None) -> str:
         return "missing_role"
     membership = await memberships.get_for_user_business(user["_id"], platform["_id"])
     if membership is None:
-        await memberships.create(
-            {
-                "user_id": user["_id"],
-                "business_account_id": platform["_id"],
-                "role_id": role["_id"],
-                "status": MembershipStatus.ACTIVE,
-                "joined_at": now,
-                "created_at": now,
-                "updated_at": now,
-            }
-        )
+        try:
+            await memberships.create(
+                {
+                    "user_id": user["_id"],
+                    "business_account_id": platform["_id"],
+                    "role_id": role["_id"],
+                    "status": MembershipStatus.ACTIVE,
+                    "joined_at": now,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            )
+        except DuplicateKeyError:
+            return "exists"
         return "created" if created_user else "membership_created"
     if membership.get("status") != MembershipStatus.ACTIVE or membership.get("role_id") != role["_id"]:
         await memberships.update(
@@ -248,7 +244,6 @@ async def seed_platform_admin(platform: dict[str, Any] | None) -> str:
         )
         return "membership_updated"
     return "created" if created_user else "exists"
-
 
 async def seed_settings() -> None:
     now = utc_now()
@@ -304,7 +299,6 @@ async def seed_settings() -> None:
             }
         )
 
-
 async def _permission_index() -> dict[str, ObjectId]:
     global _permission_index_cache
     if _permission_index_cache is not None:
@@ -316,7 +310,6 @@ async def _permission_index() -> dict[str, ObjectId]:
     }
     return _permission_index_cache
 
-
 async def _seed_roles_for_business(
     business_account_id: ObjectId,
     role_names: tuple[str, ...],
@@ -325,11 +318,6 @@ async def _seed_roles_for_business(
     session: MongoSession = None,
     fresh: bool = False,
 ) -> dict[str, dict[str, Any]]:
-    """Seed system roles + grants.
-
-    `fresh=True` skips existence checks (new business create path) and bulk-inserts
-    roles + grants in two round-trips — critical on high-latency Atlas.
-    """
     roles = RoleRepository()
     grants = RolePermissionRepository()
     now = utc_now()
@@ -376,19 +364,27 @@ async def _seed_roles_for_business(
             session=session,
         )
         if role is None:
-            role = await roles.create(
-                {
-                    "business_account_id": business_account_id,
-                    "name": name,
-                    "description": f"System role: {name}",
-                    "is_system_role": True,
-                    "is_active": True,
-                    "deleted_at": None,
-                    "created_at": now,
-                    "updated_at": now,
-                },
-                session=session,
-            )
+            try:
+                role = await roles.create(
+                    {
+                        "business_account_id": business_account_id,
+                        "name": name,
+                        "description": f"System role: {name}",
+                        "is_system_role": True,
+                        "is_active": True,
+                        "deleted_at": None,
+                        "created_at": now,
+                        "updated_at": now,
+                    },
+                    session=session,
+                )
+            except DuplicateKeyError:
+                                                                         
+                if session is not None:
+                    raise
+                role = await roles.find_one({"business_account_id": business_account_id, "name": name})
+                if role is None:
+                    raise
         created[name] = role
         wanted = SYSTEM_ROLE_GRANTS.get(name, frozenset())
         wanted_ids = {
@@ -402,8 +398,8 @@ async def _seed_roles_for_business(
             session=session,
         )
         existing_ids = {row["permission_id"] for row in existing_rows}
-        # Drop grants that no longer belong to this system role (e.g. Sales Rep
-        # accidentally holding admin permissions).
+                                                                               
+                                                  
         stale_ids = existing_ids - wanted_ids
         if stale_ids:
             await grants.collection.delete_many(

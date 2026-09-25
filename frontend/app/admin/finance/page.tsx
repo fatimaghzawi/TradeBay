@@ -1,24 +1,12 @@
 "use client";
 
-import { ComingSoonView } from "@/components/shared/ComingSoonView";
-import { InventoryLinkBtn } from "@/components/catalog/InventoryUi";
-import { ROUTES } from "@/lib/constants";
+import { AdminFinance } from "@/components/commerce/AdminFinance";
+import { Suspense } from "react";
 
-export default function AdminFinanceComingSoonPage() {
+export default function AdminFinancePage() {
   return (
-    <ComingSoonView
-      kind="finance"
-      title="Platform finance is coming soon"
-      actions={
-        <>
-          <InventoryLinkBtn href={ROUTES.admin.home} tone="accent">
-            Admin home →
-          </InventoryLinkBtn>
-          <InventoryLinkBtn href={ROUTES.admin.businesses} tone="soft">
-            Businesses
-          </InventoryLinkBtn>
-        </>
-      }
-    />
+    <Suspense fallback={null}>
+      <AdminFinance />
+    </Suspense>
   );
 }

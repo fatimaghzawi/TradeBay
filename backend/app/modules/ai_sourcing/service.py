@@ -1,27 +1,24 @@
-"""AI Sourcing service — orchestrates extraction, profile, catalog match, draft request."""
 
 from __future__ import annotations
 
-import re
-from datetime import UTC, datetime
+import logging
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
-
-from bson import ObjectId
 
 from app.core.config import get_settings
 from app.db.collections import CollectionName
 from app.db.mongodb import mongo_manager
+from app.modules.ai.eligibility import decide_eligibility
 from app.modules.ai.provider import AIProvider, get_ai_provider
-from app.modules.ai.rag import (
-    RagRetriever,
-    ensure_catalog_rag_index,
-    format_rag_context,
-    get_rag_retriever,
-)
+from app.modules.ai.quota import consume_ai_quota
 from app.modules.ai.requirements import ProcurementRequirements
+from app.modules.ai.retrieval import (
+    CatalogRetriever,
+    MongoHybridRetriever,
+    schedule_embedding_sync,
+)
 from app.modules.ai_sourcing.constants import (
-    PRODUCT_CANDIDATE_LIMIT,
     RECOMMENDATION_LIMIT,
     SourcingRequestStatus,
 )
@@ -38,33 +35,49 @@ from app.modules.ai_sourcing.repository import (
     SourcingRequestItemRepository,
     SourcingRequestRepository,
 )
-from app.modules.catalog.constants import ProductStatus
 from app.modules.identity.constants import BusinessAccountType
+from app.shared.utils.datetime import utc_now
 from app.shared.utils.objectid import parse_object_id
 
-# Expand catalog search so "beverages" also finds juice/water/etc.
-_SEARCH_SYNONYMS: dict[str, list[str]] = {
-    "beverages": ["beverage", "drink", "drinks", "soda", "juice", "water", "bottled"],
-    "beverage": ["beverages", "drink", "drinks", "soda", "juice", "water"],
-    "cleaning products": ["cleaning", "cleaner", "detergent", "soap", "disinfectant"],
-    "cleaning": ["cleaner", "detergent", "soap", "household"],
-    "grocery staples": ["grocery", "rice", "oil", "pasta", "spice", "pantry", "olive"],
-    "construction materials": ["construction", "cement", "steel", "hardware", "building"],
-    "pharmacy supplies": ["pharmacy", "medicine", "medical", "pharma", "packaging"],
-    "kitchen housewares": ["kitchen", "housewares", "cookware", "utensil"],
-    "snacks": ["snack", "chips", "biscuit", "candy", "chocolate"],
-    "dairy": ["milk", "cheese", "yogurt", "labneh"],
-    "meat": ["poultry", "chicken", "beef", "lamb"],
-}
-
+logger = logging.getLogger(__name__)
 
 def _now() -> datetime:
-    return datetime.now(UTC)
+    return utc_now()
 
+def _rfq_quantity(requirements: ProcurementRequirements, row: dict[str, Any]) -> int:
+    moq_raw = row.get("moq")
+    try:
+        moq = max(1, int(moq_raw)) if moq_raw is not None else 1
+    except (TypeError, ValueError):
+        moq = 1
+
+    product_name = str(row.get("product_name") or "").lower()
+    requested: float | None = None
+    for qty in requirements.quantities:
+        if qty.quantity is None or qty.quantity <= 0:
+            continue
+                                                                                     
+        if qty.product and qty.product.lower() in product_name:
+            requested = float(qty.quantity)
+            break
+        if requested is None:
+            requested = float(qty.quantity)
+    if requested is None:
+        return moq
+    return max(int(requested), moq)
+
+def _clarification(requirements: ProcurementRequirements) -> str | None:
+    missing = requirements.missing_information
+    if not missing:
+        return None
+    readable = ", ".join(missing[:4])
+    return (
+        f"I can search once you confirm. It would help to know {readable}. "
+        "You can add that above, or continue with what you already shared."
+    )
 
 def _oid_str(value: Any) -> str:
     return str(value)
-
 
 def _serialize_request(
     doc: dict[str, Any],
@@ -85,12 +98,10 @@ def _serialize_request(
         "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None,
     }
 
-
 def _money_str(value: Any) -> str | None:
     if value is None:
         return None
     return str(value)
-
 
 class AISourcingService:
     def __init__(
@@ -102,7 +113,7 @@ class AISourcingService:
         profiles: BusinessProcurementProfileRepository | None = None,
         ai: AIProvider | None = None,
         engine: RecommendationEngine | None = None,
-        rag: RagRetriever | None = None,
+        retriever: CatalogRetriever | None = None,
     ) -> None:
         self.requests = requests or SourcingRequestRepository()
         self.items = items or SourcingRequestItemRepository()
@@ -110,7 +121,8 @@ class AISourcingService:
         self.profiles = profiles or BusinessProcurementProfileRepository()
         self.ai = ai or get_ai_provider()
         self.engine = engine or RecommendationEngine()
-        self.rag = rag if rag is not None else get_rag_retriever()
+        embedder = self.ai if getattr(self.ai, "supports_generation", False) else None
+        self.retriever = retriever or MongoHybridRetriever(embedder=embedder)
 
     def _require_buyer(self, business: dict[str, Any] | None) -> str:
         if business is None:
@@ -137,11 +149,8 @@ class AISourcingService:
         business_description: str,
     ) -> dict[str, Any]:
         business_id = self._require_buyer(business)
-        rag_context = await self._rag_context(business_description)
-        requirements = await self.ai.extract_procurement_requirements(
-            business_description,
-            context=rag_context or None,
-        )
+        await consume_ai_quota(subject_id=business_id, feature="ai_sourcing_analyze")
+        requirements = await self.ai.extract_procurement_requirements(business_description)
         now = _now()
         doc = await self.requests.create(
             {
@@ -164,19 +173,8 @@ class AISourcingService:
             "sourcing_request_id": _oid_str(doc["_id"]),
             "requirements": requirements.model_dump(),
             "status": SourcingRequestStatus.DRAFT,
+            "clarification": _clarification(requirements),
         }
-
-    async def _rag_context(self, business_description: str) -> str:
-        """Retrieve catalog vocabulary for extraction. Empty when RAG is off."""
-        cfg = get_settings()
-        if not cfg.ai_rag_enabled:
-            return ""
-        store = await ensure_catalog_rag_index(self.rag, settings=cfg)
-        chunks = await store.retrieve(
-            business_description,
-            top_k=max(1, cfg.ai_rag_top_k),
-        )
-        return format_rag_context(chunks)
 
     def _summary(self, requirements: ProcurementRequirements) -> str:
         bits: list[str] = []
@@ -293,42 +291,112 @@ class AISourcingService:
             {"status": SourcingRequestStatus.SEARCHING, "updated_at": now},
         )
 
-        candidates = await self._load_catalog_candidates(requirements)
+        try:
+            retrieved = await self.retriever.retrieve(
+                requirements,
+                limit=get_settings().ai_max_candidates,
+            )
+        except Exception:
+            logger.exception("Catalog retrieval failed")
+            retrieved = []
+
+        if retrieved and getattr(self.ai, "supports_generation", False):
+            categories = {
+                str(item.product.get("category_id")): {"name": item.category_name}
+                for item in retrieved
+                if item.product.get("category_id")
+            }
+            schedule_embedding_sync(
+                [item.product for item in retrieved],
+                categories_by_id=categories,
+                embedder=self.ai,
+            )
+
+        eligible = []
+        for item in retrieved:
+            decision = decide_eligibility(
+                product=item.product,
+                inventory=item.inventory,
+                verified=item.verified,
+                requirements=requirements,
+            )
+            if decision.eligible:
+                eligible.append((item, decision))
+
+        products = [item.product for item, _decision in eligible]
+        suppliers = {
+            str(item.product.get("business_account_id")): item.supplier
+            for item, _decision in eligible
+            if item.product.get("business_account_id")
+        }
+        inventories = {
+            item.product_id: item.inventory
+            for item, _decision in eligible
+            if item.inventory is not None
+        }
+        prices = {item.product_id: item.prices for item, _decision in eligible}
+        categories_by_id = {}
+        for item, _decision in eligible:
+            cat_id = item.product.get("category_id")
+            if cat_id is not None:
+                categories_by_id[str(cat_id)] = {"_id": cat_id, "name": item.category_name}
+        verified_ids = {
+            str(item.product.get("business_account_id"))
+            for item, _decision in eligible
+            if item.verified and item.product.get("business_account_id")
+        }
+        semantic_scores = {
+            item.product_id: item.semantic_score
+            for item, _decision in eligible
+            if item.semantic_score is not None
+        }
+        moq_notes = {
+            decision.product_id: decision
+            for _item, decision in eligible
+        }
+
         scored = self.engine.rank(
             requirements=requirements,
-            products=candidates["products"],
-            suppliers_by_business=candidates["suppliers"],
-            inventories_by_product=candidates["inventories"],
-            prices_by_product=candidates["prices"],
-            categories_by_id=candidates["categories"],
-            verified_business_ids=candidates["verified_ids"],
+            products=products,
+            suppliers_by_business=suppliers,
+            inventories_by_product=inventories,
+            prices_by_product=prices,
+            categories_by_id=categories_by_id,
+            verified_business_ids=verified_ids,
             limit=min(limit, RECOMMENDATION_LIMIT),
             min_results=0,
+            semantic_scores=semantic_scores or None,
         )
 
         await self.recommendations.delete_for_request(doc["_id"])
         product_rows: list[dict[str, Any]] = []
         similar_count = 0
-        for item in scored:
-            product = item.product
-            price = item.price
-            if item.similar:
+        images = await self._primary_image_urls([item.product["_id"] for item, _d in eligible])
+        for ranked in scored:
+            product = ranked.product
+            price = ranked.price
+            if ranked.similar:
                 similar_count += 1
+            note = moq_notes.get(str(product.get("_id")))
+            reasons = list(ranked.reasons)
+            if note and note.moq_compatible is False:
+                reasons.append("The quantity you mentioned is below this product's minimum order.")
             rec = await self.recommendations.create(
                 {
                     "sourcing_request_id": doc["_id"],
                     "sourcing_request_item_id": None,
                     "product_id": product["_id"],
                     "business_account_id": product["business_account_id"],
-                    "reason": item.reasons[0] if item.reasons else None,
-                    "match_score": item.score,
-                    "relevance_label": relevance_label(item.score),
-                    "matched_requirements": item.matched,
-                    "unmatched_requirements": item.unmatched,
-                    "reasons": item.reasons,
+                    "reason": reasons[0] if reasons else None,
+                    "match_score": ranked.score,
+                    "relevance_label": relevance_label(ranked.score),
+                    "matched_requirements": ranked.matched,
+                    "unmatched_requirements": ranked.unmatched,
+                    "reasons": reasons,
+                    "signals": ranked.signals,
                     "estimated_unit_price": price.get("unit_price") if price else None,
                     "estimated_total_price": None,
-                    "availability_status": item.availability,
+                    "availability_status": ranked.availability,
                     "created_at": now,
                 }
             )
@@ -336,26 +404,29 @@ class AISourcingService:
                 self._serialize_recommendation(
                     rec,
                     product=product,
-                    supplier=item.supplier,
-                    category_name=item.category_name,
+                    supplier=ranked.supplier,
+                    category_name=ranked.category_name,
                     price=price,
                     verified=True,
-                    primary_image_url=candidates["images"].get(str(product["_id"])),
+                    primary_image_url=images.get(str(product["_id"])),
+                    signals=ranked.signals,
                 )
             )
 
-        suppliers = self._aggregate_suppliers(product_rows)
+        suppliers_out = self._aggregate_suppliers(product_rows)
+        message: str | None = None
         suggestions: list[str] = []
+        loose_match = bool(product_rows) and similar_count >= max(1, len(product_rows) // 2)
         if not product_rows:
+            message = "I couldn't find a verified supplier that currently meets your requirements."
             suggestions = [
-                "Try broadening product categories",
-                "Add alternate product names",
-                "Ask platform staff to verify more suppliers in your categories",
+                "Try a broader product type",
+                "Try a different quantity",
+                "Describe what you need another way",
             ]
-        elif similar_count and similar_count >= max(1, len(product_rows) // 2):
-            suggestions = [
-                "Showing similar catalog matches — refine your brief for tighter fits",
-            ]
+        elif loose_match:
+            message = "These are related listings from verified suppliers."
+            suggestions = ["Add a more specific product name for a tighter match"]
 
         await self.requests.update(
             doc["_id"],
@@ -366,138 +437,13 @@ class AISourcingService:
             "sourcing_request_id": _oid_str(doc["_id"]),
             "status": SourcingRequestStatus.COMPLETED,
             "products": product_rows,
-            "suppliers": suppliers,
+            "suppliers": suppliers_out,
+            "message": message,
             "suggestions": suggestions,
-        }
-
-    async def _load_catalog_candidates(
-        self, requirements: ProcurementRequirements
-    ) -> dict[str, Any]:
-        products_col = mongo_manager.collection(CollectionName.PRODUCTS)
-        categories_col = mongo_manager.collection(CollectionName.CATEGORIES)
-        inventories_col = mongo_manager.collection(CollectionName.INVENTORIES)
-        prices_col = mongo_manager.collection(CollectionName.PRODUCT_PRICES)
-        businesses_col = mongo_manager.collection(CollectionName.BUSINESS_ACCOUNTS)
-        profiles_col = mongo_manager.collection(CollectionName.SUPPLIER_PROFILES)
-
-        search_terms = list(
-            dict.fromkeys(
-                [
-                    *requirements.product_requirements,
-                    *requirements.categories,
-                    *[q.product for q in requirements.quantities],
-                ]
-            )
-        )
-        # Synonym expansion + individual tokens so "cleaning products" matches "cleaner"
-        token_terms: list[str] = []
-        expanded: list[str] = []
-        for term in search_terms:
-            expanded.append(term)
-            for syn in _SEARCH_SYNONYMS.get(term.lower(), []):
-                expanded.append(syn)
-            for token in re.findall(r"[a-z0-9]+", term.lower()):
-                if len(token) > 2 and token not in token_terms:
-                    token_terms.append(token)
-                for syn in _SEARCH_SYNONYMS.get(token, []):
-                    if syn not in token_terms:
-                        token_terms.append(syn)
-
-        or_clauses: list[dict[str, Any]] = []
-        for cleaned in [*expanded, *token_terms]:
-            text = cleaned.strip()
-            if len(text) < 2:
-                continue
-            escaped = re.escape(text)
-            or_clauses.append({"name": {"$regex": escaped, "$options": "i"}})
-            or_clauses.append({"description": {"$regex": escaped, "$options": "i"}})
-
-        # Category name → ids
-        category_docs = await categories_col.find({"is_active": True}).to_list(length=200)
-        categories_by_id = {str(c["_id"]): c for c in category_docs}
-        category_ids: list[ObjectId] = []
-        match_against = [
-            *requirements.categories,
-            *requirements.product_requirements,
-            *expanded,
-            *token_terms,
-        ]
-        for cat in category_docs:
-            name = str(cat.get("name") or "").lower()
-            if any(
-                term.lower() in name or name in term.lower()
-                for term in match_against
-                if term
-            ):
-                category_ids.append(cat["_id"])
-
-        query: dict[str, Any] = {"status": ProductStatus.ACTIVE}
-        or_filters: list[dict[str, Any]] = list(or_clauses)
-        if category_ids:
-            or_filters.append({"category_id": {"$in": category_ids}})
-        if not or_filters:
-            # No extractable needs → empty haul (do not return random catalog).
-            return {
-                "products": [],
-                "suppliers": {},
-                "inventories": {},
-                "prices": {},
-                "categories": categories_by_id,
-                "verified_ids": set(),
-                "images": {},
-            }
-        query["$or"] = or_filters
-
-        cursor = products_col.find(query).sort("updated_at", -1).limit(PRODUCT_CANDIDATE_LIMIT)
-        products = await cursor.to_list(length=PRODUCT_CANDIDATE_LIMIT)
-
-        # Never broaden to the entire verified catalog — that mixed unrelated categories
-        # (e.g. food into a construction ask). Similar ranking stays inside this query pool.
-
-        business_ids = list({p["business_account_id"] for p in products if p.get("business_account_id")})
-        verified_ids: set[str] = set()
-        suppliers: dict[str, dict[str, Any]] = {}
-        if business_ids:
-            profiles = await profiles_col.find(
-                {
-                    "business_account_id": {"$in": business_ids},
-                    "verification_status": "verified",
-                }
-            ).to_list(length=len(business_ids))
-            verified_ids = {str(p["business_account_id"]) for p in profiles}
-            businesses = await businesses_col.find({"_id": {"$in": business_ids}}).to_list(
-                length=len(business_ids)
-            )
-            for biz in businesses:
-                suppliers[str(biz["_id"])] = biz
-
-        product_ids = [p["_id"] for p in products]
-        inventories: dict[str, dict[str, Any]] = {}
-        prices: dict[str, list[dict[str, Any]]] = {}
-        if product_ids:
-            inv_rows = await inventories_col.find({"product_id": {"$in": product_ids}}).to_list(
-                length=len(product_ids)
-            )
-            for inv in inv_rows:
-                inventories[str(inv["product_id"])] = inv
-            price_rows = await prices_col.find(
-                {"product_id": {"$in": product_ids}, "is_active": True}
-            ).sort("min_quantity", 1).to_list(length=max(len(product_ids) * 10, 1))
-            for price in price_rows:
-                prices.setdefault(str(price["product_id"]), []).append(price)
-
-        return {
-            "products": products,
-            "suppliers": suppliers,
-            "inventories": inventories,
-            "prices": prices,
-            "categories": categories_by_id,
-            "verified_ids": verified_ids,
-            "images": await self._primary_image_urls(product_ids),
+            "loose_match": loose_match,
         }
 
     async def _primary_image_urls(self, product_ids: list[Any]) -> dict[str, str]:
-        """Map product_id → primary (or first) image URL."""
         if not product_ids:
             return {}
         images_col = mongo_manager.collection(CollectionName.PRODUCT_IMAGES)
@@ -524,8 +470,9 @@ class AISourcingService:
         price: dict[str, Any] | None,
         verified: bool,
         primary_image_url: str | None = None,
+        signals: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        return {
+        payload = {
             "id": _oid_str(rec["_id"]),
             "product_id": _oid_str(product["_id"]),
             "product_name": product.get("name"),
@@ -545,7 +492,9 @@ class AISourcingService:
             "matched_requirements": rec.get("matched_requirements") or [],
             "unmatched_requirements": rec.get("unmatched_requirements") or [],
             "reasons": rec.get("reasons") or [],
+            "signals": signals if signals is not None else rec.get("signals") or {},
         }
+        return payload
 
     def _aggregate_suppliers(self, product_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         buckets: dict[str, dict[str, Any]] = {}
@@ -585,7 +534,6 @@ class AISourcingService:
         business: dict[str, Any] | None,
         sourcing_request_id: str,
     ) -> dict[str, Any]:
-        """Materialize requirement items on the sourcing request. Remains DRAFT — never publishes RFQ."""
         business_id = self._require_buyer(business)
         doc = await self._get_owned_request(sourcing_request_id, business_id=business_id)
         raw_reqs = doc.get("requirements")
@@ -668,7 +616,7 @@ class AISourcingService:
         doc = await self._get_owned_request(sourcing_request_id, business_id=business_id)
         items = await self.items.list_for_request(doc["_id"])
         recs = await self.recommendations.list_for_request(doc["_id"])
-        # Re-hydrate product display for stored recommendations
+                                                               
         products_col = mongo_manager.collection(CollectionName.PRODUCTS)
         businesses_col = mongo_manager.collection(CollectionName.BUSINESS_ACCOUNTS)
         categories_col = mongo_manager.collection(CollectionName.CATEGORIES)
@@ -688,6 +636,17 @@ class AISourcingService:
                 length=max(len(business_ids), 1)
             )
         } if business_ids else {}
+        profiles_col = mongo_manager.collection(CollectionName.SUPPLIER_PROFILES)
+        verified_ids = {
+            str(row["business_account_id"])
+            for row in await profiles_col.find(
+                {
+                    "business_account_id": {"$in": business_ids},
+                    "verification_status": "verified",
+                },
+                {"business_account_id": 1},
+            ).to_list(length=max(len(business_ids), 1))
+        } if business_ids else set()
         cat_ids = [p["category_id"] for p in products.values() if p.get("category_id")]
         categories = {
             str(c["_id"]): c
@@ -709,6 +668,11 @@ class AISourcingService:
             pid = str(rec["product_id"]) if rec.get("product_id") else None
             product = products.get(pid or "")
             if not product:
+                continue
+            if str(product.get("status") or "").lower() != "active":
+                continue
+            business_key = str(product.get("business_account_id") or "")
+            if business_key not in verified_ids:
                 continue
             supplier = suppliers.get(str(product.get("business_account_id")), {})
             cat = categories.get(str(product.get("category_id")), {})
@@ -750,13 +714,13 @@ class AISourcingService:
     async def convert_to_rfq(
         self, *, user_id: str, business: dict[str, Any] | None, sourcing_request_id: str
     ) -> dict[str, Any]:
-        """Create a draft RFQ from a sourcing request + recommendations."""
         from app.modules.procurement.service import ProcurementService
 
         detail = await self.get_request(business=business, sourcing_request_id=sourcing_request_id)
         items_src = detail.get("items") or []
         products = (detail.get("recommendations") or {}).get("products") or []
         suppliers = (detail.get("recommendations") or {}).get("suppliers") or []
+        requirements = ProcurementRequirements.model_validate(detail.get("requirements") or {})
 
         rfq_items = []
         if products:
@@ -765,9 +729,9 @@ class AISourcingService:
                     {
                         "product_id": p.get("product_id"),
                         "product_name": p.get("product_name") or "Product",
-                        "sku": None,
-                        "quantity": "50",
-                        "unit": "unit",
+                        "sku": p.get("product_sku"),
+                        "quantity": str(_rfq_quantity(requirements, p)),
+                        "unit": p.get("unit") or "unit",
                         "target_unit_price": p.get("unit_price"),
                         "category_id": None,
                     }
@@ -796,8 +760,8 @@ class AISourcingService:
             user_id=user_id,
             business=business,
             payload={
-                "title": f"RFQ — {detail.get('title') or 'AI Sourcing'}",
-                "description": detail.get("business_description") or detail.get("notes"),
+                "title": f"RFQ — {detail.get('ai_summary') or 'AI Sourcing'}"[:200],
+                "description": detail.get("original_prompt"),
                 "destination": dest,
                 "currency": "USD",
                 "visibility": "invited",

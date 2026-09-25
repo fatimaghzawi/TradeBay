@@ -12,6 +12,7 @@ import {
   type InvitationPreview,
 } from "@/lib/api/identityApi";
 import { AUTH_QUERY_KEY, BUSINESSES_QUERY_KEY } from "@/lib/auth/session";
+import { BackLink } from "@/components/ui/BackLink";
 import { ROUTES } from "@/lib/constants";
 import { roleBlurb } from "@/lib/team";
 import { useAuth } from "@/providers/AuthProvider";
@@ -21,10 +22,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { BusyText } from "@/components/ui/LoadingState";
 
-/**
- * Accept invitation — unique "passport gate" layout (not AuthShell).
- * Left: invitation dossier. Right: full-bleed opportunity mural.
- */
 function AcceptInvitationContent() {
   const params = useSearchParams();
   const router = useRouter();
@@ -84,19 +81,19 @@ function AcceptInvitationContent() {
 
   return (
     <div className="flex min-h-svh flex-col lg:grid lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-      <section className="relative flex flex-1 flex-col bg-[#e8ebe6] px-6 py-8 sm:px-10 lg:px-14 lg:py-10">
+      <section className="relative flex flex-1 flex-col bg-muted px-6 py-8 sm:px-10 lg:px-14 lg:py-10">
         <Logo href="/" compact />
 
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
-          <p className="text-[0.7rem] font-bold uppercase tracking-[0.28em] text-[#e86f2a]">
+          <p className="text-[0.7rem] font-bold uppercase tracking-[0.28em] text-accent-text">
             Invitation
           </p>
-          <h1 className="mt-3 font-[family-name:var(--font-outfit)] text-[2rem] leading-tight tracking-tight text-[#0d3b2a] sm:text-[2.35rem]">
+          <h1 className="mt-3 font-[family-name:var(--font-outfit)] text-[2rem] leading-tight tracking-tight text-heading sm:text-[2.35rem]">
             You&apos;ve been invited!
           </h1>
-          <p className="mt-3 text-[1.02rem] leading-relaxed text-[#5a6a62]">
+          <p className="mt-3 text-[1.02rem] leading-relaxed text-muted-foreground">
             Join{" "}
-            <span className="font-semibold text-[#0d3b2a]">{businessName}</span>{" "}
+            <span className="font-semibold text-heading">{businessName}</span>{" "}
             on TradeBay.
           </p>
 
@@ -110,7 +107,7 @@ function AcceptInvitationContent() {
               </FeedbackBanner>
               <Link
                 href={ROUTES.dashboard}
-                className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#0d3b2a] text-sm font-semibold text-white"
+                className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground"
               >
                 Go to dashboard →
               </Link>
@@ -122,54 +119,49 @@ function AcceptInvitationContent() {
               <FeedbackBanner tone="info" title="Invitation declined">
                 <p>No membership was created. You can close this page.</p>
               </FeedbackBanner>
-              <Link
-                href={ROUTES.home}
-                className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-[#dce5e0] text-sm font-semibold text-[#0d3b2a]"
-              >
-                Back to TradeBay
-              </Link>
+              <BackLink href={ROUTES.home}>Back to TradeBay</BackLink>
             </div>
           ) : null}
 
           {!done && preview ? (
-            <div className="mt-8 overflow-hidden rounded-2xl border border-[#e2ebe6] bg-white shadow-[0_12px_40px_rgba(13,59,42,0.06)]">
-              <div className="flex items-center justify-between border-b border-[#eef3f0] bg-[#e8ebe6] px-5 py-3">
-                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#5a6a62]">
+            <div className="mt-8 overflow-hidden rounded-2xl border border-border bg-card shadow-[0_12px_40px_rgba(13,59,42,0.06)]">
+              <div className="flex items-center justify-between border-b border-border bg-muted px-5 py-3">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Dossier
                 </span>
                 <StatusBadge status={preview.status} />
               </div>
               <div className="space-y-5 px-5 py-5">
                 <div>
-                  <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-[#8a9a92]">
+                  <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-subtle-foreground">
                     Role
                   </p>
-                  <p className="mt-1 text-lg font-semibold text-[#0d3b2a]">
+                  <p className="mt-1 text-lg font-semibold text-heading">
                     {preview.role_name ?? "—"}
                   </p>
-                  <p className="mt-1 text-sm text-[#5a6a62]">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {roleBlurb(preview.role_name)}
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-4 border-t border-[#eef3f0] pt-4">
+                <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
                   <div>
-                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-[#8a9a92]">
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-subtle-foreground">
                       Company login
                     </p>
-                    <p className="mt-1 font-semibold text-[#0c1612]">
+                    <p className="mt-1 font-semibold text-foreground">
                       {preview.invited_email}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-[#8a9a92]">
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-subtle-foreground">
                       Invited by
                     </p>
-                    <p className="mt-1 font-semibold text-[#0c1612]">
+                    <p className="mt-1 font-semibold text-foreground">
                       {preview.inviter_name ?? "A teammate"}
                     </p>
                   </div>
                 </div>
-                <p className="text-xs text-[#8a9a92]">
+                <p className="text-xs text-subtle-foreground">
                   Invitation delivered to{" "}
                   {preview.delivery_email ?? preview.invited_email}. Sign in with{" "}
                   <strong>{preview.invited_email}</strong> to accept.
@@ -199,12 +191,12 @@ function AcceptInvitationContent() {
           ) : null}
 
           {isLoading ? (
-            <p className="mt-6 text-sm text-[#5a6a62]">Checking your session…</p>
+            <p className="mt-6 text-sm text-muted-foreground">Checking your session…</p>
           ) : null}
 
           {!isLoading && !isAuthenticated && !done ? (
             <div className="mt-8 space-y-3">
-              <p className="text-sm text-[#5a6a62]">
+              <p className="text-sm text-muted-foreground">
                 Register or sign in with the{" "}
                 <strong>company login</strong>
                 {preview?.invited_email ? (
@@ -221,13 +213,13 @@ function AcceptInvitationContent() {
                     ? `&email=${encodeURIComponent(preview.invited_email)}`
                     : ""
                 }`}
-                className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#0d3b2a] text-sm font-semibold text-white"
+                className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground"
               >
                 Sign in to continue →
               </Link>
               <Link
                 href={`${ROUTES.register}?invite=${encodeURIComponent(token)}&next=${encodeURIComponent(`/accept-invitation?token=${token}`)}`}
-                className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-[#dce5e0] bg-white text-sm font-semibold text-[#0d3b2a] hover:bg-[#e8ebe6]"
+                className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-border bg-card text-sm font-semibold text-heading hover:bg-muted"
               >
                 Create account
               </Link>
@@ -250,7 +242,7 @@ function AcceptInvitationContent() {
                   <button
                     type="button"
                     disabled={switching}
-                    className="flex h-12 w-full items-center justify-center rounded-xl bg-[#0d3b2a] text-sm font-semibold text-white disabled:opacity-60"
+                    className="flex h-12 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-60"
                     onClick={() => void switchAccount()}
                   >
                     {switching ? "Signing out…" : "Switch account →"}
@@ -261,7 +253,7 @@ function AcceptInvitationContent() {
                   <button
                     type="button"
                     disabled={pending || !token}
-                    className="flex h-12 w-full items-center justify-center rounded-xl bg-[#0d3b2a] text-sm font-semibold text-white disabled:opacity-60"
+                    className="flex h-12 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-60"
                     onClick={() => {
                       setPending(true);
                       setError(null);
@@ -300,7 +292,7 @@ function AcceptInvitationContent() {
                   <button
                     type="button"
                     disabled={pending || !token}
-                    className="flex h-12 w-full items-center justify-center rounded-xl border border-[#dce5e0] text-sm font-semibold text-[#5a6a62] hover:bg-white disabled:opacity-60"
+                    className="flex h-12 w-full items-center justify-center rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-card disabled:opacity-60"
                     onClick={() => setDeclineOpen(true)}
                   >
                     Decline
@@ -328,7 +320,7 @@ function AcceptInvitationContent() {
           <p className="font-[family-name:var(--font-outfit)] text-4xl font-extrabold leading-[1.05] tracking-tight text-white xl:text-5xl">
             Local businesses.
             <br />
-            <span className="text-[#e86f2a]">Greater opportunities.</span>
+            <span className="text-accent-text">Greater opportunities.</span>
           </p>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/65">
             Join your team on Lebanon&apos;s B2B marketplace — source, connect,
@@ -366,7 +358,7 @@ function AcceptInvitationContent() {
           }
         }}
       >
-        <p className="text-sm text-[#5c574e]">
+        <p className="text-sm text-muted-foreground">
           Decline joining <strong>{businessName}</strong> as{" "}
           <strong>{preview?.role_name ?? "a teammate"}</strong>?
         </p>
@@ -379,7 +371,7 @@ export default function AcceptInvitationPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-svh items-center justify-center bg-[#e8ebe6] text-sm text-[#5a6a62]">
+        <div className="flex min-h-svh items-center justify-center bg-muted text-sm text-muted-foreground">
           Loading invitation…
         </div>
       }

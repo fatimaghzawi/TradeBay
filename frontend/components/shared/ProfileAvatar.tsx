@@ -3,7 +3,6 @@
 import { mediaUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
-/** Business-logo avatar for users (falls back to initials). */
 export function ProfileAvatar({
   src,
   label,
@@ -34,7 +33,7 @@ export function ProfileAvatar({
         src={url}
         alt=""
         className={cn(
-          "shrink-0 rounded-full object-cover ring-1 ring-[var(--tb-border)]",
+          "shrink-0 rounded-full object-cover ring-1 ring-border-strong",
           sizeClass,
           className,
         )}
@@ -45,7 +44,7 @@ export function ProfileAvatar({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full bg-[var(--tb-primary)] font-bold text-[var(--tb-primary-foreground)]",
+        "inline-flex shrink-0 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground",
         sizeClass,
         className,
       )}

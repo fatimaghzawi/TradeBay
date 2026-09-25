@@ -129,13 +129,40 @@ export function BuyerMarketplace({
     };
   }, [products]);
 
+  const parentOf = useMemo(
+    () => new Map(categories.map((c) => [c.id, c.parent_category_id ?? null])),
+    [categories],
+  );
+
   const categoryCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const p of products) {
-      map.set(p.category_id, (map.get(p.category_id) || 0) + 1);
+      let id: string | null = p.category_id;
+      const seen = new Set<string>();
+      while (id && !seen.has(id)) {
+        seen.add(id);
+        map.set(id, (map.get(id) || 0) + 1);
+        id = parentOf.get(id) ?? null;
+      }
     }
     return map;
-  }, [products]);
+  }, [products, parentOf]);
+
+  const topCategories = useMemo(
+    () => categories.filter((c) => !c.parent_category_id),
+    [categories],
+  );
+
+  const categoryOptions = useMemo(() => {
+    const rows: { id: string; label: string }[] = [];
+    for (const parent of topCategories) {
+      rows.push({ id: parent.id, label: parent.name });
+      for (const child of categories.filter((c) => c.parent_category_id === parent.id)) {
+        rows.push({ id: child.id, label: `— ${child.name}` });
+      }
+    }
+    return rows;
+  }, [categories, topCategories]);
 
   const visible = useMemo(() => {
     let rows = [...products];
@@ -303,7 +330,7 @@ export function BuyerMarketplace({
           <strong>All Categories</strong>
           <em>{total} products</em>
         </button>
-        {categories.slice(0, 8).map((c) => (
+        {topCategories.slice(0, 8).map((c) => (
           <button
             key={c.id}
             type="button"
@@ -354,9 +381,9 @@ export function BuyerMarketplace({
                 }}
               >
                 <option value="all">All categories</option>
-                {categories.map((c) => (
+                {categoryOptions.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {c.label}
                   </option>
                 ))}
               </select>
@@ -541,7 +568,7 @@ export function BuyerMarketplace({
                 title="No products match"
                 body="Try clearing filters or search."
                 action={
-                  <button type="button" className="tb-inv-btn tb-inv-btn-soft" onClick={clearAll}>
+                  <button type="button" className="tb-btn tb-btn--secondary" onClick={clearAll}>
                     Clear filters
                   </button>
                 }

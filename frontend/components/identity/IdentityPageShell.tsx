@@ -39,9 +39,6 @@ type IdentityPageShellProps = {
   children: ReactNode;
 };
 
-/**
- * Shared Company Identity page chrome — signature mast + roles tooling.
- */
 export function IdentityPageShell({
   crumb,
   title,
@@ -132,7 +129,7 @@ export function IdentityPageShell({
           ) : (
             <div />
           )}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
             {searchExtra}
             {onSearchChange ? (
               <input

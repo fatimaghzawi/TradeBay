@@ -242,7 +242,7 @@ function AdminBusinessesPageInner() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search name, domain, email, tax…"
-          className="h-9 w-full max-w-md border-0 border-b border-[#b8c0b9] bg-transparent px-0 text-sm outline-none focus:border-[#e86f2a]"
+          className="h-9 w-full max-w-md border-0 border-b border-input bg-transparent px-0 text-sm outline-none focus:border-ring"
         />
         {(
           [
@@ -282,7 +282,7 @@ function AdminBusinessesPageInner() {
           </button>
         ))}
         <select
-          className="h-9 rounded-lg border border-[#d4e0da] bg-white px-2 text-sm"
+          className="h-9 rounded-lg border border-input bg-card px-2 text-sm"
           value={sortKey}
           onChange={(e) => setSortKey(e.target.value as SortKey)}
         >
@@ -292,7 +292,7 @@ function AdminBusinessesPageInner() {
           <option value="status">Sort: status</option>
         </select>
         <select
-          className="h-9 rounded-lg border border-[#d4e0da] bg-white px-2 text-sm"
+          className="h-9 rounded-lg border border-input bg-card px-2 text-sm"
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
         >
@@ -305,10 +305,10 @@ function AdminBusinessesPageInner() {
       </div>
 
       <div className="tb-cc-filters sm:grid-cols-2">
-          <label className="block text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Company email domain
             <select
-              className="mt-1.5 h-10 w-full rounded-lg border border-[#d4e0da] bg-white px-3 text-sm"
+              className="mt-1.5 h-10 w-full rounded-lg border border-input bg-card px-3 text-sm"
               value={domainFilter}
               onChange={(e) => setDomainFilter(e.target.value as DomainFilter)}
             >
@@ -317,13 +317,13 @@ function AdminBusinessesPageInner() {
               <option value="missing_domain">Missing domain</option>
             </select>
           </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             City / governorate contains
             <input
               value={cityNeedle}
               onChange={(e) => setCityNeedle(e.target.value)}
               placeholder="e.g. Beirut, Mount Lebanon…"
-              className="mt-1.5 h-10 w-full rounded-lg border border-[#d4e0da] bg-white px-3 text-sm outline-none focus:border-[#e86f2a]"
+              className="mt-1.5 h-10 w-full rounded-lg border border-input bg-card px-3 text-sm outline-none focus:border-ring"
             />
           </label>
         </div>
@@ -352,7 +352,7 @@ function AdminBusinessesPageInner() {
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
                           href={profileHref}
-                          className="font-semibold text-[#0c1612] hover:text-[#0d3b2a] hover:underline"
+                          className="font-semibold text-foreground hover:text-heading hover:underline"
                         >
                           {row.name}
                         </Link>
@@ -378,15 +378,15 @@ function AdminBusinessesPageInner() {
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-0.5 text-sm text-[#5a6a62]">
+                      <p className="mt-0.5 text-sm text-muted-foreground">
                         {companyLocation(row)}
                         {row.email_domain ? (
                           <>
                             {" · "}
-                            <span className="font-semibold text-[#0d3b2a]">@{row.email_domain}</span>
+                            <span className="font-semibold text-heading">@{row.email_domain}</span>
                           </>
                         ) : (
-                          <span className="text-[#b42318]"> · No email domain</span>
+                          <span className="text-destructive"> · No email domain</span>
                         )}
                         {row.contact_email ? ` · ${row.contact_email}` : ""}
                       </p>
@@ -410,39 +410,39 @@ function AdminBusinessesPageInner() {
                     </div>
                   </div>
                   {open ? (
-                    <div className="mt-4 grid gap-3 border-t border-[#e8efeb] pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="mt-4 grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Legal name
                         </p>
-                        <p className="mt-1 text-[#0c1612]">{row.legal_name || "—"}</p>
+                        <p className="mt-1 text-foreground">{row.legal_name || "—"}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Tax number
                         </p>
-                        <p className="mt-1 text-[#0c1612]">{row.tax_number || "—"}</p>
+                        <p className="mt-1 text-foreground">{row.tax_number || "—"}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Email domain
                         </p>
-                        <p className="mt-1 text-[#0c1612]">{row.email_domain || "—"}</p>
+                        <p className="mt-1 text-foreground">{row.email_domain || "—"}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Contact
                         </p>
-                        <p className="mt-1 text-[#0c1612]">
+                        <p className="mt-1 text-foreground">
                           {row.contact_email || "—"}
                           {row.contact_phone ? ` · ${row.contact_phone}` : ""}
                         </p>
                       </div>
                       <div className="sm:col-span-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Address
                         </p>
-                        <p className="mt-1 text-[#0c1612]">{formatBusinessAddress(row)}</p>
+                        <p className="mt-1 text-foreground">{formatBusinessAddress(row)}</p>
                       </div>
                     </div>
                   ) : null}

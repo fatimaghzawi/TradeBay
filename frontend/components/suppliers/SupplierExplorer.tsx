@@ -677,7 +677,7 @@ export function SupplierExplorer() {
                     body="Try clearing filters or search."
                     action={
                       <>
-                        <button type="button" className="tb-inv-btn tb-inv-btn-soft" onClick={clearFilters}>
+                        <button type="button" className="tb-btn tb-btn--secondary" onClick={clearFilters}>
                           Clear filters
                         </button>
                         <InventoryLinkBtn href={ROUTES.aiSourcing} tone="soft">

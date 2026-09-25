@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LoadingEntity, BusyText } from "@/components/ui/LoadingState";
 import { bumpLive } from "@/lib/live/bus";
 import { useLivePoll } from "@/lib/live/useLivePoll";
+import { BackLink } from "@/components/ui/BackLink";
 
 function offerSide(
   offer: NegotiationOffer,
@@ -115,7 +116,7 @@ export default function NegotiationDetailPage() {
         setNeg(data);
         setError(null);
       } catch {
-        /* keep last good negotiation on screen */
+        
       }
     },
     {
@@ -168,7 +169,7 @@ export default function NegotiationDetailPage() {
         neg?.buyer_business_id,
       )
     : null;
-  // No counters yet → Opening counter is the supplier quotation; only the buyer can act.
+  
   const latestIsCounterpart = latestOffer
     ? Boolean(
         business?.id &&
@@ -230,13 +231,9 @@ export default function NegotiationDetailPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             {neg?.rfq_id ? (
-              <InventoryLinkBtn href={ROUTES.procurementRfq(neg.rfq_id)} tone="soft">
-                ← Back to the deal
-              </InventoryLinkBtn>
+              <BackLink href={ROUTES.procurementRfq(neg.rfq_id)}>Back to the deal</BackLink>
             ) : (
-              <InventoryLinkBtn href={ROUTES.procurement} tone="soft">
-                ← Procurement
-              </InventoryLinkBtn>
+              <BackLink href={ROUTES.procurement}>Procurement</BackLink>
             )}
           </div>
         }
@@ -305,7 +302,7 @@ export default function NegotiationDetailPage() {
                           <p className="tb-inv-muted">Create the purchase order at this number?</p>
                           <button
                             type="button"
-                            className="tb-inv-btn tb-inv-btn-accent"
+                            className="tb-btn tb-btn--primary"
                             disabled={busy}
                             onClick={() =>
                               void run(async () => {
@@ -337,7 +334,7 @@ export default function NegotiationDetailPage() {
                           </button>
                           <button
                             type="button"
-                            className="tb-inv-btn tb-inv-btn-soft"
+                            className="tb-btn tb-btn--secondary"
                             onClick={() => setConfirmKey(null)}
                           >
                             Not yet
@@ -348,7 +345,7 @@ export default function NegotiationDetailPage() {
                           <p className="tb-inv-muted">This ends the whole quotation.</p>
                           <button
                             type="button"
-                            className="tb-inv-btn tb-inv-btn-soft"
+                            className="tb-btn tb-btn--secondary"
                             disabled={busy}
                             onClick={() =>
                               void run(async () => {
@@ -373,7 +370,7 @@ export default function NegotiationDetailPage() {
                           </button>
                           <button
                             type="button"
-                            className="tb-inv-btn tb-inv-btn-accent"
+                            className="tb-btn tb-btn--primary"
                             onClick={() => setConfirmKey(null)}
                           >
                             Keep bargaining
@@ -384,7 +381,7 @@ export default function NegotiationDetailPage() {
                           {canOrder ? (
                             <button
                               type="button"
-                              className="tb-inv-btn tb-inv-btn-accent"
+                              className="tb-btn tb-btn--primary"
                               disabled={busy}
                               onClick={() => setConfirmKey("order:opening")}
                             >
@@ -394,7 +391,7 @@ export default function NegotiationDetailPage() {
                           {!numberLocked && canOk ? (
                             <button
                               type="button"
-                              className="tb-inv-btn tb-inv-btn-accent"
+                              className="tb-btn tb-btn--primary"
                               disabled={busy}
                               onClick={() =>
                                 void run(async () => {
@@ -427,7 +424,7 @@ export default function NegotiationDetailPage() {
                           {!numberLocked && canEnd ? (
                             <button
                               type="button"
-                              className="tb-inv-btn tb-inv-btn-soft"
+                              className="tb-btn tb-btn--secondary"
                               disabled={busy}
                               onClick={() => setConfirmKey("end:opening")}
                             >
@@ -498,7 +495,7 @@ export default function NegotiationDetailPage() {
                             <p className="tb-inv-muted">Create the purchase order at this number?</p>
                             <button
                               type="button"
-                              className="tb-inv-btn tb-inv-btn-accent"
+                              className="tb-btn tb-btn--primary"
                               disabled={busy}
                               onClick={() =>
                                 void run(async () => {
@@ -521,7 +518,7 @@ export default function NegotiationDetailPage() {
                             </button>
                             <button
                               type="button"
-                              className="tb-inv-btn tb-inv-btn-soft"
+                              className="tb-btn tb-btn--secondary"
                               onClick={() => setConfirmKey(null)}
                             >
                               Not yet
@@ -532,7 +529,7 @@ export default function NegotiationDetailPage() {
                             <p className="tb-inv-muted">This ends the whole quotation.</p>
                             <button
                               type="button"
-                              className="tb-inv-btn tb-inv-btn-soft"
+                              className="tb-btn tb-btn--secondary"
                               disabled={busy}
                               onClick={() =>
                                 void run(async () => {
@@ -557,7 +554,7 @@ export default function NegotiationDetailPage() {
                             </button>
                             <button
                               type="button"
-                              className="tb-inv-btn tb-inv-btn-accent"
+                              className="tb-btn tb-btn--primary"
                               onClick={() => setConfirmKey(null)}
                             >
                               Keep bargaining
@@ -568,7 +565,7 @@ export default function NegotiationDetailPage() {
                             {canOrder ? (
                               <button
                                 type="button"
-                                className="tb-inv-btn tb-inv-btn-accent"
+                                className="tb-btn tb-btn--primary"
                                 disabled={busy}
                                 onClick={() => setConfirmKey(`order:${o.id}`)}
                               >
@@ -578,7 +575,7 @@ export default function NegotiationDetailPage() {
                             {!numberLocked && canOk && o.status.toUpperCase() === "PROPOSED" ? (
                               <button
                                 type="button"
-                                className="tb-inv-btn tb-inv-btn-accent"
+                                className="tb-btn tb-btn--primary"
                                 disabled={busy}
                                 onClick={() =>
                                   void run(async () => {
@@ -609,7 +606,7 @@ export default function NegotiationDetailPage() {
                             {!numberLocked && canEnd ? (
                               <button
                                 type="button"
-                                className="tb-inv-btn tb-inv-btn-soft"
+                                className="tb-btn tb-btn--secondary"
                                 disabled={busy}
                                 onClick={() => setConfirmKey(`end:${o.id}`)}
                               >
@@ -716,7 +713,7 @@ export default function NegotiationDetailPage() {
               </div>
               <button
                 type="button"
-                className="tb-inv-btn tb-inv-btn-accent"
+                className="tb-btn tb-btn--primary"
                 disabled={busy || openOffers.length > 20}
                 onClick={() => {
                   const next: Record<string, { quantity?: string; unit_price?: string }> = {};

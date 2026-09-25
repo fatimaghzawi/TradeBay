@@ -40,7 +40,7 @@ export function LoginForm() {
           params.set("invite", invite);
         }
       } catch {
-        /* ignore malformed next */
+        
       }
     }
     if (email) params.set("email", email);
@@ -105,7 +105,7 @@ export function LoginForm() {
         />
         <Link
           href={ROUTES.forgotPassword}
-          className="text-sm font-semibold text-[#1a6b4f] transition hover:text-[#0d3b2a]"
+          className="text-sm font-semibold text-link transition hover:text-heading"
         >
           Forgot password?
         </Link>
@@ -115,11 +115,11 @@ export function LoginForm() {
         {pending ? "Signing in…" : "Sign in"}
       </AuthSubmitButton>
 
-      <p className="pt-1 text-center text-sm text-[#5a6a62]">
+      <p className="pt-1 text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}
         <Link
           href={registerHref}
-          className="font-semibold text-[#0d3b2a] hover:underline"
+          className="font-semibold text-heading hover:underline"
         >
           Create one
         </Link>

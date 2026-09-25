@@ -1,4 +1,4 @@
-/** Routes guests may use without signing in. */
+
 
 export const GUEST_ALLOWED_PREFIXES = [
   "/suppliers",

@@ -1,4 +1,3 @@
-"""Procurement API schemas."""
 
 from __future__ import annotations
 
@@ -14,9 +13,7 @@ def _reject_float(v: Any) -> Any:
         raise ValueError("Money must be string or int — not float")
     return v
 
-
 def _parse_money_str(v: Any, *, required: bool) -> str | None:
-    """Normalize money input to a trimmed decimal string (or None when optional+blank)."""
     v = _reject_float(v)
     if v is None:
         if required:
@@ -42,7 +39,6 @@ def _parse_money_str(v: Any, *, required: bool) -> str | None:
         raise ValueError("Invalid money amount") from exc
     return text
 
-
 class AddressIn(BaseModel):
     street: str | None = None
     city: str | None = None
@@ -50,7 +46,6 @@ class AddressIn(BaseModel):
     governorate: str | None = None
     postal_code: str | None = None
     country: str | None = "Lebanon"
-
 
 class RFQItemIn(BaseModel):
     product_id: str | None = None
@@ -76,9 +71,7 @@ class RFQItemIn(BaseModel):
     def _money_fields(cls, v: Any) -> Any:
         return _parse_money_str(v, required=False)
 
-
 class CreateRFQRequest(BaseModel):
-    """Legacy/generic create — defaults to sourcing when type omitted."""
 
     title: str = Field(min_length=1, max_length=200)
     description: str | None = None
@@ -93,9 +86,7 @@ class CreateRFQRequest(BaseModel):
     sourcing_request_id: str | None = None
     business_plan_id: str | None = None
 
-
 class CreateProductRFQRequest(BaseModel):
-    """Quote a specific listed product from its owning supplier."""
 
     product_id: str = Field(min_length=24, max_length=24)
     quantity: str
@@ -119,9 +110,7 @@ class CreateProductRFQRequest(BaseModel):
     def _target_unit_price(cls, v: Any) -> Any:
         return _parse_money_str(v, required=False)
 
-
 class CreateSourcingRFQRequest(BaseModel):
-    """Open requirement — no product/supplier lock; multiple suppliers may quote."""
 
     title: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=8000)
@@ -152,7 +141,6 @@ class CreateSourcingRFQRequest(BaseModel):
     def _target_unit_price(cls, v: Any) -> Any:
         return _parse_money_str(v, required=False)
 
-
 class UpdateRFQRequest(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     description: str | None = None
@@ -164,19 +152,15 @@ class UpdateRFQRequest(BaseModel):
     visibility: str | None = None
     items: list[RFQItemIn] | None = None
 
-
 class InviteSuppliersRequest(BaseModel):
     supplier_business_ids: list[str] = Field(min_length=1, max_length=50)
-
 
 class DeclineInviteRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
 
-
 class ReportIssueRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
-
 
 class QuotationLineIn(BaseModel):
     rfq_item_id: str
@@ -201,7 +185,6 @@ class QuotationLineIn(BaseModel):
     def _money(cls, v: Any) -> Any:
         return _reject_float(v)
 
-
 class UpsertQuotationRequest(BaseModel):
     valid_until: datetime | None = None
     payment_terms: str | None = None
@@ -218,30 +201,23 @@ class UpsertQuotationRequest(BaseModel):
     def _doc_money(cls, v: Any) -> Any:
         return _reject_float(v)
 
-
 class AwardRFQRequest(BaseModel):
     quotation_id: str
     confirm: bool = False
 
-
 class HandshakeRFQRequest(BaseModel):
-    """Lock the deal and prepare a draft purchase order from the agreed quotation."""
 
     quotation_id: str
     confirm: bool = False
 
-
 class RejectQuotationRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=1000)
 
-
 class IssuePORequest(BaseModel):
-    """Buyer sets how they will pay when issuing a draft PO."""
 
     payment_method: str = Field(min_length=1, max_length=120)
     payment_terms: str | None = Field(default=None, max_length=200)
     delivery_terms: str | None = Field(default=None, max_length=200)
-
 
 class ShipmentLineIn(BaseModel):
     order_item_id: str
@@ -252,7 +228,6 @@ class ShipmentLineIn(BaseModel):
     def _qty(cls, v: Any) -> Any:
         return _reject_float(v)
 
-
 class CreateShipmentRequest(BaseModel):
     carrier_name: str | None = None
     tracking_number: str | None = None
@@ -261,19 +236,16 @@ class CreateShipmentRequest(BaseModel):
     shipping_notes: str | None = None
     lines: list[ShipmentLineIn] = Field(min_length=1)
 
-
 class TrackingEventRequest(BaseModel):
     status: str
     description: str | None = None
     location: str | None = None
     occurred_at: datetime | None = None
 
-
 class DeliveryEvidenceRequest(BaseModel):
     evidence_type: str = Field(min_length=1, max_length=64)
     url: str = Field(min_length=1, max_length=2000)
     note: str | None = None
-
 
 class ReceivingLineIn(BaseModel):
     order_item_id: str
@@ -293,7 +265,6 @@ class ReceivingLineIn(BaseModel):
     @classmethod
     def _qty(cls, v: Any) -> Any:
         return _reject_float(v)
-
 
 class ReceiveShipmentRequest(BaseModel):
     lines: list[ReceivingLineIn] = Field(min_length=1)

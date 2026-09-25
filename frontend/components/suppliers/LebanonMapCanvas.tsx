@@ -15,7 +15,7 @@ type Props = {
   activePlace: string;
   onSelectPlace: (placeId: string) => void;
   className?: string;
-  /** Bump when container size changes (e.g. expand overlay). */
+  
   resizeKey?: string | number;
 };
 

@@ -1,4 +1,3 @@
-"""Catalog permission codes."""
 
 PRODUCTS_READ = ("products", "read")
 PRODUCTS_MANAGE = ("products", "manage")

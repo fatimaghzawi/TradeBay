@@ -1,4 +1,3 @@
-"""Structured logging with request correlation. Secrets are never logged."""
 
 from __future__ import annotations
 
@@ -18,13 +17,11 @@ business_id_ctx: ContextVar[str | None] = ContextVar("business_account_id", defa
 route_ctx: ContextVar[str | None] = ContextVar("route", default=None)
 method_ctx: ContextVar[str | None] = ContextVar("method", default=None)
 
-
 def _drop_sensitive(_: Any, __: str, event_dict: dict[str, Any]) -> dict[str, Any]:
     for key in list(event_dict.keys()):
         if key.lower() in SENSITIVE_LOG_FIELDS:
             event_dict[key] = "[redacted]"
     return event_dict
-
 
 def _bind_context(_: Any, __: str, event_dict: dict[str, Any]) -> dict[str, Any]:
     request_id = request_id_ctx.get()
@@ -43,7 +40,6 @@ def _bind_context(_: Any, __: str, event_dict: dict[str, Any]) -> dict[str, Any]
     if method:
         event_dict.setdefault("method", method)
     return event_dict
-
 
 def configure_logging(settings: Settings) -> None:
     timestamper = structlog.processors.TimeStamper(fmt="iso", utc=True)
@@ -72,12 +68,10 @@ def configure_logging(settings: Settings) -> None:
 
     logging.basicConfig(level=settings.log_level.upper(), stream=sys.stdout)
 
-
 def get_logger(name: str | None = None) -> Any:
     return structlog.get_logger(name)
 
-
-# Future integration points (do not import SDKs until configured):
-# - Sentry: initialize from settings.sentry_dsn in production
-# - OpenTelemetry: export traces to settings.otel_exporter_otlp_endpoint
-# - Metrics: Prometheus/OTel meters around request latency and DB health
+                                                                  
+                                                             
+                                                                        
+                                                                        

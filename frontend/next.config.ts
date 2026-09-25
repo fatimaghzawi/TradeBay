@@ -1,10 +1,5 @@
 import type { NextConfig } from "next";
 
-/**
- * Backend origin for Next.js rewrites.
- * Browser calls stay same-origin (`/api/...`) so httpOnly auth cookies work.
- * On Vercel this MUST be your Render URL and requires a redeploy after setting it.
- */
 const API_PROXY_TARGET =
   process.env.API_PROXY_TARGET?.replace(/\/$/, "") || "http://127.0.0.1:8000";
 

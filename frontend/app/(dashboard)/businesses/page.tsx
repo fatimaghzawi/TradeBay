@@ -156,7 +156,7 @@ function BusinessesPageInner() {
         title="Your Business"
         lede="Establish your company on TradeBay — then build your team and define access."
         action={
-          <Link href={ROUTES.businessesNew} className="tb-ov-btn-primary">
+          <Link href={ROUTES.businessesNew} className="tb-btn tb-btn--primary">
             + Establish Company
           </Link>
         }
@@ -184,7 +184,7 @@ function BusinessesPageInner() {
           </span>
         </button>
         {businesses.length > 0 ? (
-          <p className="mt-4 text-xs text-[var(--tb-muted-fg)]">
+          <p className="mt-4 text-xs text-muted-foreground">
             Your session opens inside one company workspace — there is no company
             switcher.
           </p>

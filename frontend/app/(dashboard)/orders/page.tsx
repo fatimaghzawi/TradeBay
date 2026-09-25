@@ -1,7 +1,12 @@
 "use client";
 
-import { ComingSoonView } from "@/components/shared/ComingSoonView";
+import { PermissionGate } from "@/components/auth/PermissionGate";
+import { OrdersHub } from "@/components/commerce/OrdersHub";
 
-export default function OrdersComingSoonPage() {
-  return <ComingSoonView kind="orders" title="Orders are coming soon" />;
+export default function OrdersPage() {
+  return (
+    <PermissionGate permission="orders.read">
+      <OrdersHub />
+    </PermissionGate>
+  );
 }

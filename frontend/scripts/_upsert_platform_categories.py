@@ -1,11 +1,3 @@
-"""Upsert the 20 platform categories (with sheet images) into the live DB.
-
-Does not wipe products or companies. Remaps SKUs from old child categories
-onto the new roots, then deactivates leftover slugs.
-
-Usage:
-  python frontend/scripts/_upsert_platform_categories.py
-"""
 from __future__ import annotations
 
 import os
@@ -22,7 +14,7 @@ sys.path.insert(0, str(BACKEND))
 
 from _reset_demo_seed import CATEGORIES, _load_dotenv  # noqa: E402
 
-# Old demo slugs → new canonical slug
+                                     
 LEGACY_SLUGS: dict[str, str] = {
     "food-beverages": "food-beverages",
     "packaged-foods": "food-beverages",
@@ -43,7 +35,6 @@ LEGACY_SLUGS: dict[str, str] = {
     "agri-inputs": "agriculture-farming",
 }
 
-
 def _env() -> None:
     for path in (REPO / ".env", BACKEND / ".env"):
         if not path.is_file():
@@ -54,7 +45,6 @@ def _env() -> None:
                 continue
             key, _, value = stripped.partition("=")
             os.environ.setdefault(key.strip(), value.strip().strip("'").strip('"'))
-
 
 def main() -> None:
     _env()
@@ -76,7 +66,7 @@ def main() -> None:
         slug = spec["slug"]
         existing = cats.find_one({"slug": slug})
         if existing is None:
-            # Reuse the legacy document so product foreign keys stay valid.
+                                                                           
             legacy = [
                 old for old, new in LEGACY_SLUGS.items() if new == slug and old != slug
             ]
@@ -142,7 +132,6 @@ def main() -> None:
     print(f"Products remapped: {remapped}")
     print(f"Legacy categories deactivated: {deactivated}")
     client.close()
-
 
 if __name__ == "__main__":
     main()

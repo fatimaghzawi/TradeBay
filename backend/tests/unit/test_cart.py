@@ -1,8 +1,7 @@
-"""Buyer cart service rules."""
 
 from decimal import Decimal
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 from app.modules.cart.exceptions import CartBuyerRequiredError, CartEmptyError
@@ -13,13 +12,11 @@ from app.modules.identity.constants import BusinessAccountType
 def _buyer() -> dict[str, Any]:
     return {"_id": "aaaaaaaaaaaaaaaaaaaaaaaa", "type": BusinessAccountType.BUYER}
 
-
 @pytest.mark.asyncio
 async def test_cart_requires_buyer_company() -> None:
     service = CartService()
     with pytest.raises(CartBuyerRequiredError):
         await service.get_cart(business={"_id": "x", "type": BusinessAccountType.SUPPLIER})
-
 
 @pytest.mark.asyncio
 async def test_checkout_rejects_empty_cart() -> None:
@@ -32,7 +29,6 @@ async def test_checkout_rejects_empty_cart() -> None:
             business=_buyer(),
             publish=False,
         )
-
 
 def test_money_str_formats_decimal128_like() -> None:
     from app.modules.cart.service import _money_str

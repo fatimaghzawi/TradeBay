@@ -1,4 +1,3 @@
-"""Business Planner persistence."""
 
 from __future__ import annotations
 
@@ -31,7 +30,6 @@ class BusinessPlanRepository(BaseRepository):
     async def count_for_user(self, user_id: str) -> int:
         return await self.count({"user_id": parse_object_id(user_id)})
 
-
 class BusinessPlanItemRepository(BaseRepository):
     collection_name = CollectionName.BUSINESS_PLAN_ITEMS
 
@@ -50,7 +48,6 @@ class BusinessPlanItemRepository(BaseRepository):
             session=session,
         )
         return int(result.deleted_count)
-
 
 class PriceEstimateRepository(BaseRepository):
     collection_name = CollectionName.PRICE_ESTIMATES
@@ -73,7 +70,6 @@ class PriceEstimateRepository(BaseRepository):
         )
         return int(result.deleted_count)
 
-
 class BusinessPlanSessionRepository(BaseRepository):
     collection_name = CollectionName.BUSINESS_PLAN_SESSIONS
 
@@ -90,7 +86,6 @@ class BusinessPlanSessionRepository(BaseRepository):
             limit=limit,
             sort=[("updated_at", -1)],
         )
-
 
 class BusinessPlanMessageRepository(BaseRepository):
     collection_name = CollectionName.BUSINESS_PLAN_MESSAGES

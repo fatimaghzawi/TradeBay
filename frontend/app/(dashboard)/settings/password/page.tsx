@@ -12,6 +12,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import Link from "next/link";
 import { useState } from "react";
 import { BusyText } from "@/components/ui/LoadingState";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function ChangePasswordPage() {
   const { logout } = useAuth();
@@ -40,16 +41,11 @@ export default function ChangePasswordPage() {
       quote="“Strong passwords keep every shipment honest.”"
     >
       <p className="mb-2">
-        <Link
-          href={ROUTES.settings}
-          className="text-sm font-semibold text-[var(--tb-accent)] hover:underline"
-        >
-          ← Account settings
-        </Link>
+        <BackLink href={ROUTES.settings}>Account settings</BackLink>
       </p>
 
       <form
-        className="mx-auto max-w-lg space-y-4 rounded-[1rem] border border-[var(--tb-line)] bg-[var(--tb-surface)] p-5"
+        className="mx-auto max-w-lg space-y-4 rounded-[1rem] border border-border bg-card p-5"
         onSubmit={(e) => {
           e.preventDefault();
           setError(null);
@@ -120,14 +116,14 @@ export default function ChangePasswordPage() {
           error={live.errors.confirmPassword}
         />
         {error ? (
-          <p className="rounded-xl bg-[#fef3f2] px-3 py-2 text-sm text-[#b42318]">
+          <p role="alert" className="tb-alert tb-alert--error">
             {error}
           </p>
         ) : null}
         <button
           type="submit"
           disabled={pending}
-          className="tb-ov-btn-primary w-full disabled:opacity-60"
+          className="tb-btn tb-btn--primary tb-btn--block"
          aria-busy={pending || undefined}>
           <BusyText busy={pending}>{pending ? "Updating…" : "Update password"}</BusyText>
         </button>

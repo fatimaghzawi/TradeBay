@@ -1,23 +1,15 @@
-"""Identity-domain exceptions (all subclass ``AppError`` / core HTTP errors).
-
-Raised by services; converted to JSON envelopes by ``core/exceptions`` handlers.
-"""
 
 from app.core.constants import ErrorCode
 from app.core.exceptions import AppError, ConflictError, ForbiddenError, UnauthorizedError
-
-# ── Auth / account ───────────────────────────────────────────────────────────
 
 
 class EmailAlreadyRegisteredError(ConflictError):
     def __init__(self) -> None:
         super().__init__("Email is already registered", details={"field": "email"})
 
-
 class InvalidCredentialsError(UnauthorizedError):
     def __init__(self) -> None:
         super().__init__("Invalid email or password", code=ErrorCode.INVALID_CREDENTIALS)
-
 
 class InvalidOtpError(UnauthorizedError):
     def __init__(self, *, remaining: int | None = None, max_attempts: int = 5) -> None:
@@ -32,7 +24,6 @@ class InvalidOtpError(UnauthorizedError):
             details = {"remaining_attempts": remaining, "max_attempts": max_attempts}
         super().__init__(message, code=ErrorCode.OTP_INVALID, details=details)
 
-
 class OtpAttemptsExceededError(UnauthorizedError):
     def __init__(self, *, max_attempts: int = 5) -> None:
         super().__init__(
@@ -41,19 +32,37 @@ class OtpAttemptsExceededError(UnauthorizedError):
             details={"max_attempts": max_attempts},
         )
 
+class EmailPendingVerificationError(ConflictError):
+    def __init__(self) -> None:
+        super().__init__(
+            "An account with this email is waiting for verification. We sent a new code "
+            "to that inbox. If you don't remember the password, use Forgot password.",
+            code=ErrorCode.EMAIL_PENDING_VERIFICATION,
+            details={"field": "email"},
+        )
 
 class SessionRevokedError(UnauthorizedError):
     def __init__(self) -> None:
-        super().__init__("Session has been revoked", code=ErrorCode.SESSION_REVOKED)
-
+        super().__init__(
+            "Your session has ended. Please sign in again.", code=ErrorCode.SESSION_REVOKED
+        )
 
 class AccountInactiveError(ForbiddenError):
     def __init__(self) -> None:
-        super().__init__("Account is not active", code=ErrorCode.ACCOUNT_INACTIVE        )
+        super().__init__(
+            "This account isn't active right now. Contact TradeBay support for help.",
+            code=ErrorCode.ACCOUNT_INACTIVE,
+        )
 
+class LoginThrottledError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            ErrorCode.RATE_LIMITED,
+            "Too many sign-in attempts. Wait a few minutes or reset your password.",
+            status_code=429,
+        )
 
-# ── Business context / authorization ─────────────────────────────────────────
-
+                                                                               
 
 class BusinessContextRequiredError(ForbiddenError):
     def __init__(self) -> None:
@@ -61,7 +70,6 @@ class BusinessContextRequiredError(ForbiddenError):
             "Select a company to continue",
             code=ErrorCode.BUSINESS_CONTEXT_REQUIRED,
         )
-
 
 class PermissionDeniedError(ForbiddenError):
     def __init__(self, resource: str, action: str) -> None:
@@ -71,7 +79,6 @@ class PermissionDeniedError(ForbiddenError):
             details={"resource": resource, "action": action},
         )
 
-
 class EmailUnverifiedError(ForbiddenError):
     def __init__(self) -> None:
         super().__init__(
@@ -79,24 +86,24 @@ class EmailUnverifiedError(ForbiddenError):
             code=ErrorCode.EMAIL_UNVERIFIED,
         )
 
-
 class SellingNotVerifiedError(ForbiddenError):
     def __init__(self) -> None:
         super().__init__(
-            "Selling requires a verified supplier profile",
+            "Your company needs to finish supplier verification before it can sell.",
             code=ErrorCode.SELLING_NOT_VERIFIED,
         )
 
-
 class BusinessInactiveError(ForbiddenError):
     def __init__(self) -> None:
-        super().__init__("Business account is not active", code=ErrorCode.ACCOUNT_INACTIVE)
-
+        super().__init__(
+            "This company account is suspended. Switch to another company or contact "
+            "TradeBay support.",
+            code=ErrorCode.BUSINESS_INACTIVE,
+        )
 
 class MembershipRequiredError(ForbiddenError):
     def __init__(self) -> None:
-        super().__init__("No active membership in the selected business", code=ErrorCode.FORBIDDEN)
-
+        super().__init__("You're not an active member of that company.", code=ErrorCode.FORBIDDEN)
 
 class LastAdminError(ConflictError):
     def __init__(self) -> None:
@@ -105,14 +112,11 @@ class LastAdminError(ConflictError):
             code=ErrorCode.LAST_ADMIN_PROTECTED,
         )
 
-
-# ── Invitations / roles / company domain ─────────────────────────────────────
-
+                                                                               
 
 class InvitationInvalidError(ForbiddenError):
     def __init__(self, message: str = "Invitation is not valid") -> None:
         super().__init__(message, code=ErrorCode.INVITATION_INVALID)
-
 
 class PrivilegeEscalationError(ForbiddenError):
     def __init__(self) -> None:
@@ -121,11 +125,17 @@ class PrivilegeEscalationError(ForbiddenError):
             code=ErrorCode.PRIVILEGE_ESCALATION,
         )
 
+class MemberOutranksActorError(ForbiddenError):
+    def __init__(self) -> None:
+        super().__init__(
+            "This person or role has access you don't have, so only someone with "
+            "broader access can change it.",
+            code=ErrorCode.PRIVILEGE_ESCALATION,
+        )
 
 class SystemRoleProtectedError(ConflictError):
     def __init__(self, message: str = "System roles are protected") -> None:
         super().__init__(message)
-
 
 class BusinessAlreadyExistsError(ConflictError):
     def __init__(self) -> None:
@@ -133,7 +143,6 @@ class BusinessAlreadyExistsError(ConflictError):
             "This account already has a business. Only one business is allowed per account.",
             code=ErrorCode.CONFLICT,
         )
-
 
 class InvitationAlreadyPendingError(ConflictError):
     def __init__(
@@ -148,7 +157,6 @@ class InvitationAlreadyPendingError(ConflictError):
             details={"reason": "already_pending", "invitation_id": invitation_id},
         )
 
-
 class AlreadyBusinessMemberError(ConflictError):
     def __init__(self, message: str = "This person is already a member of this business") -> None:
         super().__init__(
@@ -156,7 +164,6 @@ class AlreadyBusinessMemberError(ConflictError):
             code=ErrorCode.CONFLICT,
             details={"reason": "already_member"},
         )
-
 
 class VerifiedBusinessLockedError(ForbiddenError):
     def __init__(self, message: str | None = None) -> None:
@@ -168,7 +175,6 @@ class VerifiedBusinessLockedError(ForbiddenError):
             ),
             code=ErrorCode.FORBIDDEN,
         )
-
 
 class CompanyDomainMismatchError(ForbiddenError):
     def __init__(self, *, company_name: str, company_domain: str) -> None:
@@ -185,7 +191,6 @@ class CompanyDomainMismatchError(ForbiddenError):
             },
         )
 
-
 class CompanyDomainRequiredError(AppError):
     def __init__(self, message: str = "Company email domain is required") -> None:
         super().__init__(
@@ -193,7 +198,6 @@ class CompanyDomainRequiredError(AppError):
             message,
             status_code=422,
         )
-
 
 class CompanyDomainTakenError(ConflictError):
     def __init__(self, domain: str) -> None:
@@ -203,6 +207,5 @@ class CompanyDomainTakenError(ConflictError):
             details={"email_domain": domain},
         )
 
-
 class IdentityError(AppError):
-    """Generic identity-domain error."""
+    pass

@@ -1,4 +1,3 @@
-"""System Settings request schemas."""
 
 from __future__ import annotations
 
@@ -13,7 +12,6 @@ def _reject_float(v: Any) -> Any:
         raise ValueError("Money/rate must be string or int — not float")
     return v
 
-
 class AddressIn(BaseModel):
     line1: str | None = None
     line2: str | None = None
@@ -21,7 +19,6 @@ class AddressIn(BaseModel):
     governorate: str | None = None
     country: str | None = "Lebanon"
     postal_code: str | None = None
-
 
 class UpdatePlatformSettingsRequest(BaseModel):
     platform_name: str | None = Field(default=None, min_length=1, max_length=120)
@@ -43,7 +40,6 @@ class UpdatePlatformSettingsRequest(BaseModel):
     def _currency_upper(cls, v: str | None) -> str | None:
         return v.upper() if v else v
 
-
 class UpdateTaxSettingsRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
     rate: str | None = None
@@ -56,7 +52,6 @@ class UpdateTaxSettingsRequest(BaseModel):
     @classmethod
     def _no_float_rate(cls, v: Any) -> Any:
         return _reject_float(v)
-
 
 class UpdateBusinessSettingsRequest(BaseModel):
     business_name: str | None = Field(default=None, min_length=1, max_length=200)

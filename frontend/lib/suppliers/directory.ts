@@ -419,7 +419,6 @@ export function countActiveFilters(filters: SupplierFilterState): number {
   return n;
 }
 
-/** Filter-dropdown shape kept for existing UI. */
 export const LEBANON_MAP_CITIES = LEBANON_MAP_PLACES.map((p) => ({
   id: p.id,
   label: p.label,

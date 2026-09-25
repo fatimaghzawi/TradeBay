@@ -1,4 +1,3 @@
-"""Unit tests for Business Planner Decimal finance."""
 
 from __future__ import annotations
 
@@ -23,7 +22,6 @@ def test_compute_line_margin() -> None:
     assert line.gross_profit == Decimal("30.00")
     assert line.margin_pct == Decimal("37.50")
 
-
 def test_compute_plan_finance_scales_to_budget() -> None:
     result = compute_plan_finance(
         line_inputs=[
@@ -38,7 +36,6 @@ def test_compute_plan_finance_scales_to_budget() -> None:
     assert result.adjustments
     assert result.gross_margin_pct >= Decimal("0")
 
-
 def test_scale_quantities_never_uses_float() -> None:
     scaled = scale_quantities_to_budget(
         [(Decimal("100"), Decimal("30"), Decimal("50"))],
@@ -47,14 +44,12 @@ def test_scale_quantities_never_uses_float() -> None:
     assert scaled[0][0] == Decimal("30")
     assert isinstance(scaled[0][0], Decimal)
 
-
 def test_adaptive_questions_for_fashion() -> None:
     qs = adaptive_questions_heuristic(
         {"business_goal": "Fashion", "adaptive": {}, "desired_margin": "20-30%"}
     )
     ids = {q.id for q in qs}
     assert "audience" in ids or "price_positioning" in ids
-
 
 def test_stub_plan_uses_marketplace_candidates_only() -> None:
     market = {
@@ -86,7 +81,6 @@ def test_stub_plan_uses_marketplace_candidates_only() -> None:
     assert validated.product_strategy
     assert validated.product_strategy[0].product_id == "507f1f77bcf86cd799439011"
     assert validated.product_strategy[0].source_type == "MARKETPLACE"
-
 
 def test_stub_plan_without_catalog_labels_ai_estimate() -> None:
     draft = stub_generate_plan_draft(

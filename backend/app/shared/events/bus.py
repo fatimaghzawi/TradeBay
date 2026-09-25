@@ -1,4 +1,3 @@
-"""In-process domain event bus for cross-domain reactions without circular imports."""
 
 from __future__ import annotations
 
@@ -15,15 +14,13 @@ logger = get_logger(__name__)
 
 EventHandler = Callable[["DomainEvent"], Awaitable[None]]
 
-
 @dataclass(frozen=True, slots=True)
 class DomainEvent:
     name: str
     payload: dict[str, Any] = field(default_factory=dict)
     occurred_at: datetime = field(default_factory=utc_now)
 
-
-# Named events (scaffolded for later subscribers)
+                                                 
 USER_REGISTERED = "UserRegistered"
 SUPPLIER_VERIFIED = "SupplierVerified"
 PRODUCT_ACTIVATED = "ProductActivated"
@@ -41,7 +38,6 @@ SOURCING_CONVERTED_TO_RFQ = "SourcingConvertedToRfq"
 BUSINESS_PLAN_GENERATED = "BusinessPlanGenerated"
 BUSINESS_PLAN_CONVERTED_TO_SOURCING = "BusinessPlanConvertedToSourcing"
 
-
 class EventBus:
     def __init__(self) -> None:
         self._handlers: dict[str, list[EventHandler]] = defaultdict(list)
@@ -57,6 +53,5 @@ class EventBus:
                 await handler(event)
             except Exception:
                 logger.exception("domain_event_handler_failed", event_name=event.name)
-
 
 event_bus = EventBus()

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { AppStateAction, AppStateFrame } from "@/components/ui/AppState";
+import { BackLink } from "@/components/ui/BackLink";
 import { ROUTES } from "@/lib/constants";
 import type { ReactNode } from "react";
 
@@ -14,9 +15,6 @@ export type ErrorStateProps = {
   extra?: ReactNode;
 };
 
-/**
- * Consistent error moment for route boundaries and in-page failures.
- */
 export function ErrorState({
   title = "Something went wrong",
   message = "We could not load this section. Try again in a moment.",
@@ -39,9 +37,7 @@ export function ErrorState({
               Try again
             </AppStateAction>
           ) : null}
-          <AppStateAction href={homeHref} tone="soft">
-            {homeLabel}
-          </AppStateAction>
+          <BackLink href={homeHref}>{homeLabel}</BackLink>
         </>
       }
     >

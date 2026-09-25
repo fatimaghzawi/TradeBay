@@ -45,8 +45,7 @@ class PlannerMessageRole(StrEnum):
     ASSISTANT = "assistant"
     SYSTEM = "system"
 
-
-# Discovery step keys (frontend + session answers)
+                                                  
 STEP_GOAL = "goal"
 STEP_LOCATION = "location"
 STEP_BUDGET = "budget"

@@ -29,6 +29,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LoadingEntity, BusyText } from "@/components/ui/LoadingState";
 import { useLivePoll } from "@/lib/live/useLivePoll";
 import { bumpLive } from "@/lib/live/bus";
+import { BackLink } from "@/components/ui/BackLink";
 
 type Props = { rfqId: string };
 type Tab = "brief" | "table" | "talk" | "handshake";
@@ -147,7 +148,7 @@ export function RfqWorkspace({ rfqId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rfqId, business?.id]);
 
-  // Quiet live refresh — updates RFQ/quotation status without wiping in-progress edits.
+  
   useLivePoll(
     async () => {
       if (busy) return;
@@ -159,7 +160,7 @@ export function RfqWorkspace({ rfqId }: Props) {
             const order = await procurementApi.getOrder(data.order_id);
             setDraftOrder(order);
           } catch {
-            /* keep prior draft order snapshot */
+            
           }
         }
         const rows = await negotiationApi.listForRfq(rfqId);
@@ -167,7 +168,7 @@ export function RfqWorkspace({ rfqId }: Props) {
           setDealAgreed(true);
         }
       } catch {
-        /* keep last good RFQ on screen */
+        
       }
     },
     { intervalMs: 4000, enabled: Boolean(rfqId), paused: busy },
@@ -194,7 +195,7 @@ export function RfqWorkspace({ rfqId }: Props) {
           setDealAgreed(true);
         }
       } catch {
-        /* Handshake still opens from draft / accepted quote */
+        
       }
     })();
     return () => {
@@ -461,7 +462,7 @@ export function RfqWorkspace({ rfqId }: Props) {
             {canSendDraft ? (
               <button
                 type="button"
-                className="tb-inv-btn tb-inv-btn-accent"
+                className="tb-btn tb-btn--primary"
                 disabled={busy}
                 onClick={() => void run(sendDraftToSuppliers)}
               >
@@ -471,7 +472,7 @@ export function RfqWorkspace({ rfqId }: Props) {
             {isPlatform && rfq.buyer_business_id ? (
               <Link
                 href={ROUTES.admin.businessDetail(rfq.buyer_business_id)}
-                className="tb-inv-btn tb-inv-btn-soft"
+                className="tb-btn tb-btn--secondary"
               >
                 Buyer profile
               </Link>
@@ -613,7 +614,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                         {canEditDraft ? (
                           <NumberInput
                             kind="decimal"
-                            className="w-28 max-w-full rounded-lg border border-[var(--tb-line)] bg-white px-2 py-1.5 text-sm font-semibold"
+                            className="w-28 max-w-full rounded-lg border border-border bg-card px-2 py-1.5 text-sm font-semibold"
                             value={draftTargets[item.id] ?? ""}
                             disabled={busy}
                             aria-label={`Target price for ${item.product_name}`}
@@ -632,7 +633,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                     {canEditDraft && rfq.items.length > 1 ? (
                       <button
                         type="button"
-                        className="text-sm font-semibold text-[var(--tb-danger)] disabled:opacity-50"
+                        className="text-sm font-semibold text-destructive disabled:opacity-50"
                         disabled={busy}
                         onClick={() =>
                           void run(() => removeDraftItem(item.id), "Product removed")
@@ -649,7 +650,7 @@ export function RfqWorkspace({ rfqId }: Props) {
               <div className="tb-inv-form-actions mt-4">
                 <button
                   type="button"
-                  className="tb-inv-btn tb-inv-btn-soft"
+                  className="tb-btn tb-btn--secondary"
                   disabled={busy}
                   onClick={() => void run(saveDraftPrices, "Brief saved")}
                 >
@@ -658,7 +659,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                 {canSendDraft ? (
                   <button
                     type="button"
-                    className="tb-inv-btn tb-inv-btn-accent"
+                    className="tb-btn tb-btn--primary"
                     disabled={busy}
                     onClick={() => void run(sendDraftToSuppliers)}
                   >
@@ -679,17 +680,17 @@ export function RfqWorkspace({ rfqId }: Props) {
                   quotation on the table. Once submitted, the numbers lock.
                 </p>
                 {canQuote && !quoteLocked ? (
-                  <button type="button" className="tb-inv-btn tb-inv-btn-accent" onClick={() => setTab("table")}>
+                  <button type="button" className="tb-btn tb-btn--primary" onClick={() => setTab("table")}>
                     Write your quotation
                   </button>
                 ) : null}
                 {quoteLocked ? (
-                  <button type="button" className="tb-inv-btn tb-inv-btn-soft" onClick={() => setTab("table")}>
+                  <button type="button" className="tb-btn tb-btn--secondary" onClick={() => setTab("table")}>
                     Open the table
                   </button>
                 ) : null}
                 {rfq.order_id ? (
-                  <Link href={ROUTES.orders} className="tb-inv-btn tb-inv-btn-soft">
+                  <Link href={ROUTES.orders} className="tb-btn tb-btn--secondary">
                     Orders coming soon →
                   </Link>
                 ) : null}
@@ -698,7 +699,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                 ["invited", "viewed", "accepted"].includes(myInvite.status) ? (
                   <button
                     type="button"
-                    className="tb-inv-btn tb-inv-btn-soft"
+                    className="tb-btn tb-btn--secondary"
                     disabled={busy}
                     onClick={() =>
                       void run(
@@ -845,7 +846,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                 {quoteLocked ? null : (
                   <button
                     type="button"
-                    className="tb-inv-btn tb-inv-btn-soft"
+                    className="tb-btn tb-btn--secondary"
                     disabled={busy}
                     onClick={() =>
                       void run(
@@ -870,7 +871,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                 )}
                 <button
                   type="button"
-                  className="tb-inv-btn tb-inv-btn-accent"
+                  className="tb-btn tb-btn--primary"
                   disabled={busy || quoteLocked}
                   onClick={() => {
                     if (quoteLocked) return;
@@ -995,7 +996,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                             </p>
                             <button
                               type="button"
-                              className="tb-inv-btn tb-inv-btn-accent"
+                              className="tb-btn tb-btn--primary"
                               disabled={busy}
                               onClick={() =>
                                 void run(async () => {
@@ -1011,7 +1012,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                             </button>
                             <button
                               type="button"
-                              className="tb-inv-btn tb-inv-btn-soft"
+                              className="tb-btn tb-btn--secondary"
                               onClick={() => setConfirmAwardId(null)}
                             >
                               Not yet
@@ -1021,7 +1022,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                           <>
                             <button
                               type="button"
-                              className="tb-inv-btn tb-inv-btn-accent"
+                              className="tb-btn tb-btn--primary"
                               disabled={busy}
                               onClick={() => setConfirmAwardId(q.id)}
                             >
@@ -1029,7 +1030,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                             </button>
                             <button
                               type="button"
-                              className="tb-inv-btn tb-inv-btn-soft"
+                              className="tb-btn tb-btn--secondary"
                               disabled={busy}
                               onClick={() =>
                                 void run(
@@ -1048,7 +1049,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                     (dealAgreed && ["submitted", "negotiating"].includes(q.status)) ? (
                       <button
                         type="button"
-                        className="tb-inv-btn tb-inv-btn-accent"
+                        className="tb-btn tb-btn--primary"
                         onClick={() => {
                           setDealAgreed(true);
                           setOpenedHandshake(true);
@@ -1166,7 +1167,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                     <div className="tb-inv-form-actions">
                       <button
                         type="button"
-                        className="tb-inv-btn tb-inv-btn-accent"
+                        className="tb-btn tb-btn--primary"
                         disabled={busy}
                         onClick={() => {
                           const quoteId =
@@ -1296,7 +1297,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                 hasPermission("quotations.accept") ? (
                   <button
                     type="button"
-                    className="tb-inv-btn tb-inv-btn-accent"
+                    className="tb-btn tb-btn--primary"
                     disabled={busy || !issuePaymentMethod.trim()}
                     onClick={() =>
                       void run(async () => {
@@ -1317,7 +1318,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                 {draftOrder.status !== "draft" ? (
                   <Link
                     href={ROUTES.orders}
-                    className="tb-inv-btn tb-inv-btn-accent"
+                    className="tb-btn tb-btn--primary"
                   >
                     Orders coming soon →
                   </Link>
@@ -1325,7 +1326,7 @@ export function RfqWorkspace({ rfqId }: Props) {
                 {isSupplier && draftOrder.status === "pending" ? (
                   <Link
                     href={ROUTES.orders}
-                    className="tb-inv-btn tb-inv-btn-soft"
+                    className="tb-btn tb-btn--secondary"
                   >
                     Orders coming soon →
                   </Link>
@@ -1339,7 +1340,7 @@ export function RfqWorkspace({ rfqId }: Props) {
       {tab === "talk" && canTalk ? (
         <section className="tb-deal-sheet tb-deal-talk-shell">
           <div className="tb-deal-talk-shell__intro">
-            <p className="tb-deal-kicker">Sidebar</p>
+            <p className="tb-deal-kicker">Conversation</p>
             <h2>Talk it through</h2>
             <p className="tb-inv-muted">
               A quiet lane with {chatPeer?.name || counterpartName} — for nuance the quotation
@@ -1379,7 +1380,7 @@ export function RfqWorkspace({ rfqId }: Props) {
       ) : null}
 
       <p className="tb-inv-foot">
-        <Link href={ROUTES.procurement}>← Back to the desk</Link>
+        <BackLink href={ROUTES.procurement}>Back to the desk</BackLink>
       </p>
     </div>
   );

@@ -1,4 +1,3 @@
-"""Unit tests for Identity password policy, rate limits, and commercial-write gate."""
 
 import pytest
 from app.core.exceptions import RateLimitError
@@ -11,7 +10,6 @@ from app.modules.identity.rate_limit import SlidingWindowLimiter
 def test_validate_password_accepts_mixed() -> None:
     assert validate_password("SecurePass123!") == "SecurePass123!"
 
-
 def test_validate_password_rejects_weak() -> None:
     with pytest.raises(ValueError):
         validate_password("short")
@@ -20,14 +18,12 @@ def test_validate_password_rejects_weak() -> None:
     with pytest.raises(ValueError):
         validate_password("12345678")
 
-
 def test_assert_email_verified_gate() -> None:
     with pytest.raises(EmailUnverifiedError):
         assert_email_verified({"email_verified_at": None, "status": "pending"})
     with pytest.raises(AccountInactiveError):
         assert_email_verified({"email_verified_at": "2026-01-01T00:00:00Z", "status": "suspended"})
     assert_email_verified({"email_verified_at": "2026-01-01T00:00:00Z", "status": "active"})
-
 
 def test_challenge_limiter() -> None:
     limiter = SlidingWindowLimiter(max_hits=2, window_seconds=60)
@@ -36,7 +32,6 @@ def test_challenge_limiter() -> None:
     with pytest.raises(RateLimitError):
         limiter.hit("a")
     limiter.hit("b")
-
 
 def test_verified_supplier_can_keep_identity_and_change_contact_fields() -> None:
     from app.modules.identity.service import verified_supplier_identity_changes
@@ -63,7 +58,6 @@ def test_verified_supplier_can_keep_identity_and_change_contact_fields() -> None
         address=business["address"],
     ) == []
 
-
 def test_verified_supplier_identity_change_is_detected() -> None:
     from app.modules.identity.service import verified_supplier_identity_changes
 
@@ -72,7 +66,6 @@ def test_verified_supplier_identity_change_is_detected() -> None:
     assert verified_supplier_identity_changes(business, legal_name="Other SARL") == [
         "legal_name"
     ]
-
 
 @pytest.mark.asyncio
 async def test_permission_subset_comparison() -> None:
@@ -83,7 +76,6 @@ async def test_permission_subset_comparison() -> None:
     with pytest.raises(PrivilegeEscalationError):
         await directory.assert_subset(actor_permissions={"A", "B", "C"}, requested={"A", "B", "D"})
 
-
 def test_company_member_avatar_uses_business_logo() -> None:
     from app.modules.identity.directory import _company_member_avatar
 
@@ -92,7 +84,6 @@ def test_company_member_avatar_uses_business_logo() -> None:
     assert _company_member_avatar(user, None) == "/personal.png"
     assert _company_member_avatar(None, "/company.png") == "/company.png"
     assert _company_member_avatar(None, None) is None
-
 
 def test_public_company_omits_tax_and_contacts() -> None:
     from app.modules.identity.service import _serialize_public_company

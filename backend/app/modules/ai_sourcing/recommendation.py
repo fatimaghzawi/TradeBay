@@ -1,4 +1,3 @@
-"""Recommendation engine — ranks REAL TradeBay catalog rows only."""
 
 from __future__ import annotations
 
@@ -23,20 +22,15 @@ from app.modules.ai_sourcing.constants import (
 def _tokens(text: str) -> set[str]:
     return {t for t in re.findall(r"[a-z0-9]+", text.lower()) if len(t) > 2}
 
-
 def _overlap_ratio(a: set[str], b: set[str]) -> float:
-    """Coverage of *query* set `a` against `b` (not diluted when `a` is small)."""
     if not a or not b:
         return 0.0
     return len(a & b) / len(a)
 
-
 def _best_overlap(a: set[str], b: set[str]) -> float:
-    """Symmetric-ish score: max of a→b and b→a coverage."""
     if not a or not b:
         return 0.0
     return max(_overlap_ratio(a, b), _overlap_ratio(b, a))
-
 
 def relevance_label(score: float) -> str:
     if score >= 0.72:
@@ -44,7 +38,6 @@ def relevance_label(score: float) -> str:
     if score >= 0.45:
         return RelevanceLabel.RELEVANT
     return RelevanceLabel.PARTIAL
-
 
 @dataclass
 class ScoredCandidate:
@@ -57,16 +50,11 @@ class ScoredCandidate:
     matched: list[str] = field(default_factory=list)
     unmatched: list[str] = field(default_factory=list)
     reasons: list[str] = field(default_factory=list)
+    signals: dict[str, float] = field(default_factory=dict)
     availability: str = AvailabilityStatus.UNKNOWN
     similar: bool = False
 
-
 class RecommendationEngine:
-    """Hard filters first, then weighted relevance from factual fields only.
-
-    When exact matches are thin, fills the haul with softer *similar* catalog picks
-    from verified suppliers so buyers still see useful recommendations.
-    """
 
     def rank(
         self,
@@ -80,6 +68,7 @@ class RecommendationEngine:
         verified_business_ids: set[str],
         limit: int = 20,
         min_results: int = 8,
+        semantic_scores: dict[str, float] | None = None,
     ) -> list[ScoredCandidate]:
         need_terms = self._requirement_terms(requirements)
         focus_terms = self._focus_terms(requirements)
@@ -136,6 +125,16 @@ class RecommendationEngine:
                 if len(results) >= limit:
                     break
                 results.append(row)
+
+        if semantic_scores:
+            for row in results:
+                pid = str(row.product.get("_id") or "")
+                raw = semantic_scores.get(pid)
+                if raw is None:
+                    continue
+                semantic = max(0.0, min(1.0, float(raw)))
+                row.signals["semantic_match"] = round(semantic, 4)
+                row.score = round(min(1.0, row.score * 0.85 + 0.15 * semantic), 4)
 
         return results[:limit]
 
@@ -194,11 +193,10 @@ class RecommendationEngine:
         )
 
     def _focus_terms(self, requirements: ProcurementRequirements) -> set[str]:
-        """High-signal terms from products/categories/qty only — used for ranking."""
         bag: set[str] = set()
         for item in requirements.product_requirements + requirements.categories:
             bag |= _tokens(item)
-            # Stem-ish: beverages → beverage
+                                            
             for token in list(_tokens(item)):
                 if token.endswith("s") and len(token) > 4:
                     bag.add(token[:-1])
@@ -210,9 +208,9 @@ class RecommendationEngine:
         bag = self._focus_terms(requirements)
         if requirements.business_type:
             bag |= _tokens(requirements.business_type)
-        # Soft context from the brief — capped so it cannot drown product keywords
+                                                                                  
         soft = _tokens(requirements.business_description[:240])
-        # Drop ultra-common filler that pollutes overlap
+                                                        
         filler = {
             "looking",
             "need",
@@ -368,6 +366,18 @@ class RecommendationEngine:
             )
 
         score = min(score, 1.0)
+        signals = {
+            "text_match": round(name_score, 4),
+            "description_match": round(desc_score, 4),
+            "category_match": round(cat_score, 4),
+            "supplier_verified": 1.0 if verified else 0.0,
+            "inventory_match": 1.0 if availability in {
+                AvailabilityStatus.IN_STOCK,
+                AvailabilityStatus.LIMITED,
+            } else 0.0,
+        }
+        if qty_hint is not None:
+            signals["moq_match"] = 1.0 if qty_hint >= moq else 0.0
         return ScoredCandidate(
             product=product,
             supplier=supplier,
@@ -378,6 +388,7 @@ class RecommendationEngine:
             matched=matched,
             unmatched=unmatched,
             reasons=self._unique_reasons(reasons),
+            signals=signals,
             availability=availability,
             similar=False,
         )
@@ -393,7 +404,6 @@ class RecommendationEngine:
         requirements: ProcurementRequirements,
         need_terms: set[str],
     ) -> ScoredCandidate:
-        """Related picks only — must share focus terms with the ask (never random catalog)."""
         name = str(product.get("name") or "")
         description = str(product.get("description") or "")
         name_tokens = _tokens(name)
@@ -415,7 +425,7 @@ class RecommendationEngine:
             return empty
 
         shared = need_terms & pool
-        # Also allow stem matches: cement ↔ cements, beverage ↔ beverages
+                                                                         
         stemmed_need = set(need_terms)
         for t in list(need_terms):
             if t.endswith("s") and len(t) > 4:

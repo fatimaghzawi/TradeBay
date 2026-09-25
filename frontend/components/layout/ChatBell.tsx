@@ -38,7 +38,7 @@ export function ChatBell() {
         setUnread(count.count);
       })
       .catch(() => {
-        /* icon stays quiet on errors */
+        
       });
   }, [canRead]);
 
@@ -47,7 +47,7 @@ export function ChatBell() {
     enabled: canRead,
   });
 
-  // Path changes (e.g. opening a thread) should refresh unread immediately.
+  
   useEffect(() => {
     refresh();
   }, [pathname, refresh]);
@@ -80,7 +80,7 @@ export function ChatBell() {
         title="Messages"
         onClick={onOpen}
         className={cn(
-          "relative flex h-10 w-10 items-center justify-center rounded-full border border-[var(--tb-border)] bg-[var(--tb-surface-muted)] text-[var(--tb-ink)] transition",
+          "relative flex h-10 w-10 items-center justify-center rounded-full border border-border-strong bg-muted text-foreground transition",
           open
             ? "border-[var(--tb-secondary)]"
             : "hover:border-[color-mix(in_srgb,var(--tb-secondary)_40%,var(--tb-border))]",
@@ -95,20 +95,20 @@ export function ChatBell() {
           />
         </svg>
         {unread > 0 ? (
-          <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#b42318] px-1 text-[0.6rem] font-bold text-white">
+          <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[0.6rem] font-bold text-destructive-foreground">
             {unread > 9 ? "9+" : unread}
           </span>
         ) : null}
       </button>
 
       {open ? (
-        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[var(--tb-border)] bg-[var(--tb-raise)] shadow-[var(--tb-shadow-modal)]">
-          <div className="flex items-center justify-between border-b border-[var(--tb-line)] px-4 py-3">
-            <p className="font-[family-name:var(--font-outfit)] text-sm font-semibold text-[var(--tb-ink)]">
+        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border-strong bg-popover shadow-[var(--tb-shadow-modal)]">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <p className="font-[family-name:var(--font-outfit)] text-sm font-semibold text-foreground">
               Messages
             </p>
             {unread > 0 ? (
-              <span className="text-xs font-bold text-[#1a6b4f]">
+              <span className="text-xs font-bold text-link">
                 {unread} unread
               </span>
             ) : null}
@@ -118,10 +118,10 @@ export function ChatBell() {
             <LoadingEntity entity="conversations" className="px-4 py-8 justify-center" />
           ) : items.length === 0 ? (
             <div className="px-4 py-8 text-center">
-              <p className="font-[family-name:var(--font-outfit)] text-sm font-semibold text-[var(--tb-ink)]">
+              <p className="font-[family-name:var(--font-outfit)] text-sm font-semibold text-foreground">
                 No conversations yet
               </p>
-              <p className="mt-1.5 text-xs leading-relaxed text-[var(--tb-muted-fg)]">
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                 No messages yet.
               </p>
             </div>
@@ -135,10 +135,10 @@ export function ChatBell() {
             </ul>
           )}
 
-          <div className="border-t border-[var(--tb-line)] px-4 py-2.5 text-center">
+          <div className="border-t border-border px-4 py-2.5 text-center">
             <Link
               href={ROUTES.conversations}
-              className="text-xs font-bold text-[#1a6b4f] hover:underline"
+              className="text-xs font-bold text-link hover:underline"
               onClick={() => setOpen(false)}
             >
               Open all messages

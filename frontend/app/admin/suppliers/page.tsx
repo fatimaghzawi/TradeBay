@@ -8,6 +8,7 @@ import { DirectoryMast } from "@/components/shared/DirectoryMast";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/useConfirm";
 import {
   formatBusinessAddress,
   statusTone,
@@ -49,6 +50,7 @@ function AdminSuppliersPageInner() {
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [queueCount, setQueueCount] = useState<number | null>(null);
+  const { confirm, prompt, dialog } = useConfirm();
 
   const load = useCallback(() => {
     setError(null);
@@ -172,6 +174,7 @@ function AdminSuppliersPageInner() {
 
   return (
     <AdminPage>
+      {dialog}
       <p className="tb-ov-crumb mb-3">
         <Link href={ROUTES.admin.home} className="hover:underline">
           Admin
@@ -228,7 +231,7 @@ function AdminSuppliersPageInner() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search supplier name, domain, email, tax…"
-          className="h-9 w-full max-w-md border-0 border-b border-[#b8c0b9] bg-transparent px-0 text-sm outline-none focus:border-[#e86f2a]"
+          className="h-9 w-full max-w-md border-0 border-b border-input bg-transparent px-0 text-sm outline-none focus:border-ring"
         />
         {(
           [
@@ -262,7 +265,7 @@ function AdminSuppliersPageInner() {
           Has documents
         </button>
         <select
-          className="h-9 rounded-lg border border-[#d4e0da] bg-white px-2 text-sm"
+          className="h-9 rounded-lg border border-input bg-card px-2 text-sm"
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
         >
@@ -295,18 +298,18 @@ function AdminSuppliersPageInner() {
               return (
                 <li key={row.id} className="tb-data-row tb-co-card grid-cols-1">
                   <div className="tb-co-card__body">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-3">
                     <div className="tb-co-card__brand min-w-0 text-left">
                       <CompanyLogo url={row.logo_url} name={row.name} />
                       <div className="min-w-0">
                       <Link
                         href={profileHref}
-                        className="inline-flex items-center gap-2 font-semibold text-[#0c1612] hover:text-[#0d3b2a] hover:underline"
+                        className="inline-flex items-center gap-2 font-semibold text-foreground hover:text-heading hover:underline"
                       >
                         {row.name}
                         {verified ? <VerifiedBadge verified label="Verified" /> : null}
                       </Link>
-                      <p className="mt-0.5 text-sm text-[#5a6a62]">
+                      <p className="mt-0.5 text-sm text-muted-foreground">
                         {companyLocation(row)}
                         {` · Company: ${row.status}`}
                         {row.verification_status &&
@@ -335,12 +338,13 @@ function AdminSuppliersPageInner() {
                             arrow
                             busy={busyId === row.id}
                             disabled={busyId === row.id}
-                            onClick={() => {
-                              if (
-                                !window.confirm(`Approve ${row.name} for selling rights?`)
-                              ) {
-                                return;
-                              }
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: `Approve ${row.name}?`,
+                                body: "They will be able to list products and receive RFQs as a verified supplier.",
+                                confirmLabel: "Approve",
+                              });
+                              if (!ok) return;
                               review(row.id, "approve");
                             }}
                           >
@@ -365,18 +369,14 @@ function AdminSuppliersPageInner() {
                             tone="danger"
                             disabled={busyId === row.id}
                             busy={busyId === row.id}
-                            onClick={() => {
-                              if (
-                                !window.confirm(
-                                  `Revoke selling rights for ${row.name}? All of their products will be taken offline so buyers cannot order them.`,
-                                )
-                              ) {
-                                return;
-                              }
-                              const reason = window.prompt(
-                                "Reason for revoking selling rights (optional)",
-                                "",
-                              );
+                            onClick={async () => {
+                              const reason = await prompt({
+                                title: `Revoke selling rights for ${row.name}?`,
+                                body: "All of their products will be taken offline so buyers cannot order them.",
+                                confirmLabel: "Revoke selling rights",
+                                destructive: true,
+                                input: { label: "Reason (optional)", placeholder: "Shared with the supplier" },
+                              });
                               if (reason === null) return;
                               review(row.id, "revoke", reason.trim() || undefined);
                             }}
@@ -401,49 +401,49 @@ function AdminSuppliersPageInner() {
                   </div>
 
                   {open ? (
-                    <div className="mt-4 space-y-4 rounded-xl bg-[#e8ebe6] p-4">
+                    <div className="mt-4 space-y-4 rounded-xl bg-muted p-4">
                       <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Legal name
                           </p>
-                          <p className="mt-1 text-[#0c1612]">{row.legal_name || "—"}</p>
+                          <p className="mt-1 text-foreground">{row.legal_name || "—"}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Tax number
                           </p>
-                          <p className="mt-1 text-[#0c1612]">{row.tax_number || "—"}</p>
+                          <p className="mt-1 text-foreground">{row.tax_number || "—"}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Email domain
                           </p>
-                          <p className="mt-1 text-[#0c1612]">{row.email_domain || "—"}</p>
+                          <p className="mt-1 text-foreground">{row.email_domain || "—"}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Contact
                           </p>
-                          <p className="mt-1 text-[#0c1612]">
+                          <p className="mt-1 text-foreground">
                             {row.contact_email || "—"}
                             {row.contact_phone ? ` · ${row.contact_phone}` : ""}
                           </p>
                         </div>
                         <div className="sm:col-span-2">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Address
                           </p>
-                          <p className="mt-1 text-[#0c1612]">{formatBusinessAddress(row)}</p>
+                          <p className="mt-1 text-foreground">{formatBusinessAddress(row)}</p>
                         </div>
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Submitted documents ({docs.length})
                         </p>
                         {docs.length === 0 ? (
-                          <p className="mt-2 text-sm text-[#5a6a62]">
+                          <p className="mt-2 text-sm text-muted-foreground">
                             No documents on file for this supplier.
                           </p>
                         ) : (
@@ -453,13 +453,13 @@ function AdminSuppliersPageInner() {
                               return (
                               <li
                                 key={`${doc.document_type}-${idx}`}
-                                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#dce5e0] bg-white px-3 py-2 text-sm"
+                                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm"
                               >
                                 <div>
-                                  <p className="font-semibold text-[#0c1612]">
+                                  <p className="font-semibold text-foreground">
                                     {doc.document_type || "Document"}
                                   </p>
-                                  <p className="text-xs text-[#5a6a62]">
+                                  <p className="text-xs text-muted-foreground">
                                     {doc.file_name || "Untitled file"}
                                     {doc.uploaded_at
                                       ? ` · ${new Date(doc.uploaded_at).toLocaleString()}`
@@ -471,12 +471,12 @@ function AdminSuppliersPageInner() {
                                     href={href}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="rounded-lg bg-[#0d3b2a] px-3 py-1.5 text-xs font-semibold text-white"
+                                    className="tb-btn tb-btn--primary tb-btn--sm"
                                   >
                                     Open file
                                   </a>
                                 ) : (
-                                  <span className="text-xs text-[#5a6a62]">
+                                  <span className="text-xs text-muted-foreground">
                                     File not stored — ask the supplier to resubmit
                                   </span>
                                 )}
@@ -488,21 +488,21 @@ function AdminSuppliersPageInner() {
                       </div>
 
                       {row.rejection_reason ? (
-                        <p className="rounded-lg bg-[#fef3f2] px-3 py-2 text-sm text-[#b42318]">
+                        <p role="alert" className="tb-alert tb-alert--error">
                           Last rejection reason: {row.rejection_reason}
                         </p>
                       ) : null}
 
                       {rejectId === row.id ? (
-                        <div className="space-y-2 rounded-xl border border-[#f3c1bb] bg-white p-3">
-                          <label className="block text-sm font-semibold text-[#0c1612]">
+                        <div className="space-y-2 rounded-xl border border-destructive/30 bg-card p-3">
+                          <label className="block text-sm font-semibold text-foreground">
                             Rejection reason
                             <textarea
                               value={rejectReason}
                               onChange={(e) => setRejectReason(e.target.value)}
                               rows={3}
                               placeholder="Explain what the supplier must fix…"
-                              className="mt-1.5 w-full rounded-xl border border-[#dce5e0] px-3 py-2 text-sm outline-none focus:border-[#e86f2a]/55 focus:ring-2 focus:ring-[#e86f2a]/15"
+                              className="mt-1.5 w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-ring/55 focus:ring-2 focus:ring-ring/15"
                             />
                           </label>
                           <div className="flex justify-end gap-2">

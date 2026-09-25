@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BusyText } from "@/components/ui/LoadingState";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function CreateBusinessPage() {
   const router = useRouter();
@@ -86,16 +87,11 @@ export default function CreateBusinessPage() {
       <LeafWash />
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Link
-            href={ROUTES.businesses}
-            className="text-sm font-semibold text-[#0d3b2a] hover:underline"
-          >
-            ← Back
-          </Link>
-          <h1 className="mt-2 font-[family-name:var(--font-outfit)] text-3xl tracking-tight text-[#0d3b2a] sm:text-[2.15rem]">
+          <BackLink href={ROUTES.businesses}>Back</BackLink>
+          <h1 className="mt-2 font-[family-name:var(--font-outfit)] text-3xl tracking-tight text-heading sm:text-[2.15rem]">
             Create your company
           </h1>
-          <p className="mt-1 text-sm text-[#5a6a62]">
+          <p className="mt-1 text-sm text-muted-foreground">
             Establish your organization on TradeBay with a company name, work email, and
             company domain. You become the Business Admin.
             {draft.type === "supplier"
@@ -107,11 +103,11 @@ export default function CreateBusinessPage() {
       </div>
 
       {draft.type === "supplier" ? (
-        <p className="rounded-xl bg-[#e8ebe6] px-3.5 py-2.5 text-sm text-[#8a4b2a]">
+        <p className="rounded-xl bg-muted px-3.5 py-2.5 text-sm text-warning">
           Next step: upload documents so TradeBay can approve selling.
         </p>
       ) : (
-        <p className="rounded-xl bg-[#e8f6ef] px-3.5 py-2.5 text-sm text-[#1a6b4f]">
+        <p className="rounded-xl bg-success-soft px-3.5 py-2.5 text-sm text-link">
           Buyer businesses skip document verification and can source after creation.
         </p>
       )}
@@ -156,7 +152,7 @@ export default function CreateBusinessPage() {
               })
               .then(async (business) => {
                 saveBusinessDraft({ ...draft, businessId: business.id, type: draft.type });
-                // Activate the new company session silently (not a user-facing switcher).
+                
                 await identityApi.switchBusiness(business.id);
                 if (draft.type === "supplier") {
                   router.push(ROUTES.businessesVerify);
@@ -218,14 +214,14 @@ export default function CreateBusinessPage() {
                 hint="e.g. safawi.com — teammates must use this domain"
               />
               <label className="block">
-                <span className="mb-1.5 block text-sm font-semibold text-[#0c1612]">
-                  Business type <span className="text-[#e86f2a]">*</span>
+                <span className="mb-1.5 block text-sm font-semibold text-foreground">
+                  Business type <span className="text-accent-text">*</span>
                 </span>
                 {typeLocked ? (
-                  <div className="flex h-11 items-center rounded-xl border border-[#dce5e0] bg-[#e8ebe6] px-3 text-sm">
-                    <span className="font-medium capitalize text-[#0c1612]">
+                  <div className="flex h-11 items-center rounded-xl border border-border bg-muted px-3 text-sm">
+                    <span className="font-medium capitalize text-foreground">
                       {draft.type}
-                      <span className="ml-2 font-normal text-[#5a6a62]">
+                      <span className="ml-2 font-normal text-muted-foreground">
                         (locked from registration — cannot be changed)
                       </span>
                     </span>
@@ -319,8 +315,8 @@ export default function CreateBusinessPage() {
                 error={live.errors.city}
               />
               <label className="block">
-                <span className="mb-1.5 block text-sm font-semibold text-[#0c1612]">
-                  Region <span className="text-[#e86f2a]">*</span>
+                <span className="mb-1.5 block text-sm font-semibold text-foreground">
+                  Region <span className="text-accent-text">*</span>
                 </span>
                 <select
                   required
@@ -351,7 +347,7 @@ export default function CreateBusinessPage() {
             </div>
           </Section>
 
-          <label className="flex items-start gap-3 rounded-xl bg-[#f3f6f4] px-3.5 py-3 text-sm text-[#3f4f47]">
+          <label className="flex items-start gap-3 rounded-xl bg-muted px-3.5 py-3 text-sm text-ink-soft">
             <input
               type="checkbox"
               checked={agreed}
@@ -365,7 +361,7 @@ export default function CreateBusinessPage() {
           </label>
 
           {error ? (
-            <p className="rounded-xl bg-[#fef3f2] px-3.5 py-2.5 text-sm text-[#b42318]">
+            <p role="alert" className="tb-alert tb-alert--error">
               {error}
             </p>
           ) : null}
@@ -373,7 +369,7 @@ export default function CreateBusinessPage() {
           <button
             type="submit"
             disabled={pending}
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-[#e86f2a] px-5 text-sm font-bold text-white disabled:opacity-60 lg:hidden"
+            className="tb-btn tb-btn--accent tb-btn--lg lg:hidden"
            aria-busy={pending || undefined}>
             <BusyText busy={pending}>{pending ? "Creating…" : "Continue"}</BusyText>
           </button>
@@ -403,7 +399,7 @@ export default function CreateBusinessPage() {
               type="button"
               disabled={pending}
               onClick={() => formRef.current?.requestSubmit()}
-              className="hidden h-12 w-full items-center justify-center rounded-xl bg-[#e86f2a] text-sm font-bold text-white disabled:opacity-60 lg:inline-flex"
+              className="hidden h-12 w-full items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-foreground disabled:opacity-60 lg:inline-flex"
             >
               <BusyText busy={pending}>{pending ? "Creating…" : "Continue"}</BusyText>
             </button>
@@ -423,7 +419,7 @@ function Section({
 }) {
   return (
     <section>
-      <h2 className="mb-3 font-[family-name:var(--font-syne)] text-base font-bold text-[#0c1612]">
+      <h2 className="mb-3 font-[family-name:var(--font-syne)] text-base font-bold text-foreground">
         {title}
       </h2>
       {children}
@@ -456,7 +452,7 @@ function Field({
     <label className="block">
       <span className="tb-field-label mb-1.5 block text-sm font-semibold">
         {label}
-        {required ? <span className="text-[#e86f2a]"> *</span> : null}
+        {required ? <span className="text-accent-text"> *</span> : null}
       </span>
       <input
         type={type}
@@ -471,7 +467,7 @@ function Field({
           {error}
         </span>
       ) : hint ? (
-        <span className="mt-1 block text-xs text-[#6a726c]">{hint}</span>
+        <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>
       ) : null}
     </label>
   );
@@ -481,7 +477,7 @@ function LeafWash() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute -right-8 -top-6 h-48 w-48 rounded-full bg-[#d8ebe1]/50 blur-3xl"
+      className="pointer-events-none absolute -right-8 -top-6 h-48 w-48 rounded-full bg-secondary-soft/50 blur-3xl"
     />
   );
 }

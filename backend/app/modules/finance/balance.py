@@ -1,14 +1,3 @@
-"""Derived AR position — never a stored editable balance field.
-
-Outstanding is always computed from financial events:
-
-    invoices (debit)
-  + refunds (debit)
-  − completed payments (credit)
-  − applied credit notes (credit)
-  ─────────────────────────────
-  = customer outstanding
-"""
 
 from __future__ import annotations
 
@@ -19,7 +8,6 @@ from bson import Decimal128
 
 MONEY_QUANT = Decimal("0.01")
 
-
 def as_decimal(value: Any) -> Decimal:
     if isinstance(value, Decimal128):
         return value.to_decimal()
@@ -29,10 +17,8 @@ def as_decimal(value: Any) -> Decimal:
         return Decimal("0")
     return Decimal(str(value))
 
-
 def money(value: Any) -> Decimal:
     return as_decimal(value).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
-
 
 def invoice_position(
     *,
@@ -40,7 +26,6 @@ def invoice_position(
     amount_paid: Any,
     amount_credited: Any,
 ) -> dict[str, Decimal]:
-    """Per-invoice view. Original `total` is never mutated by credits."""
     inv_total = money(total)
     paid = money(amount_paid)
     credited = money(amount_credited)
@@ -55,7 +40,6 @@ def invoice_position(
         "outstanding": outstanding,
         "customer_credit": customer_credit,
     }
-
 
 def ledger_outstanding(*, debits: Any, credits: Any) -> Decimal:
     return money(as_decimal(debits) - as_decimal(credits))

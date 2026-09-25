@@ -1,4 +1,3 @@
-"""Unit tests for System Settings tax math and numbering."""
 
 from __future__ import annotations
 
@@ -16,11 +15,9 @@ def test_tax_calculation() -> None:
     assert result["tax_amount"] == Decimal("104.50")
     assert result["total"] == Decimal("1054.50")
 
-
 def test_tax_rate_out_of_range() -> None:
     with pytest.raises(ValueError):
         compute_tax(subtotal="100", rate="1.5")
-
 
 def test_platform_rejects_float_commission() -> None:
     with pytest.raises(ValidationError):

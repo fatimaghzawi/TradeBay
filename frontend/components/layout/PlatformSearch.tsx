@@ -217,7 +217,7 @@ export function PlatformSearch({
     <div ref={rootRef} className="tb-platform-search relative min-w-0 flex-1">
       <label className="relative block min-w-0">
         <span className="sr-only">Search</span>
-        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--tb-muted-fg)]">
+        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
             <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
             <path d="M16 16l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -245,7 +245,7 @@ export function PlatformSearch({
               onSubmit();
             }
           }}
-          className="h-11 w-full rounded-full border border-[var(--tb-field-line)] bg-[var(--tb-field-bg)] py-0 pl-11 pr-4 text-sm text-[var(--tb-field-fg)] outline-none placeholder:text-[var(--tb-field-muted)] focus:border-[var(--tb-field-focus)]"
+          className="tb-icon-field h-11 w-full rounded-full border border-input bg-[var(--tb-field-bg)] py-0 pl-11 pr-4 text-sm text-[var(--tb-field-fg)] outline-none placeholder:text-[var(--tb-field-muted)] focus:border-[var(--tb-field-focus)]"
         />
       </label>
 

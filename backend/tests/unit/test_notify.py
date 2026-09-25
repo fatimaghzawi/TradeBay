@@ -1,9 +1,7 @@
-"""Personal-inbox routing for business event emails."""
-
-from bson import ObjectId
 
 from app.modules.identity.email import outbound_email_is_remote
 from app.modules.trust.notify import _default_cta, _personal_inbox
+from bson import ObjectId
 
 
 def test_personal_inbox_prefers_stored_personal_email() -> None:
@@ -17,7 +15,6 @@ def test_personal_inbox_prefers_stored_personal_email() -> None:
     )
     assert to == "karim.personal@gmail.com"
 
-
 def test_personal_inbox_uses_invitation_delivery_when_personal_missing() -> None:
     to = _personal_inbox(
         {"email": "nora@levantwholesale.com"},
@@ -25,7 +22,6 @@ def test_personal_inbox_uses_invitation_delivery_when_personal_missing() -> None
         company_contact="sales@levantwholesale.com",
     )
     assert to == "nora.khoury@gmail.com"
-
 
 def test_personal_inbox_allows_owner_when_login_is_company_contact() -> None:
     to = _personal_inbox(
@@ -35,7 +31,6 @@ def test_personal_inbox_allows_owner_when_login_is_company_contact() -> None:
     )
     assert to == "sales@levantwholesale.com"
 
-
 def test_personal_inbox_falls_back_to_login_when_not_company_contact() -> None:
     to = _personal_inbox(
         {"email": "nora@levantwholesale.com"},
@@ -44,21 +39,19 @@ def test_personal_inbox_falls_back_to_login_when_not_company_contact() -> None:
     )
     assert to == "nora@levantwholesale.com"
 
-
 def test_default_cta_deep_links_orders_and_finance() -> None:
     oid = ObjectId()
     assert _default_cta("order", oid) == f"/procurement/orders/{oid}"
-    assert _default_cta("invoice", oid) == "/finance"
+    assert _default_cta("invoice", oid) == f"/finance/invoices/{oid}"
+    assert _default_cta("checkout", oid) == f"/orders/checkouts/{oid}"
     assert _default_cta("shipment", oid) == f"/procurement/shipments/{oid}"
     assert _default_cta("supplier_verification", oid) == "/admin/suppliers"
     assert _default_cta("invitation", oid) == "/accept-invitation"
     assert _default_cta("membership", oid) == "/members"
     assert _default_cta(None, None) == "/notifications"
 
-
 def test_local_email_sender_is_not_elastic() -> None:
     assert outbound_email_is_remote() is False
-
 
 def test_rfq_events_do_not_email() -> None:
     from app.modules.trust.notify import _email_event
@@ -69,7 +62,6 @@ def test_rfq_events_do_not_email() -> None:
     assert _email_event("NEGOTIATION_OFFER") is False
     assert _email_event("CONVERSATION_MESSAGE") is False
     assert _email_event("ORDER_CREATED") is True
-
 
 def test_elastic_quota_exhausted_detects_trial_credits() -> None:
     from app.modules.identity.email import elastic_quota_exhausted

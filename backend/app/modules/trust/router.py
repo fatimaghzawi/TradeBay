@@ -1,7 +1,3 @@
-"""Trust API — in-app notifications only.
-
-Disputes and reviews are out of scope for the current product release.
-"""
 
 from __future__ import annotations
 
@@ -16,10 +12,8 @@ from app.shared.schemas.response import paginated, success
 
 router = APIRouter(tags=["Notifications"])
 
-
 def get_notification_service() -> NotificationService:
     return NotificationService()
-
 
 @router.get("/notifications", summary="List my in-app notifications")
 async def list_notifications(
@@ -36,14 +30,12 @@ async def list_notifications(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @router.get("/notifications/unread-count", summary="Unread notification count")
 async def unread_notification_count(
     auth: Annotated[AuthContext, Depends(require_permission("notifications", "read"))],
     service: Annotated[NotificationService, Depends(get_notification_service)],
 ) -> dict[str, Any]:
     return success({"count": await service.unread_count(user_id=auth.user_id)})
-
 
 @router.post("/notifications/{notification_id}/read", summary="Mark one notification read")
 async def mark_notification_read(
@@ -54,7 +46,6 @@ async def mark_notification_read(
     return success(
         await service.mark_read(user_id=auth.user_id, notification_id=notification_id)
     )
-
 
 @router.post("/notifications/read-all", summary="Mark all my notifications read")
 async def mark_all_notifications_read(

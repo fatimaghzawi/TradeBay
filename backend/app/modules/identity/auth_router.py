@@ -1,8 +1,3 @@
-"""Authentication HTTP routes under ``/api/v1/auth``.
-
-Canonical paths follow the BRD. Older path aliases remain with
-``include_in_schema=False`` so existing clients keep working.
-"""
 
 from __future__ import annotations
 
@@ -12,11 +7,12 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from app.core.config import Settings, get_settings
 from app.core.constants import ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import BadRequestError, UnauthorizedError
 from app.modules.identity.dependencies import (
     AuthContext,
     get_auth_service,
     get_current_user,
+    get_optional_user,
     get_refresh_token_from_cookie,
 )
 from app.modules.identity.http import client_ip
@@ -35,9 +31,7 @@ from app.shared.schemas.response import success
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-
-# ── Cookie helpers ───────────────────────────────────────────────────────────
-
+                                                                               
 
 def _set_auth_cookies(response: Response, settings: Settings, tokens: dict[str, Any]) -> None:
     common: dict[str, Any] = {
@@ -62,17 +56,19 @@ def _set_auth_cookies(response: Response, settings: Settings, tokens: dict[str, 
         **common,
     )
 
-
 def _clear_auth_cookies(response: Response, settings: Settings) -> None:
-    common: dict[str, Any] = {"path": "/"}
+    common: dict[str, Any] = {
+        "path": "/",
+        "httponly": True,
+        "secure": settings.cookie_secure or settings.is_production,
+        "samesite": settings.cookie_samesite,
+    }
     if settings.cookie_domain:
         common["domain"] = settings.cookie_domain
     response.delete_cookie(ACCESS_COOKIE_NAME, **common)
     response.delete_cookie(REFRESH_COOKIE_NAME, **common)
 
-
-# ── Register / login / logout / refresh / me ─────────────────────────────────
-
+                                                                               
 
 @router.post("/register", summary="Register a new user")
 async def register(
@@ -101,7 +97,6 @@ async def register(
     }
     return success(payload)
 
-
 @router.post("/login", summary="Login with email and password")
 async def login(
     body: LoginRequest,
@@ -124,7 +119,6 @@ async def login(
         }
     )
 
-
 @router.post("/logout", summary="Revoke current session and clear cookies")
 async def logout(
     request: Request,
@@ -136,7 +130,6 @@ async def logout(
     await service.logout(session_id=auth.session_id, user_id=auth.user_id, ip_address=client_ip(request))
     _clear_auth_cookies(response, settings)
     return success({"logged_out": True})
-
 
 @router.post("/logout-all", summary="Revoke all sessions for the current user")
 async def logout_all(
@@ -155,7 +148,6 @@ async def logout_all(
     _clear_auth_cookies(response, settings)
     return success(result)
 
-
 @router.post("/refresh", summary="Rotate refresh token and issue new access token")
 async def refresh(
     request: Request,
@@ -165,7 +157,7 @@ async def refresh(
     refresh_cookie: Annotated[str | None, Depends(get_refresh_token_from_cookie)] = None,
 ) -> dict[str, Any]:
     if not refresh_cookie:
-        raise UnauthorizedError("Refresh token cookie missing")
+        raise UnauthorizedError()
     result = await service.refresh(
         raw_refresh_token=refresh_cookie,
         ip_address=client_ip(request),
@@ -178,7 +170,6 @@ async def refresh(
             "access_token_expires_in_minutes": result["access_token_expires_in_minutes"],
         }
     )
-
 
 @router.get(
     "/me",
@@ -193,69 +184,53 @@ async def me(
     payload = await service.get_me(user_id=auth.user_id, session=auth.session)
     return success(AuthMeResponse(**payload).model_dump())
 
-
-# ── Email verification (canonical + legacy alias) ────────────────────────────
-
+                                                                               
 
 async def _verify_email(
     body: VerifyEmailRequest,
     request: Request,
     service: AuthService,
+    auth: AuthContext | None,
 ) -> dict[str, Any]:
     result = await service.verify_email(
         raw_token=body.token,
         email=str(body.email) if body.email else None,
+        user_id=auth.user_id if auth else None,
         ip_address=client_ip(request),
     )
     return success(result)
-
 
 @router.post("/email/verify", summary="Verify email with a one-time token")
 async def verify_email_brd(
     body: VerifyEmailRequest,
     request: Request,
     service: Annotated[AuthService, Depends(get_auth_service)],
+    auth: Annotated[AuthContext | None, Depends(get_optional_user)],
 ) -> dict[str, Any]:
-    return await _verify_email(body, request, service)
-
+    return await _verify_email(body, request, service, auth)
 
 @router.post("/verify-email", summary="Verify email (legacy alias)", include_in_schema=False)
 async def verify_email_legacy(
     body: VerifyEmailRequest,
     request: Request,
     service: Annotated[AuthService, Depends(get_auth_service)],
+    auth: Annotated[AuthContext | None, Depends(get_optional_user)],
 ) -> dict[str, Any]:
-    return await _verify_email(body, request, service)
-
+    return await _verify_email(body, request, service, auth)
 
 @router.post("/email/resend", summary="Resend email verification challenge")
 async def resend_email_verification(
-    request: Request,
     service: Annotated[AuthService, Depends(get_auth_service)],
-    settings: Annotated[Settings, Depends(get_settings)],
+    auth: Annotated[AuthContext | None, Depends(get_optional_user)],
     body: ResendVerificationRequest | None = None,
 ) -> dict[str, Any]:
-    token = request.cookies.get(ACCESS_COOKIE_NAME) or None
-    auth_header = request.headers.get("authorization")
-    if auth_header or token:
-        try:
-            auth = await get_current_user(
-                request=request,
-                settings=settings,
-                authorization=auth_header,
-                access_cookie=token,
-            )
-            await service.resend_verification(user_id=auth.user_id)
-            return success({"requested": True})
-        except UnauthorizedError:
-            pass
-        except Exception:
-            pass
+    if auth is not None:
+        await service.resend_verification(user_id=auth.user_id)
+        return success({"requested": True})
     if body and body.email:
         await service.resend_verification_for_email(email=str(body.email))
         return success({"requested": True})
-    raise UnauthorizedError("Authentication or email is required")
-
+    raise BadRequestError("Enter your email address to get a new code.")
 
 @router.post("/resend-verification", summary="Resend verification (legacy authenticated)", include_in_schema=False)
 async def resend_verification_legacy(
@@ -265,9 +240,7 @@ async def resend_verification_legacy(
     await service.resend_verification(user_id=auth.user_id)
     return success({"requested": True})
 
-
-# ── Password forgot / reset / change (canonical + legacy aliases) ─────────────
-
+                                                                                
 
 @router.post("/forgot-password", summary="Request a password-reset token")
 async def forgot_password(
@@ -277,17 +250,18 @@ async def forgot_password(
     await service.request_password_reset(email=body.email)
     return success({"requested": True})
 
-
 async def _reset_password(
     body: ResetPasswordRequest,
     request: Request,
     service: AuthService,
 ) -> dict[str, Any]:
     await service.reset_password(
-        raw_token=body.token, new_password=body.password, ip_address=client_ip(request)
+        raw_token=body.token,
+        email=str(body.email),
+        new_password=body.password,
+        ip_address=client_ip(request),
     )
     return success({"reset": True})
-
 
 @router.post("/password/reset", summary="Reset password with a one-time token")
 async def reset_password_brd(
@@ -297,7 +271,6 @@ async def reset_password_brd(
 ) -> dict[str, Any]:
     return await _reset_password(body, request, service)
 
-
 @router.post("/reset-password", summary="Reset password (legacy alias)", include_in_schema=False)
 async def reset_password_legacy(
     body: ResetPasswordRequest,
@@ -305,7 +278,6 @@ async def reset_password_legacy(
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> dict[str, Any]:
     return await _reset_password(body, request, service)
-
 
 async def _change_password(
     body: ChangePasswordRequest,
@@ -324,7 +296,6 @@ async def _change_password(
     _clear_auth_cookies(response, settings)
     return success({"changed": True})
 
-
 @router.post("/password/change", summary="Change password while authenticated")
 async def change_password_brd(
     body: ChangePasswordRequest,
@@ -335,7 +306,6 @@ async def change_password_brd(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> dict[str, Any]:
     return await _change_password(body, request, response, auth, service, settings)
-
 
 @router.post("/change-password", summary="Change password (legacy alias)", include_in_schema=False)
 async def change_password_legacy(

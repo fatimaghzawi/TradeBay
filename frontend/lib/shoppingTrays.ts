@@ -1,4 +1,4 @@
-/** Events to open the shopping trays from anywhere in the app. */
+
 
 export const OPEN_CART_TRAY_EVENT = "tradebay-open-cart-tray";
 export const OPEN_FAVORITES_TRAY_EVENT = "tradebay-open-favorites-tray";

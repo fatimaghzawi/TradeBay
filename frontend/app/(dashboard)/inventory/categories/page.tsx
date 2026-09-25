@@ -11,7 +11,6 @@ import {
   InventoryToolbar,
   StatusBadge,
 } from "@/components/catalog/InventoryUi";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
@@ -62,7 +61,7 @@ function BuyerShopByCategory() {
     return map;
   }, [products]);
 
-  /** Count products in a category including its descendants. */
+  
   const countWithChildren = useCallback(
     (catId: string): number => {
       let total = productCount.get(catId) ?? 0;
@@ -217,7 +216,6 @@ function BuyerShopByCategory() {
   );
 }
 
-/** Supplier: organize own listings by category — not a marketplace shop. */
 function SupplierCategoriesView() {
   const { business } = useAuth();
   const ownId = business?.id;
@@ -426,7 +424,6 @@ function ManagerCategories() {
   const [description, setDescription] = useState("");
   const [parentId, setParentId] = useState("");
   const [pending, setPending] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const live = useLiveFields(categoryCreateSchema, {
     name,
     slug,
@@ -534,7 +531,7 @@ function ManagerCategories() {
             {kids.length > 0 ? (
               <button
                 type="button"
-                className="grid h-6 w-6 place-items-center rounded-md border border-[#d7e3dc] text-xs font-bold text-[#1a6b4f]"
+                className="grid h-6 w-6 place-items-center rounded-md border border-input text-xs font-bold text-link"
                 onClick={() => toggle(cat.id)}
                 aria-label={isOpen ? "Collapse" : "Expand"}
               >
@@ -547,8 +544,8 @@ function ManagerCategories() {
               {cat.name.slice(0, 2).toUpperCase()}
             </span>
             <div>
-              <p className="font-semibold text-[#0d3b2a]">{cat.name}</p>
-              <p className="text-xs text-[#5a6a62]">/{cat.slug}</p>
+              <p className="font-semibold text-heading">{cat.name}</p>
+              <p className="text-xs text-muted-foreground">/{cat.slug}</p>
             </div>
           </div>
         </td>
@@ -560,7 +557,7 @@ function ManagerCategories() {
           <div className="flex gap-3">
             <button
               type="button"
-              className="text-sm font-bold text-[#1a6b4f] hover:underline"
+              className="text-sm font-bold text-link hover:underline"
               onClick={() => {
                 void catalogApi
                   .updateCategory(cat.id, { is_active: !cat.is_active })
@@ -577,13 +574,6 @@ function ManagerCategories() {
               }}
             >
               {cat.is_active ? "Deactivate" : "Activate"}
-            </button>
-            <button
-              type="button"
-              className="text-sm font-bold text-[#b42318] hover:underline"
-              onClick={() => setDeleteTarget(cat)}
-            >
-              Delete
             </button>
           </div>
         </td>
@@ -674,14 +664,14 @@ function ManagerCategories() {
           <>
             <button
               type="button"
-              className="tb-split-btn-ghost"
+              className="tb-btn tb-btn--outline"
               onClick={() => setCreateOpen(false)}
             >
               Cancel
             </button>
             <button
               type="button"
-              className="tb-split-btn"
+              className="tb-btn tb-btn--primary"
               disabled={pending || !name.trim()}
               onClick={submitCreate}
              aria-busy={pending || undefined}>
@@ -734,34 +724,6 @@ function ManagerCategories() {
           </select>
         </label>
       </Modal>
-
-      <ConfirmModal
-        open={Boolean(deleteTarget)}
-        onClose={() => setDeleteTarget(null)}
-        title="Delete category?"
-        asideTitle="Soft-delete"
-        asideBody="The category is deactivated, not permanently removed. Categories with products or children cannot be deleted."
-        confirmLabel="Delete"
-        onConfirm={async () => {
-          if (!deleteTarget) return;
-          try {
-            await catalogApi.deleteCategory(deleteTarget.id);
-            success("Deleted", `${deleteTarget.name} is inactive.`);
-            setDeleteTarget(null);
-            reload();
-          } catch (err) {
-            toastError(
-              "Delete failed",
-              err instanceof ApiError ? err.message : "Could not delete.",
-            );
-            throw err;
-          }
-        }}
-      >
-        <p className="text-sm text-[#5c574e]">
-          Soft-delete <strong>{deleteTarget?.name}</strong>? You can reactivate it later.
-        </p>
-      </ConfirmModal>
     </div>
   );
 }

@@ -69,9 +69,8 @@ class SystemEvent(StrEnum):
     DISPUTE_OPENED = "DISPUTE_OPENED"
     DISPUTE_RESOLVED = "DISPUTE_RESOLVED"
 
-
-# DIRECT and SUPPORT do not require a commercial document to open a thread.
-# Context on those types is optional metadata (latest RFQ/order), never a new chat.
+                                                                           
+                                                                                   
 CONTEXTLESS_CONVERSATION_TYPES: frozenset[str] = frozenset(
     {ConversationType.DIRECT, ConversationType.SUPPORT}
 )

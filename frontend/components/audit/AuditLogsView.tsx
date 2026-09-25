@@ -46,10 +46,6 @@ const ENTITY_PRESETS = [
   { value: "business", label: "Business" },
 ];
 
-/**
- * Audit — forensic timeline stream.
- * Job: chronology of who did what to which entity.
- */
 export function AuditLogsView({ mode = "business" }: AuditListProps) {
   const { hasPermission } = useAuth();
   const [events, setEvents] = useState<AuditEvent[]>([]);
@@ -211,7 +207,7 @@ export function AuditLogsView({ mode = "business" }: AuditListProps) {
                 setResourceType("");
                 setQuery("");
               }}
-              className="text-sm font-semibold text-[#6a726c] hover:text-[#0d3b2a]"
+              className="text-sm font-semibold text-muted-foreground hover:text-heading"
             >
               Clear
             </button>
@@ -288,7 +284,7 @@ export function AuditLogsView({ mode = "business" }: AuditListProps) {
                 </div>
                 <Link
                   href={`${detailBase}/${event.id}`}
-                  className="text-sm font-bold text-[var(--tb-accent)] hover:underline"
+                  className="text-sm font-bold text-accent hover:underline"
                 >
                   Open →
                 </Link>
@@ -299,7 +295,7 @@ export function AuditLogsView({ mode = "business" }: AuditListProps) {
       )}
 
       {total > 0 ? (
-        <div className="mt-4 flex items-center justify-between border-t border-[var(--tb-line)] pt-4">
+        <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
           <p className="tb-meta">{total} events</p>
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>

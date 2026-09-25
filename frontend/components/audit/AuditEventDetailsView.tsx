@@ -9,10 +9,10 @@ import {
   auditTargetLabel,
 } from "@/lib/identity/auditCopy";
 import { formatJoined } from "@/lib/team";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LoadingEntity } from "@/components/ui/LoadingState";
+import { BackLink } from "@/components/ui/BackLink";
 
 type AuditDetailProps = {
   mode?: "business" | "platform";
@@ -40,10 +40,8 @@ export function AuditEventDetailsView({ mode = "business" }: AuditDetailProps) {
   if (error && !event) {
     return (
       <div className="space-y-3">
-        <Link href={backHref} className="text-sm font-semibold text-[#0d3b2a] hover:underline">
-          ← Back to audit logs
-        </Link>
-        <p className="rounded-xl bg-[#fef3f2] px-3.5 py-2.5 text-sm text-[#b42318]">{error}</p>
+        <BackLink href={backHref}>Back to audit logs</BackLink>
+        <p role="alert" className="tb-alert tb-alert--error">{error}</p>
       </div>
     );
   }
@@ -71,10 +69,8 @@ export function AuditEventDetailsView({ mode = "business" }: AuditDetailProps) {
   return (
     <div className="space-y-5">
       <div>
-        <Link href={backHref} className="text-sm font-semibold text-[#0d3b2a] hover:underline">
-          ← Back to audit logs
-        </Link>
-        <h1 className="mt-2 font-[family-name:var(--font-syne)] text-2xl font-bold text-[#0c1612]">
+        <BackLink href={backHref}>Back to audit logs</BackLink>
+        <h1 className="mt-2 font-[family-name:var(--font-syne)] text-2xl font-bold text-foreground">
           {auditHeadline(event)}
         </h1>
       </div>
@@ -86,7 +82,7 @@ export function AuditEventDetailsView({ mode = "business" }: AuditDetailProps) {
               <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--tb-card-muted)]">
                 {row.label}
               </dt>
-              <dd className="mt-1 break-all text-sm font-medium text-[var(--tb-card-fg)]">
+              <dd className="mt-1 break-all text-sm font-medium text-card-foreground">
                 {row.value}
               </dd>
             </div>
@@ -97,15 +93,13 @@ export function AuditEventDetailsView({ mode = "business" }: AuditDetailProps) {
       {Object.keys(metadata).length > 0 ? (
         <div className="tb-card overflow-hidden" data-kind="info">
           <div className="relative z-[1] px-5 pt-5">
-            <h2 className="font-semibold text-[var(--tb-card-fg)]">Details</h2>
-            <pre className="mt-3 overflow-x-auto rounded-xl bg-[#f3f7f5] p-3 text-xs text-[var(--tb-card-fg)]">
+            <h2 className="font-semibold text-card-foreground">Details</h2>
+            <pre className="mt-3 overflow-x-auto rounded-xl bg-muted p-3 text-xs text-card-foreground">
               {JSON.stringify(metadata, null, 2)}
             </pre>
           </div>
           <div className="tb-card-footer">
-            <Link href={backHref} className="tb-card-action">
-              Back to logs →
-            </Link>
+            <BackLink href={backHref}>Back to logs</BackLink>
           </div>
         </div>
       ) : null}

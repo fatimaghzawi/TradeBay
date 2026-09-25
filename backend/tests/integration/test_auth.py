@@ -1,4 +1,3 @@
-"""Authentication foundation tests."""
 
 from typing import Any
 
@@ -18,7 +17,6 @@ async def test_register_and_me(client: AsyncClient, registered_user: dict[str, A
     assert me["active_business"] is not None
     assert "users.read" in me["permissions"]
 
-
 @pytest.mark.asyncio
 async def test_login_logout(client: AsyncClient, registered_user: dict[str, Any]) -> None:
     login = await client.post(
@@ -36,7 +34,6 @@ async def test_login_logout(client: AsyncClient, registered_user: dict[str, Any]
     me_after = await client.get("/api/v1/auth/me")
     assert me_after.status_code == 401
 
-
 @pytest.mark.asyncio
 async def test_refresh(client: AsyncClient, registered_user: dict[str, Any]) -> None:
     _ = registered_user
@@ -44,14 +41,12 @@ async def test_refresh(client: AsyncClient, registered_user: dict[str, Any]) -> 
     assert refresh.status_code == 200
     assert "access_token_expires_in_minutes" in refresh.json()["data"]
 
-
 @pytest.mark.asyncio
 async def test_validation_error_shape(client: AsyncClient) -> None:
     response = await client.post("/api/v1/auth/register", json={"email": "not-an-email"})
     assert response.status_code == 422
     body = response.json()
     assert body["error"]["code"] == "VALIDATION_ERROR"
-
 
 @pytest.mark.asyncio
 async def test_verify_email(client: AsyncClient, registered_user: dict[str, Any]) -> None:
@@ -62,7 +57,6 @@ async def test_verify_email(client: AsyncClient, registered_user: dict[str, Any]
     assert response.json()["data"]["user"]["status"] == "active"
     me = await client.get("/api/v1/auth/me")
     assert me.json()["data"]["user"]["email_verified_at"] is not None
-
 
 @pytest.mark.asyncio
 async def test_forgot_password_does_not_reveal_account(client: AsyncClient) -> None:

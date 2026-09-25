@@ -38,6 +38,8 @@ export const ROUTES = {
   supplierProducts: (id: string) => `/inventory/products?supplier=${encodeURIComponent(id)}`,
   quotations: "/quotations",
   orders: "/orders",
+  checkout: "/checkout",
+  checkoutDetail: (id: string) => `/orders/checkouts/${id}`,
   tracking: "/tracking",
   trackingOrder: (id: string) => `/tracking/${id}`,
   notifications: "/notifications",
@@ -50,6 +52,7 @@ export const ROUTES = {
   procurementOrder: (id: string) => `/procurement/orders/${id}`,
   procurementShipment: (id: string) => `/procurement/shipments/${id}`,
   finance: "/finance",
+  financeInvoice: (id: string) => `/finance/invoices/${id}`,
   settings: "/settings",
   profile: "/settings/profile",
   changePassword: "/settings/password",
@@ -89,14 +92,12 @@ export const DOMAIN_NAV = [
   { href: ROUTES.inventory, label: "Inventory", key: "inventory" },
   { href: ROUTES.procurement, label: "Procurement", key: "procurement" },
   { href: ROUTES.conversations, label: "Conversations", key: "conversations" },
-  { href: ROUTES.finance, label: "Finance (soon)", key: "finance" },
+  { href: ROUTES.finance, label: "Finance", key: "finance" },
   { href: ROUTES.settings, label: "Settings", key: "settings" },
   { href: ROUTES.members, label: "Members", key: "members" },
   { href: ROUTES.roles, label: "Roles", key: "roles" },
   { href: ROUTES.invitations, label: "Invitations", key: "invitations" },
 ] as const;
-
-/** Prefer role-aware nav from `@/lib/navigation` for the app shell. */
 
 export const DASHBOARD_DOMAINS = [
   {

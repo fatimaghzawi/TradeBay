@@ -1,8 +1,3 @@
-"""Members, roles, invitations, and account suspension.
-
-Authorization always uses permission codes (``assert_subset``), never role names.
-Call ``guards.assert_not_last_admin`` before removing or demoting a Business Admin.
-"""
 
 from __future__ import annotations
 
@@ -13,6 +8,7 @@ from typing import Any
 
 from bson import ObjectId
 
+from app.core.exceptions import BadRequestError, ConflictError, ForbiddenError, NotFoundError
 from app.core.security import generate_invitation_token, hash_token
 from app.db.transactions import run_in_transaction
 from app.modules.identity.auth_cache import invalidate_role_permissions, invalidate_session_auth
@@ -28,6 +24,7 @@ from app.modules.identity.exceptions import (
     AccountInactiveError,
     AlreadyBusinessMemberError,
     InvitationInvalidError,
+    MemberOutranksActorError,
     PrivilegeEscalationError,
     SystemRoleProtectedError,
 )
@@ -53,7 +50,6 @@ from app.shared.utils.objectid import parse_object_id
 def _codes_from_permissions(rows: list[dict[str, Any]]) -> set[str]:
     return {permission_code(str(row["resource"]), str(row["action"])) for row in rows}
 
-
 def _person_label(user: dict[str, Any] | None, *, fallback: str | None = None) -> str | None:
     if user:
         name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
@@ -66,13 +62,10 @@ def _person_label(user: dict[str, Any] | None, *, fallback: str | None = None) -
         return fallback.strip()
     return None
 
-
 def _company_member_avatar(user: dict[str, Any] | None, logo_url: str | None) -> str | None:
-    """Profile image is the company logo whenever the business has one."""
     if logo_url:
         return logo_url
     return user.get("avatar_url") if user else None
-
 
 class DirectoryService:
     def __init__(
@@ -100,18 +93,32 @@ class DirectoryService:
         self.auth = auth or AuthService()
         self.audit = audit or AuditService()
 
-    # —— Permission helpers ————————————————————————————————————————————————
+                                                                            
 
     async def permission_codes_for_role(self, role_id: str | ObjectId) -> set[str]:
         ids = await self.role_permissions.list_permission_ids_for_role(role_id)
         return await self.permissions.codes_for_ids(ids)
 
     async def assert_subset(self, *, actor_permissions: set[str], requested: set[str]) -> None:
-        """Refuse granting codes the actor does not already hold."""
         if not requested <= actor_permissions:
             raise PrivilegeEscalationError()
 
-    # —— Members ————————————————————————————————————————————————————————————
+    async def _assert_outranks_role(
+        self, *, actor_permissions: set[str], role_id: str | ObjectId
+    ) -> None:
+        current = await self.permission_codes_for_role(role_id)
+        if not current <= actor_permissions:
+            raise MemberOutranksActorError()
+
+    async def _membership_in_business(
+        self, membership_id: str, business_id: str
+    ) -> dict[str, Any]:
+        membership = await self.memberships.get_by_id(membership_id)
+        if membership is None or str(membership["business_account_id"]) != business_id:
+            raise ForbiddenError("We couldn't find that team member in this company.")
+        return membership
+
+                                                                             
 
     async def list_members(
         self,
@@ -203,7 +210,6 @@ class DirectoryService:
         skip: int = 0,
         limit: int = 20,
     ) -> tuple[list[dict[str, Any]], int]:
-        """Platform staff directory of every user account (not scoped to one business)."""
         filter_query: dict[str, Any] = {}
         if status:
             filter_query["status"] = status
@@ -298,9 +304,7 @@ class DirectoryService:
         return results, total
 
     async def get_member(self, *, business_id: str, membership_id: str) -> dict[str, Any]:
-        membership = await self.memberships.get_by_id(membership_id)
-        if membership is None or str(membership["business_account_id"]) != business_id:
-            raise InvitationInvalidError("Membership not found")
+        membership = await self._membership_in_business(membership_id, business_id)
         user = await self.users.get_by_id(membership["user_id"])
         role = await self.roles.get_by_id(membership["role_id"])
         business = await self.businesses.get_by_id(business_id)
@@ -412,7 +416,7 @@ class DirectoryService:
             perms = actor_permissions_by_business[business_id]
             can_manage = "users.read" in perms or "users.invite" in perms
         if not is_recipient and not can_manage:
-            # Fall back: active membership with users.read on that business
+                                                                           
             membership = await self.memberships.get_active_membership(requester_user_id, business_id)
             if membership is None:
                 raise InvitationInvalidError()
@@ -489,10 +493,11 @@ class DirectoryService:
         actor_permissions: set[str],
         ip_address: str | None,
     ) -> dict[str, Any]:
-        membership = await self.memberships.get_by_id(membership_id)
-        if membership is None or str(membership["business_account_id"]) != business_id:
-            raise InvitationInvalidError("Membership not found")
+        membership = await self._membership_in_business(membership_id, business_id)
         role = await self._role_in_business(role_id, business_id)
+        await self._assert_outranks_role(
+            actor_permissions=actor_permissions, role_id=membership["role_id"]
+        )
         await self.assert_subset(
             actor_permissions=actor_permissions,
             requested=await self.permission_codes_for_role(role["_id"]),
@@ -532,11 +537,13 @@ class DirectoryService:
         business_id: str,
         membership_id: str,
         actor_user_id: str,
+        actor_permissions: set[str],
         ip_address: str | None,
     ) -> None:
-        membership = await self.memberships.get_by_id(membership_id)
-        if membership is None or str(membership["business_account_id"]) != business_id:
-            raise InvitationInvalidError("Membership not found")
+        membership = await self._membership_in_business(membership_id, business_id)
+        await self._assert_outranks_role(
+            actor_permissions=actor_permissions, role_id=membership["role_id"]
+        )
         await assert_not_last_admin(business_account_id=business_id, membership=membership)
         await self.memberships.update(
             membership_id,
@@ -564,7 +571,7 @@ class DirectoryService:
             },
         )
 
-    # —— Roles —————————————————————————————————————————————————————————————
+                                                                            
 
     async def create_role(
         self,
@@ -632,8 +639,8 @@ class DirectoryService:
         protect_owner_role: bool = True,
     ) -> dict[str, Any]:
         role = await self._role_in_business(role_id, business_id)
-        # Business Admin stays the full-access owner role for trading companies.
-        # Platform staff may override via protect_owner_role=False.
+                                                                                
+                                                                   
         if (
             protect_owner_role
             and role.get("is_system_role")
@@ -641,6 +648,10 @@ class DirectoryService:
         ):
             raise SystemRoleProtectedError(
                 "Business Admin permissions cannot be changed"
+            )
+        if protect_owner_role:
+            await self._assert_outranks_role(
+                actor_permissions=actor_permissions, role_id=role["_id"]
             )
         requested = set(permission_codes)
         await self.assert_subset(actor_permissions=actor_permissions, requested=requested)
@@ -677,7 +688,6 @@ class DirectoryService:
         }
 
     async def delete_role(self, *, business_id: str, role_id: str, actor_user_id: str, ip_address: str | None) -> None:
-        """Soft-delete custom role: deactivate, clear grants, free the unique name."""
         role = await self._role_in_business(role_id, business_id, allow_inactive=True)
         if role.get("is_system_role"):
             raise SystemRoleProtectedError("System roles cannot be deleted")
@@ -687,11 +697,31 @@ class DirectoryService:
             {
                 "business_account_id": parse_object_id(business_id),
                 "role_id": role["_id"],
-                "status": MembershipStatus.ACTIVE,
+                "status": {
+                    "$in": [
+                        MembershipStatus.ACTIVE,
+                        MembershipStatus.INVITED,
+                        MembershipStatus.SUSPENDED,
+                    ]
+                },
             }
         )
         if in_use:
-            raise SystemRoleProtectedError("Roles assigned to active members cannot be deleted")
+            raise SystemRoleProtectedError(
+                "This role is still assigned to team members. Move them to another role first."
+            )
+        pending_invites = await self.invitations.count(
+            {
+                "business_account_id": parse_object_id(business_id),
+                "role_id": role["_id"],
+                "status": InvitationStatus.PENDING,
+                "expires_at": {"$gt": utc_now()},
+            }
+        )
+        if pending_invites:
+            raise SystemRoleProtectedError(
+                "Open invitations still use this role. Revoke them or wait for them to expire first."
+            )
         now = utc_now()
         original_name = str(role.get("name") or "role")
         await self.role_permissions.replace_for_role(role["_id"], [], created_at=now)
@@ -701,7 +731,7 @@ class DirectoryService:
                 "is_active": False,
                 "deleted_at": now,
                 "updated_at": now,
-                # Free uniq_roles_business_name so a new role can reuse the label.
+                                                                                  
                 "name": f"{original_name}·deleted·{str(role['_id'])[-6:]}",
             },
         )
@@ -722,7 +752,7 @@ class DirectoryService:
             },
         )
 
-    # —— Invitations ———————————————————————————————————————————————————————
+                                                                            
 
     async def create_invitation(
         self,
@@ -736,12 +766,6 @@ class DirectoryService:
         permissions: list[str] | None = None,
         company_email: str | None = None,
     ) -> dict[str, Any]:
-        """Invite a teammate.
-
-        ``email`` = personal inbox that receives the invitation link.
-        ``company_email`` = TradeBay login identity (@company domain).
-        Auto-generated when omitted.
-        """
         from app.modules.identity.company_domain import (
             email_matches_company_domain,
             generate_company_login_email,
@@ -797,7 +821,7 @@ class DirectoryService:
             requested=requested,
         )
 
-        # Membership uniqueness is by company login email.
+                                                          
         existing_user = await self.users.get_by_email(login_email)
         if existing_user is not None:
             membership = await self.memberships.get_for_user_business(
@@ -840,24 +864,32 @@ class DirectoryService:
 
         invite_role = role
         if requested != set(role_codes):
-            custom_name = f"{role['name']} · invite"
-            existing_custom = await self.roles.find_one(
+                                                                                 
+                                                                     
+            base_name = f"{role['name']} · invite"
+            candidates = await self.roles.find_many(
                 {
                     "business_account_id": parse_object_id(business_id),
-                    "name": custom_name,
+                    "name": {"$regex": f"^{re.escape(base_name)}"},
                     "is_system_role": False,
                     "is_active": {"$ne": False},
-                }
+                },
+                limit=100,
             )
+            existing_custom = None
+            for candidate in candidates:
+                if await self.permission_codes_for_role(candidate["_id"]) == requested:
+                    existing_custom = candidate
+                    break
             if existing_custom is not None:
-                await self.role_permissions.replace_for_role(
-                    existing_custom["_id"],
-                    await self._permission_ids(requested),
-                    created_at=utc_now(),
-                )
-                invalidate_role_permissions(str(existing_custom["_id"]))
                 invite_role = existing_custom
             else:
+                taken = {str(candidate.get("name")) for candidate in candidates}
+                custom_name = base_name
+                suffix = 2
+                while custom_name in taken:
+                    custom_name = f"{base_name} {suffix}"
+                    suffix += 1
                 now_role = utc_now()
                 invite_role = await self.roles.create(
                     {
@@ -1082,7 +1114,6 @@ class DirectoryService:
         *,
         persist: bool = True,
     ) -> dict[str, Any]:
-        """If a pending invite is past expiry, mark it expired and return the updated doc."""
         if invitation.get("status") != InvitationStatus.PENDING:
             return invitation
         if as_utc(invitation["expires_at"]) >= utc_now():
@@ -1328,7 +1359,7 @@ class DirectoryService:
         business_id = invitation["business_account_id"]
         invited_role_id = invitation["role_id"]
 
-        # Guard last-admin demotion before the transaction mutates membership.
+                                                                              
         existing_outside = await self.memberships.get_for_user_business(user_id, business_id)
         if existing_outside is not None and str(existing_outside.get("role_id")) != str(
             invited_role_id
@@ -1369,7 +1400,7 @@ class DirectoryService:
                         memberships=self.memberships,
                         roles=self.roles,
                     )
-                # Upsert path: reactivate REMOVED/SUSPENDED and bind invited role.
+                                                                                  
                 membership = await self.memberships.update(
                     existing["_id"],
                     {
@@ -1390,8 +1421,8 @@ class DirectoryService:
 
         membership = await run_in_transaction(work)
 
-        # Invitation was delivered to a real personal inbox. Company login emails may not
-        # receive mail, so accepting the invite verifies the login identity without OTP.
+                                                                                         
+                                                                                        
         verified_via_invite = False
         user = await self.users.get_by_id(user_id)
         now_updates: dict[str, Any] = {}
@@ -1407,7 +1438,7 @@ class DirectoryService:
             now_updates["updated_at"] = now
             await self.users.update(user_id, now_updates)
 
-        # Profile image is the company logo for every member.
+                                                             
         if user is not None:
             business = await self.businesses.get_by_id(business_id)
             logo_url = business.get("logo_url") if business else None
@@ -1478,7 +1509,7 @@ class DirectoryService:
             "already_accepted": False,
         }
 
-    # —— Suspend / reactivate membership or user ————————————————————————————
+                                                                             
 
     async def suspend_membership(
         self,
@@ -1487,16 +1518,18 @@ class DirectoryService:
         membership_id: str,
         reason: str,
         actor_user_id: str,
+        actor_permissions: set[str],
         ip_address: str | None,
     ) -> None:
         cleaned = reason.strip()
         if not cleaned:
-            raise InvitationInvalidError("Suspension reason is required")
-        membership = await self.memberships.get_by_id(membership_id)
-        if membership is None or str(membership["business_account_id"]) != business_id:
-            raise InvitationInvalidError("Membership not found")
+            raise BadRequestError("Add a short reason for the suspension.")
+        membership = await self._membership_in_business(membership_id, business_id)
         if membership["status"] not in {MembershipStatus.ACTIVE, MembershipStatus.INVITED}:
-            raise InvitationInvalidError("Membership cannot be suspended")
+            raise ConflictError("This team member is already suspended or no longer active.")
+        await self._assert_outranks_role(
+            actor_permissions=actor_permissions, role_id=membership["role_id"]
+        )
         await assert_not_last_admin(business_account_id=business_id, membership=membership)
         await self.memberships.update(
             membership_id,
@@ -1527,17 +1560,20 @@ class DirectoryService:
         business_id: str,
         membership_id: str,
         actor_user_id: str,
+        actor_permissions: set[str],
         ip_address: str | None,
     ) -> None:
-        membership = await self.memberships.get_by_id(membership_id)
-        if membership is None or str(membership["business_account_id"]) != business_id:
-            raise InvitationInvalidError("Membership not found")
+        membership = await self._membership_in_business(membership_id, business_id)
         if membership["status"] != MembershipStatus.SUSPENDED:
-            raise InvitationInvalidError("Membership is not suspended")
+            raise ConflictError("This team member isn't suspended.")
+        await self._assert_outranks_role(
+            actor_permissions=actor_permissions, role_id=membership["role_id"]
+        )
         await self.memberships.update(
             membership_id,
             {"status": MembershipStatus.ACTIVE, "updated_at": utc_now()},
         )
+        invalidate_session_auth()
         target = await self.users.get_by_id(membership["user_id"])
         actor = await self.users.get_by_id(actor_user_id)
         await self.audit.log(
@@ -1566,7 +1602,11 @@ class DirectoryService:
     ) -> None:
         cleaned = reason.strip()
         if not cleaned:
-            raise InvitationInvalidError("Suspension reason is required")
+            raise BadRequestError("Add a short reason for the suspension.")
+        if await self.users.get_by_id(target_user_id) is None:
+            raise NotFoundError("We couldn't find that account.")
+        if target_user_id == actor_user_id:
+            raise ForbiddenError("You can't suspend your own account.")
         now = utc_now()
 
         async def work(session: MongoSession) -> None:
@@ -1627,7 +1667,7 @@ class DirectoryService:
     ) -> None:
         user = await self.users.get_by_id(target_user_id)
         if user is None:
-            raise InvitationInvalidError("User not found")
+            raise NotFoundError("We couldn't find that account.")
         status = UserStatus.ACTIVE if user.get("email_verified_at") else UserStatus.PENDING
         await self.users.update(
             target_user_id,
@@ -1674,12 +1714,12 @@ class DirectoryService:
     ) -> dict[str, Any]:
         role = await self.roles.get_by_id(role_id)
         if role is None or str(role["business_account_id"]) != business_id:
-            raise InvitationInvalidError("Role does not belong to this business")
+            raise ForbiddenError("We couldn't find that role in this company.")
         if (
             not allow_inactive
             and (role.get("is_active") is False or role.get("deleted_at") is not None)
         ):
-            raise InvitationInvalidError("Role is no longer available")
+            raise ConflictError("That role was deleted. Choose another role.")
         return role
 
     async def _permission_ids(self, codes: set[str]) -> list[ObjectId]:

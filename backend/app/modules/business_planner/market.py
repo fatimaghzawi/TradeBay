@@ -1,7 +1,3 @@
-"""Catalog-backed market snapshot for Business Planner.
-
-Only aggregates real TradeBay catalog rows. Never invents demand or RFQ stats.
-"""
 
 from __future__ import annotations
 
@@ -30,40 +26,39 @@ def _dec(value: Any) -> Decimal | None:
     except Exception:
         return None
 
+def retrieval_requirements(preferences: dict[str, Any]) -> Any:
+    from app.modules.ai.requirements import ProcurementRequirements
+    from app.modules.business_planner.schemas import read_adaptive
 
-def _tokens(text: str) -> set[str]:
-    import re
-
-    return {t for t in re.findall(r"[a-z0-9]+", text.lower()) if len(t) > 2}
-
+    goal = str(preferences.get("business_goal") or "")
+    product_prefs = [str(p) for p in (preferences.get("product_preferences") or [])]
+    extra: list[str] = []
+    dumped = read_adaptive(preferences).model_dump(exclude_none=True)
+    dumped.pop("margin_confirm", None)
+    for value in dumped.values():
+        if isinstance(value, str) and value.strip():
+            extra.append(value.strip())
+        elif isinstance(value, list):
+            extra.extend(str(item).strip() for item in value if str(item).strip())
+    return ProcurementRequirements(
+        business_description=(goal or "wholesale business")[:800],
+        business_type=goal or None,
+        location=str(preferences.get("location") or "") or None,
+        product_requirements=[*product_prefs, *extra][:12],
+        categories=[str(c) for c in (preferences.get("category_hints") or [])][:12],
+    )
 
 async def build_market_snapshot(
     *,
     preferences: dict[str, Any],
     limit_products: int = 40,
 ) -> dict[str, Any]:
-    """Return marketplace aggregates + candidate products from real catalog data."""
     db = mongo_manager.database
     products_col = db[str(CollectionName.PRODUCTS)]
     prices_col = db[str(CollectionName.PRODUCT_PRICES)]
     categories_col = db[str(CollectionName.CATEGORIES)]
     businesses_col = db[str(CollectionName.BUSINESS_ACCOUNTS)]
     profiles_col = db[str(CollectionName.SUPPLIER_PROFILES)]
-
-    goal = str(preferences.get("business_goal") or "")
-    category_hints = [str(c).lower() for c in (preferences.get("category_hints") or [])]
-    product_prefs = [str(p).lower() for p in (preferences.get("product_preferences") or [])]
-    adaptive = preferences.get("adaptive") or {}
-    adaptive_terms = []
-    for v in adaptive.values():
-        if isinstance(v, str):
-            adaptive_terms.append(v.lower())
-        elif isinstance(v, list):
-            adaptive_terms.extend(str(x).lower() for x in v)
-
-    search_terms = _tokens(
-        " ".join([goal, *category_hints, *product_prefs, *adaptive_terms])
-    )
 
     verified_profiles = await profiles_col.find(
         {"verification_status": SupplierVerificationStatus.VERIFIED},
@@ -88,37 +83,26 @@ async def build_market_snapshot(
     biz_docs = await businesses_col.find({"_id": {"$in": verified_ids}}).to_list(length=len(verified_ids))
     suppliers_by_id = {str(d["_id"]): d for d in biz_docs}
 
-    query: dict[str, Any] = {
-        "status": ProductStatus.ACTIVE,
-        "business_account_id": {"$in": verified_ids},
-    }
-    products = await products_col.find(query).limit(200).to_list(length=200)
+    from app.modules.ai.retrieval import MongoHybridRetriever
 
-    # Soft rank by token overlap when we have search terms
-    scored: list[tuple[float, dict[str, Any]]] = []
-    for product in products:
-        blob = " ".join(
-            [
-                str(product.get("name") or ""),
-                str(product.get("description") or ""),
-                str(product.get("sku") or ""),
-            ]
+    products: list[dict[str, Any]] = []
+    try:
+        retrieved = await MongoHybridRetriever().retrieve(
+            retrieval_requirements(preferences),
+            limit=limit_products,
         )
-        pt = _tokens(blob)
-        score = len(pt & search_terms) / max(len(search_terms), 1) if search_terms else 0.15
-        # Prefer products that match at least one term; keep a small baseline set if unsure
-        if search_terms and score <= 0 and preferences.get("unsure_goal"):
-            score = 0.05
-        if search_terms and score <= 0 and not preferences.get("unsure_goal"):
-            continue
-        scored.append((score, product))
+        products = [row.product for row in retrieved if row.verified]
+    except Exception:
+        products = []
 
-    scored.sort(key=lambda x: x[0], reverse=True)
-    if not scored and products:
-        # Unsure / no match — sample diverse active products (still real)
-        scored = [(0.05, p) for p in products[:limit_products]]
+    if not products:
+        query: dict[str, Any] = {
+            "status": ProductStatus.ACTIVE,
+            "business_account_id": {"$in": verified_ids},
+        }
+        products = await products_col.find(query).limit(limit_products).to_list(length=limit_products)
 
-    top = [p for _, p in scored[:limit_products]]
+    top = products[:limit_products]
     product_ids = [p["_id"] for p in top]
     category_ids = list({p["category_id"] for p in top if p.get("category_id")})
 
@@ -224,6 +208,5 @@ async def build_market_snapshot(
         else None,
     }
 
-
-# Keep Decimal128 helper import used for type clarity in callers that persist money
+                                                                                   
 __all__ = ["ObjectId", "build_market_snapshot", "to_decimal128"]

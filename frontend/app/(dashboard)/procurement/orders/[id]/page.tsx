@@ -1,7 +1,14 @@
 "use client";
 
-import { ComingSoonView } from "@/components/shared/ComingSoonView";
+import { PermissionGate } from "@/components/auth/PermissionGate";
+import { OrderDetail } from "@/components/commerce/OrderDetail";
+import { use } from "react";
 
-export default function PurchaseOrderComingSoonPage() {
-  return <ComingSoonView kind="orders" title="Purchase orders are coming soon" />;
+export default function PurchaseOrderPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  return (
+    <PermissionGate permission="orders.read">
+      <OrderDetail orderId={id} />
+    </PermissionGate>
+  );
 }

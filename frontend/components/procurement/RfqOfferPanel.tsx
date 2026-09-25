@@ -28,7 +28,7 @@ type Props = {
   buyerLogoUrl?: string | null;
   supplierLogoUrl?: string | null;
   onChanged?: () => void;
-  /** Fired after OK — always open Handshake (orderId set when buyer prepared a draft PO). */
+  
   onDealLocked?: (orderId?: string) => void;
 };
 
@@ -55,7 +55,6 @@ function offerSide(
   return index % 2 === 0 ? "supplier" : "buyer";
 }
 
-/** Opening quotation is the supplier's number; counters are owned by whoever proposed them. */
 function isCounterpartMove(
   offer: NegotiationOffer | null,
   index: number,
@@ -67,7 +66,7 @@ function isCounterpartMove(
   },
 ): boolean {
   if (!offer) {
-    // No counters yet — opening quote is from the supplier.
+    
     return opts.isBuyer;
   }
   if (!opts.myBusinessId) return false;
@@ -111,7 +110,7 @@ export function RfqOfferPanel({
     const next = handshake;
     setHandshake(null);
     if (next.mode === "order") {
-      // Orders are out of this release — celebrate the deal, then show Coming Soon.
+      
       router.push(ROUTES.orders);
       return;
     }
@@ -250,7 +249,7 @@ export function RfqOfferPanel({
       setHandshake({ mode: "ok", orderId: order.id, amount });
       return;
     }
-    // Supplier OK — lock the number and send them to Handshake to wait on the draft PO.
+    
     setHandshake({ mode: "ok", amount });
   }
 
@@ -272,8 +271,7 @@ export function RfqOfferPanel({
     setConfirmKey(null);
   }
 
-  /** Actions only on the counterpart's latest live number — never on your own counter.
-   *  After the number is locked, the buyer may still Order regardless of who last proposed. */
+  
   function tableActions(offer: NegotiationOffer | null, rowKey: string, offerIndex = 0) {
     const counterpart = isCounterpartMove(offer, offerIndex, {
       myBusinessId: business?.id,
@@ -292,7 +290,7 @@ export function RfqOfferPanel({
             <p className="tb-inv-muted">Create the purchase order at this number?</p>
             <button
               type="button"
-              className="tb-inv-btn tb-inv-btn-accent"
+              className="tb-btn tb-btn--primary"
               disabled={busy}
               onClick={() => void run(() => orderNumber(offer ?? current), { holdRefresh: true })}
             >
@@ -300,7 +298,7 @@ export function RfqOfferPanel({
             </button>
             <button
               type="button"
-              className="tb-inv-btn tb-inv-btn-soft"
+              className="tb-btn tb-btn--secondary"
               onClick={() => setConfirmKey(null)}
             >
               Not yet
@@ -312,7 +310,7 @@ export function RfqOfferPanel({
         <div className="tb-inv-form-actions">
           <button
             type="button"
-            className="tb-inv-btn tb-inv-btn-accent"
+            className="tb-btn tb-btn--primary"
             disabled={busy}
             onClick={() => setConfirmKey(`order:${rowKey}`)}
           >
@@ -331,7 +329,7 @@ export function RfqOfferPanel({
           <p className="tb-inv-muted">Create the purchase order at this number?</p>
           <button
             type="button"
-            className="tb-inv-btn tb-inv-btn-accent"
+            className="tb-btn tb-btn--primary"
             disabled={busy}
             onClick={() => void run(() => orderNumber(offer), { holdRefresh: true })}
           >
@@ -339,7 +337,7 @@ export function RfqOfferPanel({
           </button>
           <button
             type="button"
-            className="tb-inv-btn tb-inv-btn-soft"
+            className="tb-btn tb-btn--secondary"
             onClick={() => setConfirmKey(null)}
           >
             Not yet
@@ -353,7 +351,7 @@ export function RfqOfferPanel({
           <p className="tb-inv-muted">This ends the whole quotation.</p>
           <button
             type="button"
-            className="tb-inv-btn tb-inv-btn-soft"
+            className="tb-btn tb-btn--secondary"
             disabled={busy}
             onClick={() => void run(endQuotation)}
           >
@@ -361,7 +359,7 @@ export function RfqOfferPanel({
           </button>
           <button
             type="button"
-            className="tb-inv-btn tb-inv-btn-accent"
+            className="tb-btn tb-btn--primary"
             onClick={() => setConfirmKey(null)}
           >
             Keep bargaining
@@ -374,7 +372,7 @@ export function RfqOfferPanel({
         {canOk && (!offer || offer.status.toLowerCase() === "proposed") ? (
           <button
             type="button"
-            className="tb-inv-btn tb-inv-btn-accent"
+            className="tb-btn tb-btn--primary"
             disabled={busy}
             onClick={() => void run(() => okNumber(offer), { holdRefresh: true })}
           >
@@ -384,7 +382,7 @@ export function RfqOfferPanel({
         {canOrder ? (
           <button
             type="button"
-            className="tb-inv-btn tb-inv-btn-accent"
+            className="tb-btn tb-btn--primary"
             disabled={busy}
             onClick={() => setConfirmKey(`order:${rowKey}`)}
           >
@@ -394,7 +392,7 @@ export function RfqOfferPanel({
         {canEnd ? (
           <button
             type="button"
-            className="tb-inv-btn tb-inv-btn-soft"
+            className="tb-btn tb-btn--secondary"
             disabled={busy}
             onClick={() => setConfirmKey(`end:${rowKey}`)}
           >
@@ -637,7 +635,7 @@ export function RfqOfferPanel({
           })}
           <button
             type="button"
-            className="tb-inv-btn tb-inv-btn-accent tb-deal-next__send"
+            className="tb-btn tb-btn--primary tb-deal-next__send"
             disabled={busy}
             onClick={() =>
               void run(async () => {

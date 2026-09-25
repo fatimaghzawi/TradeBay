@@ -1,7 +1,12 @@
 "use client";
 
-import { ComingSoonView } from "@/components/shared/ComingSoonView";
+import { PermissionGate } from "@/components/auth/PermissionGate";
+import { TrackingHub } from "@/components/procurement/OrderTracking";
 
-export default function TrackingComingSoonPage() {
-  return <ComingSoonView kind="orders" title="Order tracking is coming soon" />;
+export default function TrackingPage() {
+  return (
+    <PermissionGate permission="orders.read">
+      <TrackingHub />
+    </PermissionGate>
+  );
 }

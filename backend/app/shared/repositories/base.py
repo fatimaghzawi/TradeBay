@@ -1,4 +1,3 @@
-"""Generic Motor-backed repository primitives. Persistence only — no business rules."""
 
 from __future__ import annotations
 
@@ -13,7 +12,6 @@ from app.db.mongodb import mongo_manager
 from app.shared.utils.objectid import parse_object_id
 
 MongoSession = AsyncIOMotorClientSession | None
-
 
 class BaseRepository:
     collection_name: CollectionName
@@ -92,9 +90,7 @@ class BaseRepository:
         result = await self.collection.delete_one({"_id": oid}, session=session)
         return result.deleted_count == 1
 
-
 class AppendOnlyRepository(BaseRepository):
-    """Ledgers and stock history must never be updated or deleted in place."""
 
     async def update(
         self,

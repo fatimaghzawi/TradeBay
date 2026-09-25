@@ -1,4 +1,5 @@
 import { AppStateAction, AppStateFrame } from "@/components/ui/AppState";
+import { BackLink } from "@/components/ui/BackLink";
 import { ROUTES } from "@/lib/constants";
 import type { ReactNode } from "react";
 
@@ -11,9 +12,6 @@ export type NotFoundStateProps = {
   actions?: ReactNode;
 };
 
-/**
- * Consistent 404 / missing-resource moment.
- */
 export function NotFoundState({
   title = "Page not found",
   message = "This route isn’t on the bay — it may have moved, or the link is incomplete.",
@@ -31,9 +29,7 @@ export function NotFoundState({
       actions={
         actions ?? (
           <>
-            <AppStateAction href={homeHref} tone="primary">
-              {homeLabel}
-            </AppStateAction>
+            <BackLink href={homeHref}>{homeLabel}</BackLink>
             <AppStateAction href={ROUTES.marketplace} tone="soft">
               Browse products
             </AppStateAction>

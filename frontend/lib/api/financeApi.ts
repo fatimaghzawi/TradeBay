@@ -4,8 +4,20 @@ export type Invoice = {
   id: string;
   invoice_number: string;
   order_id: string | null;
+  order_number?: string | null;
+  checkout_id?: string | null;
+  buyer_business_id?: string | null;
+  buyer_name?: string | null;
+  supplier_business_id?: string | null;
+  supplier_name?: string | null;
   status: string;
   currency: string;
+  subtotal?: string | null;
+  discount_total?: string | null;
+  charge_total?: string | null;
+  tax_total?: string | null;
+  tax_name?: string | null;
+  tax_rate?: string | null;
   total: string;
   amount_paid: string;
   amount_credited?: string;
@@ -14,12 +26,22 @@ export type Invoice = {
   customer_credit?: string;
   issued_at: string | null;
   due_at: string | null;
+  created_at?: string | null;
   lines?: {
+    product_id?: string | null;
     description: string;
     quantity: string | null;
+    unit?: string | null;
     unit_price: string | null;
     line_total: string | null;
   }[];
+  payment?: {
+    payment_reference: string | null;
+    receipt_number: string | null;
+    status: string;
+    method: string | null;
+    paid_at: string | null;
+  } | null;
 };
 
 export type Payable = {
@@ -69,6 +91,10 @@ export type Payment = {
   currency?: string;
   status: string;
   payment_method: string | null;
+  provider?: string | null;
+  checkout_id?: string | null;
+  failure_message?: string | null;
+  created_at?: string | null;
   paid_at?: string | null;
   allocations?: { invoice_id: string; allocated_amount: string | null }[];
 };
@@ -76,6 +102,8 @@ export type Payment = {
 export const financeApi = {
   listInvoices: (params?: { page?: number; page_size?: number }) =>
     apiClient.getPage<Invoice>("/invoices", { params }),
+
+  getPayment: (id: string) => apiClient.get<Payment>(`/payments/${id}`),
 
   getInvoice: (id: string) => apiClient.get<Invoice>(`/invoices/${id}`),
 

@@ -1,4 +1,3 @@
-"""AI Sourcing persistence."""
 
 from __future__ import annotations
 
@@ -31,7 +30,6 @@ class SourcingRequestRepository(BaseRepository):
     async def count_for_business(self, business_id: str) -> int:
         return await self.count({"buyer_business_id": parse_object_id(business_id)})
 
-
 class SourcingRequestItemRepository(BaseRepository):
     collection_name = CollectionName.SOURCING_REQUEST_ITEMS
 
@@ -51,7 +49,6 @@ class SourcingRequestItemRepository(BaseRepository):
         )
         return int(result.deleted_count)
 
-
 class SourcingRecommendationRepository(BaseRepository):
     collection_name = CollectionName.SOURCING_RECOMMENDATIONS
 
@@ -70,7 +67,6 @@ class SourcingRecommendationRepository(BaseRepository):
             session=session,
         )
         return int(result.deleted_count)
-
 
 class BusinessProcurementProfileRepository(BaseRepository):
     collection_name = CollectionName.BUSINESS_PROCUREMENT_PROFILES

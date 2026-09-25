@@ -1,19 +1,20 @@
 "use client";
 
 import { AppStateAction, AppStateFrame } from "@/components/ui/AppState";
+import { BackLink } from "@/components/ui/BackLink";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ROUTES } from "@/lib/constants";
 import { useAuth } from "@/providers/AuthProvider";
 import type { ReactNode } from "react";
 
 type PermissionGateProps = {
-  /** One or more permission codes. Any match grants access unless `requireAll`. */
+  
   permission: string | string[];
   requireAll?: boolean;
   children: ReactNode;
   fallbackTitle?: string;
   fallbackDescription?: string;
-  /** When true, signed-out visitors can still view the screen (explore mode). */
+  
   allowGuest?: boolean;
 };
 
@@ -56,9 +57,7 @@ export function PermissionGate({
           title={fallbackTitle}
           body={<p>{fallbackDescription}</p>}
           actions={
-            <AppStateAction href={ROUTES.dashboard} tone="primary">
-              Back to home →
-            </AppStateAction>
+            <BackLink href={ROUTES.dashboard}>Back to home</BackLink>
           }
         />
       </div>
@@ -68,7 +67,6 @@ export function PermissionGate({
   return <>{children}</>;
 }
 
-/** Supplier inventory ops (stock, movements, pricing boards). Buyers browse products only. */
 export function SupplierOnlyGate({
   children,
   fallbackTitle = "Supplier tools",

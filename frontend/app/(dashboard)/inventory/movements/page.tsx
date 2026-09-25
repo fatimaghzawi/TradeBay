@@ -155,7 +155,7 @@ function MovementsInner() {
                     tx.transaction_type.includes("reserve");
                   return (
                     <tr key={tx.id}>
-                      <td className="text-xs text-[#5a6a62]">
+                      <td className="text-xs text-muted-foreground">
                         {tx.created_at
                           ? new Date(tx.created_at).toLocaleString()
                           : "—"}
@@ -163,7 +163,7 @@ function MovementsInner() {
                       <td>
                         <Link
                           href={ROUTES.inventoryProduct(tx.product_id)}
-                          className="font-semibold text-[#0d3b2a] hover:underline"
+                          className="font-semibold text-heading hover:underline"
                         >
                           {tx.product_name ?? "Product"}
                         </Link>
@@ -172,14 +172,14 @@ function MovementsInner() {
                         {tx.transaction_type.split("_").join(" ")}
                       </td>
                       <td
-                        className={`font-semibold ${outbound ? "text-[#b42318]" : "text-[#0f6b45]"}`}
+                        className={`font-semibold ${outbound ? "text-destructive" : "text-success"}`}
                       >
                         {outbound ? `−${tx.quantity}` : `+${tx.quantity}`}
                       </td>
                       <td>
                         {tx.new_available} avail · {tx.new_reserved} res
                       </td>
-                      <td className="text-sm text-[#5a6a62]">{tx.reason ?? "—"}</td>
+                      <td className="text-sm text-muted-foreground">{tx.reason ?? "—"}</td>
                     </tr>
                   );
                 })}

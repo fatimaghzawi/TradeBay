@@ -1,11 +1,8 @@
-/**
- * Translate API / technical errors into polished B2B product language.
- * Never surface field names, permission codes, stack traces, or status enums.
- */
+
 
 const TECHNICAL_PATTERNS: RegExp[] = [
-  /\b[a-z]+(?:_[a-z0-9]+)+\b/i, // snake_case identifiers
-  /\b[a-z]+\.[a-z_]+\b/i, // permission codes like products.read
+  /\b[a-z]+(?:_[a-z0-9]+)+\b/i, 
+  /\b[a-z]+\.[a-z_]+\b/i, 
   /\bObjectId\b/i,
   /\bMongo(?:DB)?\b/i,
   /\bPostgreSQL\b/i,
@@ -21,7 +18,6 @@ const TECHNICAL_PATTERNS: RegExp[] = [
   /\[.*\]/,
 ];
 
-/** Known backend messages → product copy (exact or prefix match). */
 const KNOWN: Array<{ match: RegExp | string; message: string }> = [
   { match: /^Permission denied$/i, message: "You don’t have access to this action." },
   { match: /^Forbidden$/i, message: "You don’t have access to this action." },
@@ -171,7 +167,6 @@ function matchKnown(message: string): string | null {
   return null;
 }
 
-/** Sanitize a raw API message for display. */
 export function sanitizeApiMessage(
   message: string | null | undefined,
   status = 0,
@@ -182,7 +177,7 @@ export function sanitizeApiMessage(
   if (known) return known;
 
   if (raw && !looksTechnical(raw)) {
-    // Already readable product copy from the API.
+    
     return raw;
   }
 
@@ -203,7 +198,6 @@ export function sanitizeApiMessage(
   return "Something went wrong. Please try again.";
 }
 
-/** Default message when the API returns no body for a status. */
 export function defaultMessageForStatus(status: number): string {
   const statusMessage = STATUS_DEFAULTS[status];
   if (statusMessage) return statusMessage;
@@ -213,7 +207,6 @@ export function defaultMessageForStatus(status: number): string {
   return "Something went wrong. Please try again.";
 }
 
-/** Prefer ApiError (already sanitized) or a contextual fallback. */
 export function userFacingError(err: unknown, fallback: string): string {
   if (err && typeof err === "object" && "message" in err) {
     const msg = String((err as { message?: unknown }).message ?? "").trim();

@@ -324,13 +324,13 @@ export function ShoppingTraysHost() {
               <button
                 type="button"
                 className="tb-shop-tray__btn is-accent"
-                disabled={!!working}
+                disabled={!!working || !canOrder}
                 onClick={() => {
                   setTray(null);
-                  router.push(ROUTES.orders);
+                  router.push(ROUTES.checkout);
                 }}
               >
-                Order now (soon)
+                Checkout
               </button>
             </div>
             </div>

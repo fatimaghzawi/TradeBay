@@ -11,6 +11,7 @@ import { formatJoined } from "@/lib/team";
 import { useAuth } from "@/providers/AuthProvider";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { BackLink } from "@/components/ui/BackLink";
 
 type SessionFilter = "all" | "current" | "other";
 
@@ -77,7 +78,7 @@ export default function SessionsPage() {
         <button
           type="button"
           disabled={busyId === "others" || otherCount === 0}
-          className="tb-ov-btn-primary disabled:opacity-50"
+          className="tb-btn tb-btn--primary"
           onClick={() => {
             setBusyId("others");
             setError(null);
@@ -142,12 +143,7 @@ export default function SessionsPage() {
       quote="“One trusted device is better than ten forgotten ones.”"
     >
       <p className="mb-2">
-        <Link
-          href={ROUTES.settings}
-          className="text-sm font-semibold text-[var(--tb-accent)] hover:underline"
-        >
-          ← Account settings
-        </Link>
+        <BackLink href={ROUTES.settings}>Account settings</BackLink>
       </p>
 
       {error ? (
@@ -202,7 +198,7 @@ export default function SessionsPage() {
               <button
                 type="button"
                 disabled={busyId === session.id}
-                className="text-sm font-bold text-[#b42318] hover:underline disabled:opacity-50"
+                className="text-sm font-bold text-destructive hover:underline disabled:opacity-50"
                 onClick={() => {
                   setBusyId(session.id);
                   setError(null);

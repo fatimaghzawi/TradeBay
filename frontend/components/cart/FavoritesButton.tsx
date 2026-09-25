@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/AuthProvider";
 import { useEffect, useState } from "react";
 
-/** Favorites shortcut — buyers (and guests) only; not for suppliers/platform. */
 export function FavoritesButton({
   className,
   badgeClassName,
@@ -40,7 +39,7 @@ export function FavoritesButton({
       type="button"
       onClick={() => openFavoritesTray()}
       className={cn(
-        "relative flex h-10 w-10 items-center justify-center rounded-full border border-[var(--tb-border)] bg-[var(--tb-surface)] text-[var(--tb-ink)] transition hover:border-[var(--tb-primary)]/45 hover:text-[var(--tb-ink)]",
+        "relative flex h-10 w-10 items-center justify-center rounded-full border border-border-strong bg-card text-foreground transition hover:border-[var(--tb-primary)]/45 hover:text-foreground",
         className,
       )}
       aria-label={count > 0 ? `Favorites, ${count} saved` : "Favorites"}
@@ -53,7 +52,7 @@ export function FavoritesButton({
           strokeWidth="1.8"
           strokeLinejoin="round"
           fill={count > 0 ? "currentColor" : "none"}
-          className={count > 0 ? "text-[var(--tb-danger)]" : undefined}
+          className={count > 0 ? "text-destructive" : undefined}
         />
       </svg>
       {count > 0 ? (

@@ -9,11 +9,6 @@ const HERO_VIDEO = "/videos/hero-workers-buses.mp4";
 const HERO_POSTER = "/images/landing/hero-mock.jpg";
 const NEXT_SECTION_ID = "trade-story";
 
-/**
- * Full-bleed hero video. After the first playthrough, smoothly advances
- * once to the next related section — cancelled if the user scrolls/interacts
- * or prefers reduced motion.
- */
 export function LandingHero() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const advancedRef = useRef(false);
@@ -71,7 +66,7 @@ export function LandingHero() {
       if (timer || advancedRef.current || cancelledRef.current) return;
       const duration = video.duration;
       if (!Number.isFinite(duration) || duration <= 0) return;
-      // Advance just before the first loop restarts.
+      
       const delayMs = Math.max(2500, (duration - 0.6) * 1000);
       timer = setTimeout(advance, delayMs);
     };

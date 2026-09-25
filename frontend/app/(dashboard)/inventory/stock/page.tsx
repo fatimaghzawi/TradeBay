@@ -141,11 +141,11 @@ function StockInner() {
                       <td>
                         <Link
                           href={ROUTES.inventoryProduct(p.id)}
-                          className="font-semibold text-[#0d3b2a] hover:underline"
+                          className="font-semibold text-heading hover:underline"
                         >
                           {p.name}
                         </Link>
-                        <p className="text-xs text-[#5a6a62]">SKU {p.sku}</p>
+                        <p className="text-xs text-muted-foreground">SKU {p.sku}</p>
                       </td>
                       <td className="font-semibold">
                         {p.inventory?.available_quantity ?? "0"}
@@ -158,7 +158,7 @@ function StockInner() {
                       <td>
                         <Link
                           href={ROUTES.inventoryProduct(p.id)}
-                          className="text-sm font-bold text-[#1a6b4f] hover:underline"
+                          className="text-sm font-bold text-link hover:underline"
                         >
                           Open
                         </Link>

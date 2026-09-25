@@ -235,7 +235,7 @@ export function CompanyProfileView({
     setGovernorate(business.address?.governorate ?? "Beirut");
     setPostalCode(business.address?.postal_code ?? "");
     setCountry(business.address?.country ?? "Lebanon");
-    // Don't clobber an in-flight local blob preview with a stale server value.
+    
     if (!logoPreviewRef.current) {
       setLogoUrl(business.logo_url ?? null);
     }
@@ -746,7 +746,7 @@ export function CompanyProfileView({
                 <div className="tb-cp-actions">
                   <button
                     type="button"
-                    className="tb-ov-btn-ghost"
+                    className="tb-btn tb-btn--outline"
                     onClick={() => {
                       setEditing(false);
                       setError(null);
@@ -756,7 +756,7 @@ export function CompanyProfileView({
                   </button>
                   <button
                     type="button"
-                    className="tb-ov-btn-primary"
+                    className="tb-btn tb-btn--primary"
                     disabled={saving}
                     onClick={() => void saveProfile()}
                   >
@@ -871,7 +871,7 @@ export function CompanyProfileView({
                 <div className="tb-cp-actions">
                   <button
                     type="button"
-                    className="tb-ov-btn-primary"
+                    className="tb-btn tb-btn--primary"
                     disabled={saving}
                     onClick={() => void saveProfile()}
                   >
@@ -929,7 +929,7 @@ export function CompanyProfileView({
                   {!verified ? (
                     <Link
                       href={ROUTES.businessesVerify}
-                      className="tb-ov-btn-accent mt-4 inline-flex"
+                      className="tb-btn tb-btn--accent mt-4"
                     >
                       {(business.verification_documents?.length ?? 0) > 0
                         ? "Resubmit documents"

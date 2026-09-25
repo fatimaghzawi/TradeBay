@@ -3,10 +3,10 @@
 import { AdminAct } from "@/components/admin/AdminUi";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { IdentityPageShell } from "@/components/identity/IdentityPageShell";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingEntity, BusyText } from "@/components/ui/LoadingState";
 import { Modal } from "@/components/ui/Modal";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { FieldError } from "@/components/ui/FormField";
 import { useToast } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api/client";
@@ -31,7 +31,6 @@ function CategoriesInner() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const live = useLiveFields(categoryCreateSchema, {
     name,
@@ -157,12 +156,12 @@ function CategoriesInner() {
           className="tb-roles-row"
           style={{ paddingLeft: `${12 + depth * 18}px` }}
         >
-          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[var(--tb-line)] bg-[var(--tb-surface-muted)]">
+          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
             {src ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={src} alt="" className="h-full w-full object-cover" />
             ) : (
-              <span className="flex h-full w-full items-center justify-center text-sm font-bold text-[var(--tb-muted-fg)]">
+              <span className="flex h-full w-full items-center justify-center text-sm font-bold text-muted-foreground">
                 {cat.name.slice(0, 1).toUpperCase()}
               </span>
             )}
@@ -184,13 +183,11 @@ function CategoriesInner() {
                 : " · top level"}
             </p>
           </div>
-          <span className="tb-roles-status">
-            {cat.is_active ? "Active" : "Inactive"}
-          </span>
+          <StatusBadge status={cat.is_active ? "active" : "inactive"} />
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              className="text-sm font-bold text-[var(--tb-accent)] hover:underline"
+              className="text-sm font-bold text-accent hover:underline"
               onClick={() => {
                 void catalogApi
                   .updateCategory(cat.id, { is_active: !cat.is_active })
@@ -212,13 +209,6 @@ function CategoriesInner() {
               }}
             >
               {cat.is_active ? "Deactivate" : "Activate"}
-            </button>
-            <button
-              type="button"
-              className="text-sm font-bold text-[#b42318] hover:underline"
-              onClick={() => setDeleteTarget(cat)}
-            >
-              Delete
             </button>
           </div>
         </div>
@@ -329,7 +319,7 @@ function CategoriesInner() {
           <>
             <button
               type="button"
-              className="tb-split-btn-ghost"
+              className="tb-btn tb-btn--outline"
               disabled={pending}
               onClick={() => {
                 setCreateOpen(false);
@@ -340,7 +330,7 @@ function CategoriesInner() {
             </button>
             <button
               type="button"
-              className="tb-split-btn"
+              className="tb-btn tb-btn--primary"
               disabled={pending || !name.trim()}
               onClick={submitCreate}
              aria-busy={pending || undefined}>
@@ -397,7 +387,7 @@ function CategoriesInner() {
         <div className="tb-split-field mt-3">
           <span>Image (optional)</span>
           <div className="mt-2 flex items-center gap-3">
-            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[var(--tb-line)] bg-[var(--tb-surface-muted)]">
+            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
               {imagePreview ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -406,13 +396,13 @@ function CategoriesInner() {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-[var(--tb-muted-fg)]">
+                <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
                   —
                 </span>
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <label className="inline-flex cursor-pointer items-center rounded-full border border-[#d4e0da] bg-white px-3 py-1.5 text-sm font-semibold text-[#0d3b2a]">
+              <label className="inline-flex cursor-pointer items-center rounded-full border border-input bg-card px-3 py-1.5 text-sm font-semibold text-heading">
                 {imageFile ? "Change image" : "Choose image"}
                 <input
                   type="file"
@@ -441,13 +431,13 @@ function CategoriesInner() {
               {imageFile ? (
                 <button
                   type="button"
-                  className="ml-2 text-sm font-semibold text-[#5a6a62] hover:underline"
+                  className="ml-2 text-sm font-semibold text-muted-foreground hover:underline"
                   onClick={() => setImageFile(null)}
                 >
                   Clear
                 </button>
               ) : null}
-              <p className="mt-1 text-xs text-[var(--tb-muted-fg)]">
+              <p className="mt-1 text-xs text-muted-foreground">
                 JPEG, PNG, WebP, or GIF
               </p>
               <FieldError error={imageError} />
@@ -455,26 +445,6 @@ function CategoriesInner() {
           </div>
         </div>
       </Modal>
-
-      <ConfirmModal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        title="Delete category?"
-        asideTitle="Soft-delete"
-        asideBody="The category is deactivated, not permanently removed. Categories with products or children cannot be deleted."
-        confirmLabel="Delete"
-        onConfirm={async () => {
-          if (!deleteTarget) return;
-          await catalogApi.deleteCategory(deleteTarget.id);
-          success("Deleted", `${deleteTarget.name} is inactive.`);
-          setDeleteTarget(null);
-          reload();
-        }}
-      >
-        <p className="text-sm text-[#5c574e]">
-          Soft-delete <strong>{deleteTarget?.name}</strong>? You can reactivate it later.
-        </p>
-      </ConfirmModal>
     </IdentityPageShell>
   );
 }

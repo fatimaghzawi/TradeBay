@@ -148,7 +148,7 @@ export default function SettingsPage() {
             </div>
             <Link
               href={link.href}
-              className="text-sm font-bold text-[var(--tb-accent)] hover:underline"
+              className="text-sm font-bold text-accent hover:underline"
             >
               Open →
             </Link>

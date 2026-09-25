@@ -39,12 +39,12 @@ export function ConfirmModal({
       asideBody={asideBody}
       footer={
         <>
-          <button type="button" className="tb-split-btn-ghost" onClick={onClose}>
+          <button type="button" className="tb-btn tb-btn--outline" onClick={onClose}>
             Cancel
           </button>
           <button
             type="button"
-            className="tb-split-btn-danger"
+            className="tb-btn tb-btn--destructive"
             disabled={pending}
             aria-busy={pending || undefined}
             onClick={() => {

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { buttonClass, type ButtonVariant } from "@/components/ui/Button";
 import { DirectoryMast } from "@/components/shared/DirectoryMast";
 import { BusyText, LoadingEntity } from "@/components/ui/LoadingState";
 import Link from "next/link";
@@ -6,7 +7,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 export function InventoryPageHeader({
   title,
-  description: _description,
+  description,
   actions,
   eyebrow: _eyebrow = "Inventory",
   mark,
@@ -22,12 +23,22 @@ export function InventoryPageHeader({
   return (
     <DirectoryMast
       title={title}
+      lede={description}
       actions={actions}
       mark={mark}
       size="page"
     />
   );
 }
+
+type InventoryTone = "primary" | "accent" | "ghost" | "soft";
+
+const INVENTORY_VARIANT: Record<InventoryTone, ButtonVariant> = {
+  primary: "primary",
+  accent: "primary",
+  ghost: "outline",
+  soft: "secondary",
+};
 
 export function InventoryBtn({
   children,
@@ -37,7 +48,7 @@ export function InventoryBtn({
   disabled,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  tone?: "primary" | "accent" | "ghost" | "soft";
+  tone?: InventoryTone;
   busy?: boolean;
 }) {
   return (
@@ -45,7 +56,7 @@ export function InventoryBtn({
       type="button"
       disabled={disabled || busy}
       aria-busy={busy || undefined}
-      className={cn("tb-inv-btn", `tb-inv-btn-${tone}`, className)}
+      className={buttonClass({ variant: INVENTORY_VARIANT[tone], className })}
       {...props}
     >
       <BusyText busy={busy}>{children}</BusyText>
@@ -62,10 +73,10 @@ export function InventoryLinkBtn({
   href: string;
   children: ReactNode;
   className?: string;
-  tone?: "primary" | "accent" | "ghost" | "soft";
+  tone?: InventoryTone;
 }) {
   return (
-    <Link href={href} className={cn("tb-inv-btn", `tb-inv-btn-${tone}`, className)}>
+    <Link href={href} className={buttonClass({ variant: INVENTORY_VARIANT[tone], className })}>
       {children}
     </Link>
   );
@@ -171,7 +182,7 @@ export function InventorySkeleton({
   entity = "data",
 }: {
   rows?: number;
-  /** Entity label shown as “Loading {entity}…” */
+  
   entity?: string;
 }) {
   return <LoadingEntity entity={entity} />;
@@ -246,69 +257,7 @@ export function InventoryFoot({
   );
 }
 
-const OK_STATUSES = new Set([
-  "active",
-  "ok",
-  "published",
-  "submitted",
-  "confirmed",
-  "accepted",
-  "paid",
-  "received",
-  "completed",
-  "delivered",
-  "awarded",
-  "shipped",
-  "settled",
-  "closed",
-  "verified",
-]);
-const WAIT_STATUSES = new Set([
-  "draft",
-  "pending",
-  "low",
-  "invited",
-  "viewed",
-  "open",
-  "under_review",
-  "processing",
-  "in_transit",
-  "negotiating",
-  "partially_shipped",
-  "partially_received",
-]);
-const BAD_STATUSES = new Set([
-  "inactive",
-  "rejected",
-  "out",
-  "cancelled",
-  "canceled",
-  "declined",
-  "failed",
-  "disputed",
-  "overdue",
-]);
-
-export function StatusBadge({ status }: { status: string }) {
-  const key = status.toLowerCase().replaceAll(" ", "_");
-  const tone = OK_STATUSES.has(key)
-    ? "ok"
-    : WAIT_STATUSES.has(key)
-      ? "wait"
-      : BAD_STATUSES.has(key)
-        ? "bad"
-        : "off";
-  const label = key
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-  return (
-    <span className="tb-inv-badge" data-tone={tone}>
-      {label || status}
-    </span>
-  );
-}
+export { StatusBadge } from "@/components/ui/StatusBadge";
 
 export function StockBar({
   label,

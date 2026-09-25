@@ -22,7 +22,7 @@ export function DocumentUploadCard({
 
   return (
     <label className="tb-drop cursor-pointer" data-state={shown ? "error" : undefined}>
-      <span className="mb-1 text-[#8a9690]" aria-hidden>
+      <span className="mb-1 text-subtle-foreground" aria-hidden>
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
           <path
             d="M7 18a4.5 4.5 0 0 1-.4-9 5.5 5.5 0 0 1 10.7-1.4A4 4 0 0 1 17 18H7Z"
@@ -56,7 +56,7 @@ export function DocumentUploadCard({
       <span
         className={cn(
           "mt-1 inline-flex h-8 items-center rounded-[0.5rem] px-3 text-xs font-semibold",
-          fileName ? "bg-[#e8f6ef] text-[#157347]" : "bg-[#f2f4f3] text-[#344054]",
+          fileName ? "bg-success-soft text-success" : "bg-muted text-ink-soft",
         )}
       >
         {fileName ? "Replace file" : "Upload file"}

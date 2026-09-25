@@ -1,9 +1,3 @@
-"""Catalog document shapes.
-
-ERD §5. `inventories` is current stock; `inventory_transactions` is the history that
-explains it. `product_prices` is the live shop window — agreed deal prices live on
-quotation and order items, never here.
-"""
 
 from __future__ import annotations
 
@@ -25,9 +19,7 @@ class CategoryDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class ProductDocument(MongoDocument):
-    """SKU is unique per supplier, not globally."""
 
     supplier_id: DocumentId
     business_account_id: DocumentId
@@ -45,9 +37,7 @@ class ProductDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class ProductPriceDocument(MongoDocument):
-    """A wholesale quantity tier. Tiers on one product must not overlap."""
 
     product_id: DocumentId
     min_quantity: int
@@ -59,7 +49,6 @@ class ProductPriceDocument(MongoDocument):
     updated_at: datetime
     deleted_at: datetime | None = None
 
-
 class ProductImageDocument(MongoDocument):
     product_id: DocumentId
     url: str
@@ -69,18 +58,14 @@ class ProductImageDocument(MongoDocument):
     created_at: datetime
     deleted_at: datetime | None = None
 
-
 class InventoryDocument(MongoDocument):
-    """Current stock only, 1:1 with product. Never write history here."""
 
     product_id: DocumentId
     available_quantity: Money
     reserved_quantity: Money
     updated_at: datetime
 
-
 class InventoryTransactionDocument(MongoDocument):
-    """Append-only stock history. Written in the same transaction as the `inventories` update."""
 
     inventory_id: DocumentId
     product_id: DocumentId

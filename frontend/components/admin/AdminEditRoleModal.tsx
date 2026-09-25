@@ -21,9 +21,6 @@ type AdminEditRoleModalProps = {
   onSaved: () => void;
 };
 
-/**
- * Platform staff role editor for a trading company — including Business Admin.
- */
 export function AdminEditRoleModal({
   open,
   businessId,
@@ -69,12 +66,12 @@ export function AdminEditRoleModal({
       asideBody="Platform staff can grant any trading permission, including on Business Admin."
       footer={
         <>
-          <button type="button" className="tb-split-btn-ghost" onClick={onClose}>
+          <button type="button" className="tb-btn tb-btn--outline" onClick={onClose}>
             Cancel
           </button>
           <button
             type="button"
-            className="tb-split-btn"
+            className="tb-btn tb-btn--primary"
             disabled={!role || selected.length === 0 || pending}
             aria-busy={pending || undefined}
             onClick={() => {
@@ -110,7 +107,7 @@ export function AdminEditRoleModal({
     >
       {role ? (
         <div className="space-y-3">
-          <p className="text-sm text-[#5a6a62]">
+          <p className="text-sm text-muted-foreground">
             {selected.length} selected · {grantable.size} grantable trading permissions
           </p>
           <ModulePermissionPicker

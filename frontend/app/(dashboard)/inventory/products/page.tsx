@@ -237,11 +237,11 @@ function SupplierProductsTable({
                         <div>
                           <Link
                             href={ROUTES.inventoryProduct(product.id)}
-                            className="font-semibold text-[#0d3b2a] hover:underline"
+                            className="font-semibold text-heading hover:underline"
                           >
                             {product.name}
                           </Link>
-                          <p className="text-xs text-[#5a6a62]">
+                          <p className="text-xs text-muted-foreground">
                             MOQ {product.moq}
                             {product.origin ? ` · ${product.origin}` : ""}
                           </p>
@@ -255,7 +255,7 @@ function SupplierProductsTable({
                       <span className="font-semibold">
                         {product.inventory?.available_quantity ?? "—"}
                       </span>
-                      <span className="text-[#5a6a62]"> avail</span>
+                      <span className="text-muted-foreground"> avail</span>
                     </td>
                     <td>
                       <StatusBadge status={product.status} />
@@ -263,7 +263,7 @@ function SupplierProductsTable({
                     <td>
                       <Link
                         href={ROUTES.inventoryProduct(product.id)}
-                        className="text-sm font-bold text-[#1a6b4f] hover:underline"
+                        className="text-sm font-bold text-link hover:underline"
                       >
                         {canManage ? "Manage →" : "Open →"}
                       </Link>

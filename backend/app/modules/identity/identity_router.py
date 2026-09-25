@@ -1,14 +1,3 @@
-"""Identity domain routes: members, roles, invitations, sessions, account, platform.
-
-Canonical trading-company APIs are session-scoped (`/members`, `/roles`,
-`/invitations`, `/audit-logs`) and use the active business from the JWT.
-
-Nested `/businesses/{id}/...` mirrors of those endpoints still work for
-explicit-id clients but are hidden from OpenAPI to avoid Swagger duplicates.
-
-Platform routes (`/platform/...`) are a separate tenant (TradeBay staff), not
-duplicates of trading-company audit.
-"""
 
 from __future__ import annotations
 
@@ -72,9 +61,7 @@ sessions_router = APIRouter(prefix="/sessions", tags=["Sessions"])
 platform_router = APIRouter(prefix="/platform", tags=["Platform"])
 audit_logs_router = APIRouter(prefix="/audit-logs", tags=["Audit"])
 
-
-# ── Nested mirrors (hidden from Swagger; prefer session-scoped routes below) ─
-
+                                                                               
 
 @businesses_router.get(
     "/{business_id}/members",
@@ -99,7 +86,6 @@ async def list_business_members(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @businesses_router.get(
     "/{business_id}/members/{membership_id}",
     summary="View a specific membership",
@@ -113,7 +99,6 @@ async def get_business_member(
 ) -> dict[str, Any]:
     del auth
     return success(await directory.get_member(business_id=business_id, membership_id=membership_id))
-
 
 @businesses_router.patch(
     "/{business_id}/members/{membership_id}/role",
@@ -138,7 +123,6 @@ async def update_business_member_role(
     )
     return success(result)
 
-
 @businesses_router.delete(
     "/{business_id}/members/{membership_id}",
     summary="Remove a member",
@@ -155,10 +139,10 @@ async def remove_business_member(
         business_id=business_id,
         membership_id=membership_id,
         actor_user_id=auth.user_id,
+        actor_permissions=auth.permissions,
         ip_address=client_ip(request),
     )
     return success({"removed": True})
-
 
 @businesses_router.post(
     "/{business_id}/members/{membership_id}/suspend",
@@ -178,10 +162,10 @@ async def suspend_membership(
         membership_id=membership_id,
         reason=body.reason,
         actor_user_id=auth.user_id,
+        actor_permissions=auth.permissions,
         ip_address=client_ip(request),
     )
     return success({"suspended": True})
-
 
 @businesses_router.post(
     "/{business_id}/members/{membership_id}/reactivate",
@@ -199,10 +183,10 @@ async def reactivate_membership(
         business_id=business_id,
         membership_id=membership_id,
         actor_user_id=auth.user_id,
+        actor_permissions=auth.permissions,
         ip_address=client_ip(request),
     )
     return success({"reactivated": True})
-
 
 @businesses_router.get(
     "/{business_id}/invitations",
@@ -226,7 +210,6 @@ async def list_business_invitations(
         limit=pagination.limit,
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
-
 
 @businesses_router.post(
     "/{business_id}/invitations",
@@ -252,7 +235,6 @@ async def create_business_invitation(
     )
     return success(result)
 
-
 @businesses_router.get(
     "/{business_id}/roles",
     summary="List roles for a business",
@@ -274,7 +256,6 @@ async def list_business_roles(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @businesses_router.get(
     "/{business_id}/roles/{role_id}",
     summary="View a role and its permissions",
@@ -288,7 +269,6 @@ async def get_business_role(
 ) -> dict[str, Any]:
     del auth
     return success(await directory.get_role(business_id=business_id, role_id=role_id))
-
 
 @businesses_router.post(
     "/{business_id}/roles",
@@ -311,7 +291,6 @@ async def create_business_role(
         ip_address=client_ip(request),
     )
     return success(result)
-
 
 @businesses_router.patch(
     "/{business_id}/roles/{role_id}",
@@ -336,7 +315,6 @@ async def update_business_role(
     )
     return success(result)
 
-
 @businesses_router.delete(
     "/{business_id}/roles/{role_id}",
     summary="Soft-delete a custom role",
@@ -356,7 +334,6 @@ async def delete_business_role(
         ip_address=client_ip(request),
     )
     return success({"deleted": True})
-
 
 @businesses_router.get(
     "/{business_id}/audit-logs",
@@ -384,7 +361,6 @@ async def list_business_audit_logs(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @businesses_router.get(
     "/{business_id}/audit-logs/{audit_log_id}",
     summary="View one business audit event",
@@ -401,9 +377,7 @@ async def get_business_audit_log(
         raise InvitationInvalidError("Audit log not found")
     return success(item)
 
-
-# ── Session-scoped trading APIs (active business from JWT) ───────────────────
-
+                                                                               
 
 @members_router.get("", summary="List members of the active business")
 async def list_members(
@@ -422,7 +396,6 @@ async def list_members(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @members_router.get("/{membership_id}", summary="View a membership in the active business")
 async def get_member(
     membership_id: str,
@@ -432,7 +405,6 @@ async def get_member(
     return success(
         await directory.get_member(business_id=str(auth.business_id), membership_id=membership_id)
     )
-
 
 @members_router.patch("/{membership_id}", summary="Change a member's role")
 async def update_member(
@@ -452,7 +424,6 @@ async def update_member(
     )
     return success(result)
 
-
 @members_router.delete("/{membership_id}", summary="Remove a member")
 async def remove_member(
     membership_id: str,
@@ -464,10 +435,10 @@ async def remove_member(
         business_id=str(auth.business_id),
         membership_id=membership_id,
         actor_user_id=auth.user_id,
+        actor_permissions=auth.permissions,
         ip_address=client_ip(request),
     )
     return success({"removed": True})
-
 
 @members_router.post("/{membership_id}/suspend", summary="Suspend a membership in the active business")
 async def suspend_member(
@@ -482,10 +453,10 @@ async def suspend_member(
         membership_id=membership_id,
         reason=body.reason,
         actor_user_id=auth.user_id,
+        actor_permissions=auth.permissions,
         ip_address=client_ip(request),
     )
     return success({"suspended": True})
-
 
 @members_router.post("/{membership_id}/reactivate", summary="Reactivate a suspended membership")
 async def reactivate_member(
@@ -498,10 +469,10 @@ async def reactivate_member(
         business_id=str(auth.business_id),
         membership_id=membership_id,
         actor_user_id=auth.user_id,
+        actor_permissions=auth.permissions,
         ip_address=client_ip(request),
     )
     return success({"reactivated": True})
-
 
 @roles_router.get("", summary="List roles for the active business")
 async def list_roles(
@@ -518,7 +489,6 @@ async def list_roles(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @roles_router.get("/{role_id}", summary="View a role and its permissions")
 async def get_role(
     role_id: str,
@@ -526,7 +496,6 @@ async def get_role(
     directory: Annotated[DirectoryService, Depends(get_directory_service)],
 ) -> dict[str, Any]:
     return success(await directory.get_role(business_id=str(auth.business_id), role_id=role_id))
-
 
 @roles_router.post("", summary="Create a custom role")
 async def create_role(
@@ -544,7 +513,6 @@ async def create_role(
         ip_address=client_ip(request),
     )
     return success(result)
-
 
 @roles_router.patch("/{role_id}", summary="Update custom or system role grants")
 async def update_role(
@@ -564,7 +532,6 @@ async def update_role(
     )
     return success(result)
 
-
 @roles_router.delete("/{role_id}", summary="Soft-delete a custom role")
 async def delete_role(
     role_id: str,
@@ -580,7 +547,6 @@ async def delete_role(
     )
     return success({"deleted": True})
 
-
 @permissions_router.get("", summary="List permission catalog")
 async def list_permissions(
     auth: Annotated[AuthContext, Depends(require_permission("roles", "read"))],
@@ -591,7 +557,6 @@ async def list_permissions(
         for resource, action, description in DEFAULT_PERMISSION_CATALOG
     ]
     return paginated(items, page=1, page_size=len(items), total=len(items))
-
 
 @invitations_router.get("", summary="List invitations for the active business")
 async def list_invitations(
@@ -610,14 +575,12 @@ async def list_invitations(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @invitations_router.get("/preview", summary="Preview invitation details by token")
 async def preview_invitation(
     token: str,
     directory: Annotated[DirectoryService, Depends(get_directory_service)],
 ) -> dict[str, Any]:
     return success(await directory.preview_invitation_by_token(raw_token=token))
-
 
 @invitations_router.post("", summary="Invite a person by email and role")
 async def create_invitation(
@@ -638,7 +601,6 @@ async def create_invitation(
     )
     return success(result)
 
-
 @invitations_router.get("/{invitation_id}", summary="View a specific invitation")
 async def get_invitation(
     invitation_id: str,
@@ -652,7 +614,6 @@ async def get_invitation(
     )
     return success(result)
 
-
 def _set_access_cookie(response: Response, settings: Settings, access_token: str) -> None:
     cookie: dict[str, Any] = {
         "httponly": True,
@@ -665,7 +626,6 @@ def _set_access_cookie(response: Response, settings: Settings, access_token: str
         cookie["domain"] = settings.cookie_domain
     response.set_cookie(ACCESS_COOKIE_NAME, access_token, **cookie)
 
-
 async def _finalize_invitation_accept(
     *,
     result: dict[str, Any],
@@ -674,7 +634,6 @@ async def _finalize_invitation_accept(
     auth_service: AuthService,
     settings: Settings,
 ) -> dict[str, Any]:
-    """Activate the invited business on the session and refresh the access cookie."""
     switched = await auth_service.switch_business(
         session_id=auth.session_id,
         user_id=auth.user_id,
@@ -686,7 +645,6 @@ async def _finalize_invitation_accept(
         "business": switched["business"],
         "role_name": result.get("role_name") or switched["business"].get("role_name"),
     }
-
 
 @invitations_router.post(
     "/accept",
@@ -719,7 +677,6 @@ async def accept_invitation_by_token(
         )
     )
 
-
 @invitations_router.post(
     "/decline",
     summary="Decline invitation by email link token",
@@ -739,7 +696,6 @@ async def decline_invitation_by_token(
     )
     return success({"declined": True})
 
-
 @invitations_router.post("/{invitation_id}/resend", summary="Resend a pending invitation email")
 async def resend_invitation(
     invitation_id: str,
@@ -755,7 +711,6 @@ async def resend_invitation(
         ip_address=client_ip(request),
     )
     return success(result)
-
 
 @invitations_router.post(
     "/{invitation_id}/accept",
@@ -797,7 +752,6 @@ async def accept_invitation_by_id(
             settings=settings,
         )
     )
-
 
 @invitations_router.post(
     "/{invitation_id}/decline",
@@ -843,7 +797,6 @@ async def revoke_invitation(
     )
     return success({"revoked": True})
 
-
 @users_router.post(
     "/suspend",
     summary="Suspend a user account (platform staff only)",
@@ -854,10 +807,6 @@ async def suspend_user(
     auth: Annotated[AuthContext, Depends(get_current_user)],
     directory: Annotated[DirectoryService, Depends(get_directory_service)],
 ) -> dict[str, Any]:
-    """Global account suspension is a platform capability — not a trading-company action.
-
-    Trading companies must use membership suspend (`POST /members/{id}/suspend`).
-    """
     platform = await BusinessRepository().find_one({"type": BusinessAccountType.PLATFORM})
     if platform is None:
         raise MembershipRequiredError()
@@ -875,7 +824,6 @@ async def suspend_user(
         ip_address=client_ip(request),
     )
     return success({"suspended": True})
-
 
 @users_router.post(
     "/{user_id}/reactivate",
@@ -904,9 +852,7 @@ async def reactivate_user(
     )
     return success({"reactivated": True})
 
-
-# ── /me ──────────────────────────────────────────────────────────────────────
-
+                                                                               
 
 @me_router.get(
     "",
@@ -921,7 +867,6 @@ async def get_me(
     payload = await service.get_me(user_id=auth.user_id, session=auth.session)
     return success(AuthMeResponse(**payload).model_dump())
 
-
 @me_router.patch("", summary="Update personal profile fields")
 async def patch_me(
     body: UpdateProfileRequest,
@@ -935,9 +880,7 @@ async def patch_me(
     )
     return success({"user": user})
 
-
-# ── Sessions ─────────────────────────────────────────────────────────────────
-
+                                                                               
 
 @sessions_router.get("", summary="List active sessions for the current user")
 async def list_sessions(
@@ -946,7 +889,6 @@ async def list_sessions(
 ) -> dict[str, Any]:
     items = await service.list_sessions(user_id=auth.user_id, current_session_id=auth.session_id)
     return paginated(items, page=1, page_size=len(items) or 20, total=len(items))
-
 
 @sessions_router.delete("/{session_id}", summary="Revoke a specific session")
 async def revoke_session(
@@ -967,7 +909,6 @@ async def revoke_session(
         response.delete_cookie(ACCESS_COOKIE_NAME, **common)
     return success({"revoked": True})
 
-
 @sessions_router.delete("", summary="Revoke other sessions (keep current)")
 async def revoke_other_sessions(
     request: Request,
@@ -982,9 +923,7 @@ async def revoke_other_sessions(
     )
     return success(result)
 
-
-# ── Audit logs (active trading business from JWT) ─────────────────────────────
-
+                                                                                
 
 @audit_logs_router.get(
     "",
@@ -1010,7 +949,6 @@ async def list_audit_logs(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @audit_logs_router.get(
     "/{audit_log_id}",
     summary="View one audit event for the active business",
@@ -1024,9 +962,7 @@ async def get_audit_log(
         raise InvitationInvalidError("Audit log not found")
     return success(item)
 
-
-# ── Platform (TradeBay staff tenant — not the same as trading-company audit) ─
-
+                                                                               
 
 @platform_router.get("/me", summary="Platform business membership context")
 async def platform_me(
@@ -1056,7 +992,6 @@ async def platform_me(
             "permissions": sorted(scoped.permissions),
         }
     )
-
 
 @platform_router.get(
     "/audit-logs",
@@ -1091,7 +1026,6 @@ async def platform_audit_logs(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @platform_router.get(
     "/audit-logs/{audit_log_id}",
     summary="View one platform audit event",
@@ -1113,7 +1047,6 @@ async def platform_audit_log_detail(
     if item is None:
         raise InvitationInvalidError("Audit log not found")
     return success(item)
-
 
 @platform_router.get("/businesses", summary="List all trading businesses for platform staff")
 async def list_platform_businesses(
@@ -1141,7 +1074,6 @@ async def list_platform_businesses(
         limit=pagination.limit,
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
-
 
 @platform_router.post(
     "/businesses",
@@ -1180,7 +1112,6 @@ async def create_platform_trading_business(
     )
     return success(result)
 
-
 @platform_router.get(
     "/businesses/{business_id}",
     summary="Get a buyer or supplier profile for platform staff",
@@ -1201,7 +1132,6 @@ async def get_platform_business(
     )
     payload = await service.get_trading_business(business_id)
     return success(payload)
-
 
 @platform_router.get(
     "/businesses/{business_id}/members",
@@ -1225,7 +1155,7 @@ async def list_platform_business_members(
         resource="businesses",
         action="read",
     )
-    # Ensures the target is a trading company (buyer/supplier), not the platform tenant.
+                                                                                        
     await service.get_trading_business(business_id)
     items, total = await directory.list_members(
         business_id=business_id,
@@ -1236,15 +1166,12 @@ async def list_platform_business_members(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 def _trading_only_permission_codes(codes: list[str]) -> list[str]:
-    """Trading company roles may never receive platform-only grants."""
     allowed = {permission_code(resource, action) for resource, action in TRADING_CODES}
     requested = set(codes)
     if not requested <= allowed:
         raise PrivilegeEscalationError()
     return sorted(requested)
-
 
 @platform_router.get(
     "/businesses/{business_id}/roles",
@@ -1276,7 +1203,6 @@ async def list_platform_business_roles(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @platform_router.get(
     "/businesses/{business_id}/roles/{role_id}",
     summary="View a trading-company role (platform staff)",
@@ -1299,7 +1225,6 @@ async def get_platform_business_role(
     )
     await service.get_trading_business(business_id)
     return success(await directory.get_role(business_id=business_id, role_id=role_id))
-
 
 @platform_router.post(
     "/businesses/{business_id}/roles",
@@ -1332,7 +1257,6 @@ async def create_platform_business_role(
         ip_address=client_ip(request),
     )
     return success(result)
-
 
 @platform_router.patch(
     "/businesses/{business_id}/roles/{role_id}",
@@ -1368,7 +1292,6 @@ async def update_platform_business_role(
     )
     return success(result)
 
-
 @platform_router.delete(
     "/businesses/{business_id}/roles/{role_id}",
     summary="Soft-delete a custom trading-company role (platform staff)",
@@ -1398,7 +1321,6 @@ async def delete_platform_business_role(
         ip_address=client_ip(request),
     )
     return success({"deleted": True})
-
 
 @platform_router.patch(
     "/businesses/{business_id}/members/{membership_id}/role",
@@ -1433,7 +1355,6 @@ async def update_platform_business_member_role(
     )
     return success(result)
 
-
 @platform_router.get(
     "/businesses/{business_id}/audit-logs",
     summary="List audit events for a trading company (platform staff)",
@@ -1460,7 +1381,7 @@ async def list_platform_business_audit_logs(
         resource="audit_logs",
         action="read",
     )
-    # Ensures the target is a trading company (buyer/supplier), not the platform tenant.
+                                                                                        
     await service.get_trading_business(business_id)
     audit = AuditService()
     total = await audit.count_for_business(
@@ -1474,7 +1395,6 @@ async def list_platform_business_audit_logs(
         resource_type=resource_type,
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
-
 
 @platform_router.get(
     "/businesses/{business_id}/audit-logs/{audit_log_id}",
@@ -1500,7 +1420,6 @@ async def get_platform_business_audit_log(
     if item is None:
         raise InvitationInvalidError("Audit log not found")
     return success(item)
-
 
 @platform_router.get(
     "/businesses/{business_id}/purchase-orders",
@@ -1535,9 +1454,9 @@ async def list_platform_business_orders(
         page=pagination.page,
         page_size=pagination.page_size,
         status=status,
+        include_unpaid=True,
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
-
 
 @platform_router.get(
     "/businesses/{business_id}/rfqs",
@@ -1573,7 +1492,6 @@ async def list_platform_business_rfqs(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @platform_router.get("/users", summary="List all user accounts for platform staff")
 async def list_platform_users(
     auth: Annotated[AuthContext, Depends(get_current_user)],
@@ -1601,7 +1519,6 @@ async def list_platform_users(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @platform_router.post("/users", summary="Provision a user account (platform staff)")
 async def create_platform_user(
     body: PlatformCreateUserRequest,
@@ -1628,7 +1545,6 @@ async def create_platform_user(
     )
     return success(user)
 
-
 @platform_router.post("/users/suspend", summary="Suspend any user account (platform staff)")
 async def platform_suspend_user(
     body: SuspendUserRequest,
@@ -1653,7 +1569,6 @@ async def platform_suspend_user(
         ip_address=client_ip(request),
     )
     return success({"suspended": True})
-
 
 @platform_router.post(
     "/users/{user_id}/reactivate",
@@ -1682,7 +1597,6 @@ async def platform_reactivate_user(
     )
     return success({"reactivated": True})
 
-
 @platform_router.get("/suppliers", summary="List supplier businesses for verification review")
 async def list_platform_suppliers(
     auth: Annotated[AuthContext, Depends(get_current_user)],
@@ -1707,7 +1621,6 @@ async def list_platform_suppliers(
         limit=pagination.limit,
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
-
 
 @platform_router.post(
     "/suppliers/{business_id}/review",

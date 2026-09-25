@@ -1,4 +1,3 @@
-"""Negotiation API — open, propose offers, accept into quotation revision."""
 
 from __future__ import annotations
 
@@ -13,15 +12,12 @@ from app.shared.schemas.response import success
 
 router = APIRouter(prefix="/negotiations", tags=["Negotiation"])
 
-
 def get_negotiation_service() -> NegotiationService:
     return NegotiationService()
-
 
 class OpenNegotiationRequest(BaseModel):
     rfq_id: str
     quotation_id: str
-
 
 class OfferLineIn(BaseModel):
     rfq_item_id: str
@@ -41,12 +37,10 @@ class OfferLineIn(BaseModel):
             raise ValueError("Money must be string or int — not float")
         return v
 
-
 class ProposeOfferRequest(BaseModel):
     payment_terms: str | None = None
     parent_offer_id: str | None = None
     lines: list[OfferLineIn] = Field(min_length=1)
-
 
 @router.post("", summary="Open negotiation on an RFQ quotation")
 async def open_negotiation(
@@ -63,7 +57,6 @@ async def open_negotiation(
         )
     )
 
-
 @router.get("", summary="List negotiations for an RFQ")
 async def list_negotiations(
     auth: Annotated[AuthContext, Depends(require_permission("negotiations", "read"))],
@@ -72,7 +65,6 @@ async def list_negotiations(
 ) -> dict[str, Any]:
     return success(await service.list_for_rfq(business=auth.business, rfq_id=rfq_id))
 
-
 @router.get("/{negotiation_id}", summary="Get negotiation with offer history")
 async def get_negotiation(
     negotiation_id: str,
@@ -80,7 +72,6 @@ async def get_negotiation(
     service: Annotated[NegotiationService, Depends(get_negotiation_service)],
 ) -> dict[str, Any]:
     return success(await service.get(negotiation_id=negotiation_id, business=auth.business))
-
 
 @router.post("/{negotiation_id}/offers", summary="Propose or counter an offer")
 async def propose_offer(
@@ -100,7 +91,6 @@ async def propose_offer(
         )
     )
 
-
 @router.post("/{negotiation_id}/offers/{offer_id}/accept", summary="Accept offer → revise quotation")
 async def accept_offer(
     negotiation_id: str,
@@ -116,7 +106,6 @@ async def accept_offer(
             offer_id=offer_id,
         )
     )
-
 
 @router.post("/{negotiation_id}/offers/{offer_id}/reject", summary="Reject a proposed offer")
 async def reject_offer(

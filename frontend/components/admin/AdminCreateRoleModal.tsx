@@ -66,12 +66,12 @@ export function AdminCreateRoleModal({
       asideBody="Build a role from trading permissions only. Platform-only codes stay on TradeBay staff."
       footer={
         <>
-          <button type="button" className="tb-split-btn-ghost" onClick={onClose}>
+          <button type="button" className="tb-btn tb-btn--outline" onClick={onClose}>
             Cancel
           </button>
           <button
             type="button"
-            className="tb-split-btn"
+            className="tb-btn tb-btn--primary"
             disabled={!name.trim() || selected.length === 0 || pending}
             aria-busy={pending || undefined}
             onClick={() => {
@@ -116,7 +116,7 @@ export function AdminCreateRoleModal({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="h-10 w-full rounded-lg border border-[#d4e0da] px-3 text-sm outline-none focus:border-[#e86f2a]"
+            className="h-10 w-full rounded-lg border border-input px-3 text-sm outline-none focus:border-ring"
             placeholder="e.g. Procurement Lead"
             maxLength={80}
           />

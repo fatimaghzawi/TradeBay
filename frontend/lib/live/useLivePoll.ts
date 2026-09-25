@@ -4,20 +4,16 @@ import { LIVE_BUMP_EVENT, type LiveBumpDetail } from "@/lib/live/bus";
 import { useCallback, useEffect, useRef } from "react";
 
 type LivePollOptions = {
-  /** Poll interval while the tab is visible. Default 5s. */
+  
   intervalMs?: number;
-  /** When false, polling pauses. Default true. */
+  
   enabled?: boolean;
-  /** Extra pause (e.g. while a form mutation is in flight). */
+  
   paused?: boolean;
-  /** Run immediately on mount / when enabled flips on. Default true. */
+  
   immediate?: boolean;
 };
 
-/**
- * Visibility-aware poller for live screens.
- * Also refreshes on tab focus and on `tradebay:live-bump` events.
- */
 export function useLivePoll(
   tick: () => void | Promise<void>,
   {
@@ -40,7 +36,7 @@ export function useLivePoll(
     try {
       await tickRef.current();
     } catch {
-      /* callers handle their own errors; keep the loop alive */
+      
     } finally {
       inFlight.current = false;
     }
@@ -75,7 +71,6 @@ export function useLivePoll(
   }, [enabled, paused, intervalMs, immediate, run]);
 }
 
-/** Subscribe to live bumps without polling. */
 export function useLiveBump(handler: (detail: LiveBumpDetail) => void) {
   const handlerRef = useRef(handler);
   handlerRef.current = handler;

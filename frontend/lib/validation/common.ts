@@ -116,7 +116,12 @@ export const passwordSchema = z
   .min(8, PASSWORD_LENGTH_MESSAGE)
   .max(128, "Password must be 128 characters or fewer")
   .regex(/[A-Za-z]/, PASSWORD_LETTER_MESSAGE)
-  .regex(/[0-9]/, PASSWORD_NUMBER_MESSAGE);
+  .regex(/[0-9]/, PASSWORD_NUMBER_MESSAGE)
+  
+  .refine(
+    (value) => new TextEncoder().encode(value).length <= 72,
+    "Password is too long. Please choose a shorter password.",
+  );
 
 export const positiveNumberString = (label: string, { integer = false } = {}) =>
   z

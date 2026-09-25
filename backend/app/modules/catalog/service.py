@@ -1,4 +1,3 @@
-"""Catalog & inventory business logic."""
 
 from __future__ import annotations
 
@@ -61,14 +60,12 @@ def _slugify(value: str) -> str:
     text = re.sub(r"-{2,}", "-", text).strip("-")
     return text[:140] or "item"
 
-
 def _money_str(value: Any) -> str:
     if isinstance(value, Decimal128):
         return format(value.to_decimal(), "f")
     if isinstance(value, Decimal):
         return format(value, "f")
     return str(value)
-
 
 def _as_decimal(value: Any) -> Decimal:
     if isinstance(value, Decimal128):
@@ -77,12 +74,10 @@ def _as_decimal(value: Any) -> Decimal:
         return value
     return Decimal(str(value))
 
-
 def _oid_str(value: Any | None) -> str | None:
     if value is None:
         return None
     return str(value)
-
 
 def serialize_category(doc: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -98,7 +93,6 @@ def serialize_category(doc: dict[str, Any]) -> dict[str, Any]:
         "updated_at": doc.get("updated_at"),
     }
 
-
 def serialize_image(doc: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": str(doc["_id"]),
@@ -109,7 +103,6 @@ def serialize_image(doc: dict[str, Any]) -> dict[str, Any]:
         "display_order": int(doc.get("display_order") or 0),
         "created_at": doc.get("created_at"),
     }
-
 
 def serialize_price(doc: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -124,7 +117,6 @@ def serialize_price(doc: dict[str, Any]) -> dict[str, Any]:
         "updated_at": doc.get("updated_at"),
     }
 
-
 def serialize_inventory(doc: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": str(doc["_id"]),
@@ -133,7 +125,6 @@ def serialize_inventory(doc: dict[str, Any]) -> dict[str, Any]:
         "reserved_quantity": _money_str(doc.get("reserved_quantity", 0)),
         "updated_at": doc.get("updated_at"),
     }
-
 
 def serialize_transaction(doc: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -152,7 +143,6 @@ def serialize_transaction(doc: dict[str, Any]) -> dict[str, Any]:
         "created_by": _oid_str(doc.get("created_by")),
         "created_at": doc.get("created_at"),
     }
-
 
 def serialize_product(
     doc: dict[str, Any],
@@ -201,7 +191,6 @@ def serialize_product(
         payload["primary_image_url"] = primary.get("url") if primary else None
     return payload
 
-
 def _ranges_overlap(
     a_min: int,
     a_max: int | None,
@@ -212,9 +201,7 @@ def _ranges_overlap(
     b_hi = b_max if b_max is not None else 10**12
     return a_min <= b_hi and b_min <= a_hi
 
-
 class CatalogService:
-    """Categories, products, prices, and inventory mutations."""
 
     def __init__(
         self,
@@ -236,7 +223,7 @@ class CatalogService:
         self.businesses = businesses or BusinessRepository()
         self.supplier_profiles = supplier_profiles or SupplierProfileRepository()
 
-    # —— Categories ————————————————————————————————————————————————————————
+                                                                            
 
     async def _supplier_info_by_business_ids(
         self, business_ids: list[Any]
@@ -287,7 +274,6 @@ class CatalogService:
         *,
         reason: str | None = None,
     ) -> int:
-        """Soft-deactivate every listing for a supplier (revoke / loss of selling rights)."""
         oid = parse_object_id(business_id)
         now = utc_now()
         result = await self.products.collection.update_many(
@@ -311,7 +297,7 @@ class CatalogService:
             pass
         return int(result.modified_count)
 
-    # ── Categories ─────────────────────────────────────────────────────────
+                                                                             
 
     async def create_category(
         self,
@@ -429,7 +415,6 @@ class CatalogService:
         return serialize_category(updated)
 
     async def delete_category(self, category_id: str) -> None:
-        """Soft-delete: deactivate. Document and media stay for reactivation."""
         doc = await self.categories.get_by_id(category_id)
         if doc is None:
             raise CategoryNotFoundError()
@@ -478,7 +463,7 @@ class CatalogService:
         delete_stored_file(previous)
         return serialize_category(updated)
 
-    # —— Category graph helpers ————————————————————————————————————————————
+                                                                            
 
     async def _assert_no_cycle(self, category_id: str, new_parent_id: str) -> None:
         cursor = new_parent_id
@@ -493,6 +478,18 @@ class CatalogService:
             parent_ref = parent.get("parent_category_id")
             cursor = str(parent_ref) if parent_ref else ""
 
+    async def _category_with_descendants(self, category_id: str) -> list[Any]:
+        root = parse_object_id(category_id)
+        found: list[Any] = [root]
+        frontier = [root]
+        while frontier and len(found) < 500:
+            children = await self.categories.collection.find(
+                {"parent_category_id": {"$in": frontier}}, {"_id": 1}
+            ).to_list(length=500)
+            frontier = [c["_id"] for c in children if c["_id"] not in found]
+            found.extend(frontier)
+        return found
+
     async def _require_active_category(self, category_id: str) -> dict[str, Any]:
         category = await self.categories.get_by_id(category_id)
         if category is None:
@@ -501,7 +498,7 @@ class CatalogService:
             raise CategoryInactiveError()
         return category
 
-    # ── Products ───────────────────────────────────────────────────────────
+                                                                             
 
     async def create_product(
         self,
@@ -591,13 +588,13 @@ class CatalogService:
         if supplier_business_id:
             query["business_account_id"] = parse_object_id(supplier_business_id)
         if category_id:
-            query["category_id"] = parse_object_id(category_id)
+            query["category_id"] = {"$in": await self._category_with_descendants(category_id)}
         if q:
             query["name"] = {"$regex": re.escape(q.strip()), "$options": "i"}
         if featured is True:
             query["is_featured"] = True
 
-        # Suppliers manage / view their own catalog only (never the full marketplace).
+                                                                                      
         is_supplier_viewer = (
             viewer_business_type == BusinessAccountType.SUPPLIER
             and viewer_business_id is not None
@@ -610,8 +607,8 @@ class CatalogService:
         if viewing_own and "business_account_id" not in query:
             query["business_account_id"] = parse_object_id(viewer_business_id)
 
-        # Platform staff may inspect the full marketplace catalog (all suppliers /
-        # statuses). Supplier managers may include draft/inactive for their own rows.
+                                                                                  
+                                                                                     
         manage_own = can_manage and viewing_own
         platform_oversight = bool(is_platform_viewer)
         if (manage_own or platform_oversight) and status:
@@ -619,8 +616,8 @@ class CatalogService:
         elif manage_own or platform_oversight:
             pass
         else:
-            # Buyers / public browse: active listings from verified suppliers only.
-            # Inactive / revoked listings never appear in marketplace browsing.
+                                                                                   
+                                                                               
             query["status"] = ProductStatus.ACTIVE
             if status and status != ProductStatus.ACTIVE:
                 return [], 0
@@ -719,7 +716,7 @@ class CatalogService:
             await self._supplier_info_by_business_ids([doc.get("business_account_id")])
         ).get(str(doc["business_account_id"]), {})
         if not ((can_manage and owns) or is_platform) and not info.get("verified"):
-            # Revoked / unverified suppliers must not be orderable even if a row was left active.
+                                                                                                 
             raise ProductNotFoundError()
         return serialize_product(
             doc,
@@ -795,7 +792,7 @@ class CatalogService:
 
     async def delete_product(self, product_id: str, *, business_id: str) -> None:
         await self._require_owned_product(product_id, business_id)
-        # Soft-deactivate rather than hard-delete commercial history anchors.
+                                                                             
         await self.products.update(
             product_id,
             {"status": ProductStatus.INACTIVE, "updated_at": utc_now()},
@@ -863,7 +860,6 @@ class CatalogService:
         *,
         business_id: str,
     ) -> None:
-        """Soft-delete: mark deleted_at. File stays so the gallery can be restored."""
         await self._require_owned_product(product_id, business_id)
         image = await self.images.get_by_id(image_id)
         if image is None or str(image["product_id"]) != product_id:
@@ -912,7 +908,7 @@ class CatalogService:
         if price_count < 1:
             raise ProductNotPublishableError("add at least one active price before publishing")
 
-    # ── Pricing ────────────────────────────────────────────────────────────
+                                                                             
 
     async def list_prices(self, product_id: str) -> list[dict[str, Any]]:
         product = await self.products.get_by_id(product_id)
@@ -980,7 +976,11 @@ class CatalogService:
     ) -> dict[str, Any]:
         await self._require_owned_product(product_id, business_id)
         price = await self.prices.get_by_id(price_id)
-        if price is None or str(price["product_id"]) != product_id:
+        if (
+            price is None
+            or str(price["product_id"]) != product_id
+            or price.get("deleted_at") is not None
+        ):
             raise PriceNotFoundError()
         new_min = min_quantity if min_quantity is not None else int(price["min_quantity"])
         if clear_max_quantity:
@@ -1014,7 +1014,6 @@ class CatalogService:
         return serialize_price(updated)
 
     async def delete_price(self, product_id: str, price_id: str, *, business_id: str) -> None:
-        """Soft-delete: deactivate and hide the tier. Row stays for commercial history."""
         await self._require_owned_product(product_id, business_id)
         price = await self.prices.get_by_id(price_id)
         if price is None or str(price["product_id"]) != product_id:
@@ -1033,7 +1032,6 @@ class CatalogService:
     def resolve_unit_price(
         self, tiers: list[dict[str, Any]], quantity: int
     ) -> dict[str, Any] | None:
-        """Return the active serialized tier that covers `quantity`, if any."""
         matches: list[dict[str, Any]] = []
         for row in tiers:
             if not row.get("is_active", True):
@@ -1050,7 +1048,7 @@ class CatalogService:
         matches.sort(key=lambda r: int(r["min_quantity"]), reverse=True)
         return matches[0]
 
-    # ── Inventory ──────────────────────────────────────────────────────────
+                                                                             
 
     async def get_inventory(
         self,
@@ -1104,6 +1102,7 @@ class CatalogService:
         reason: str | None = None,
         reference_type: str | None = None,
         reference_id: str | None = None,
+        session: MongoSession = None,
     ) -> dict[str, Any]:
         return await self._mutate_stock(
             product_id,
@@ -1114,6 +1113,7 @@ class CatalogService:
             reason=reason,
             reference_type=reference_type or InventoryReferenceType.ORDER,
             reference_id=reference_id,
+            session=session,
         )
 
     async def release_stock(
@@ -1126,6 +1126,7 @@ class CatalogService:
         reason: str | None = None,
         reference_type: str | None = None,
         reference_id: str | None = None,
+        session: MongoSession = None,
     ) -> dict[str, Any]:
         return await self._mutate_stock(
             product_id,
@@ -1136,6 +1137,7 @@ class CatalogService:
             reason=reason,
             reference_type=reference_type or InventoryReferenceType.ORDER,
             reference_id=reference_id,
+            session=session,
         )
 
     async def sale_stock(
@@ -1148,6 +1150,7 @@ class CatalogService:
         reason: str | None = None,
         reference_type: str | None = None,
         reference_id: str | None = None,
+        session: MongoSession = None,
     ) -> dict[str, Any]:
         return await self._mutate_stock(
             product_id,
@@ -1158,6 +1161,7 @@ class CatalogService:
             reason=reason,
             reference_type=reference_type or InventoryReferenceType.ORDER,
             reference_id=reference_id,
+            session=session,
         )
 
     async def list_transactions(
@@ -1192,6 +1196,7 @@ class CatalogService:
         reason: str | None,
         reference_type: str | None,
         reference_id: str | None,
+        session: MongoSession = None,
     ) -> dict[str, Any]:
         if quantity <= 0:
             raise InvalidStockQuantityError()
@@ -1206,6 +1211,28 @@ class CatalogService:
         ref_oid = parse_object_id(reference_id) if reference_id else None
 
         async def work(session: MongoSession) -> dict[str, Any]:
+            if kind in {InventoryTransactionType.RESERVATION_RELEASE, InventoryTransactionType.SALE}:
+                                                                                  
+                                                                                    
+                if ref_oid is not None:
+                    held = await self.transactions.held_quantity(
+                        inventory["_id"], ref_oid, session=session
+                    )
+                else:
+                    current = await self.inventories.get_by_product(product_id, session=session)
+                    order_held = await self.transactions.held_quantity(
+                        inventory["_id"], {"$ne": None}, session=session
+                    )
+                    held = _as_decimal((current or inventory)["reserved_quantity"]) - max(
+                        order_held, Decimal("0")
+                    )
+                if held < quantity:
+                    raise InsufficientReservedError(
+                        "Only stock held manually can be released or sold here. "
+                        "Stock reserved for orders is managed from the order."
+                        if ref_oid is None
+                        else None
+                    )
             if kind == InventoryTransactionType.STOCK_RECEIVED:
                 updated = await self.inventories.add_stock(
                     product_id=product_id,
@@ -1246,15 +1273,15 @@ class CatalogService:
             assert updated is not None
             new_available = _as_decimal(updated["available_quantity"])
             new_reserved = _as_decimal(updated["reserved_quantity"])
-            # Re-read previous from before update for accurate history when concurrent.
-            # For stock_received / success paths, compute from deltas.
+                                                                                       
+                                                                      
             if kind == InventoryTransactionType.STOCK_RECEIVED:
                 p_avail, p_res = new_available - quantity, new_reserved
             elif kind == InventoryTransactionType.RESERVATION:
                 p_avail, p_res = new_available + quantity, new_reserved - quantity
             elif kind == InventoryTransactionType.RESERVATION_RELEASE:
                 p_avail, p_res = new_available - quantity, new_reserved + quantity
-            else:  # SALE
+            else:        
                 p_avail, p_res = new_available, new_reserved + quantity
 
             tx = await self.transactions.create(
@@ -1277,9 +1304,9 @@ class CatalogService:
             )
             return {"inventory": updated, "transaction": tx}
 
-        # Capture unused locals for lint clarity of pre-read snapshot.
+                                                                      
         _ = (prev_available, prev_reserved)
-        result = await run_in_transaction(work)
+        result = await work(session) if session is not None else await run_in_transaction(work)
         return {
             "inventory": serialize_inventory(result["inventory"]),
             "transaction": serialize_transaction(result["transaction"]),

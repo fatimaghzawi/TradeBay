@@ -1,6 +1,7 @@
 "use client";
 
-import { AppStateAction, AppStateFrame } from "@/components/ui/AppState";
+import { AppStateFrame } from "@/components/ui/AppState";
+import { BackLink } from "@/components/ui/BackLink";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ApiError } from "@/lib/api/client";
 import { identityApi } from "@/lib/api/identityApi";
@@ -9,11 +10,6 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
-/**
- * Ensures the signed-in user has an active membership on the TradeBay platform
- * tenant before rendering /admin/* UI. APIs already enforce this; this gate
- * prevents buyer/supplier users from seeing the admin chrome.
- */
 export function PlatformAdminGate({ children }: { children: ReactNode }) {
   const { isLoading: authLoading, business } = useAuth();
   const router = useRouter();
@@ -82,9 +78,7 @@ export function PlatformAdminGate({ children }: { children: ReactNode }) {
           title="Access restricted"
           body={<p>{error}</p>}
           actions={
-            <AppStateAction href={ROUTES.dashboard} tone="primary">
-              Back to dashboard →
-            </AppStateAction>
+            <BackLink href={ROUTES.dashboard}>Back to dashboard</BackLink>
           }
         />
       </div>
@@ -105,9 +99,7 @@ export function PlatformAdminGate({ children }: { children: ReactNode }) {
             </p>
           }
           actions={
-            <AppStateAction href={ROUTES.dashboard} tone="primary">
-              Back to dashboard →
-            </AppStateAction>
+            <BackLink href={ROUTES.dashboard}>Back to dashboard</BackLink>
           }
         />
       </div>

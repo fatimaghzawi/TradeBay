@@ -113,7 +113,7 @@ export function BusinessPlannerEntry() {
           <div className="tb-inv-form-actions mt-4">
             <button
               type="button"
-              className="tb-inv-btn tb-inv-btn-ghost"
+              className="tb-btn tb-btn--outline"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
@@ -124,7 +124,7 @@ export function BusinessPlannerEntry() {
             </span>
             <button
               type="button"
-              className="tb-inv-btn tb-inv-btn-ghost"
+              className="tb-btn tb-btn--outline"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
             >

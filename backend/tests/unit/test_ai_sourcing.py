@@ -1,4 +1,3 @@
-"""Unit tests for AI sourcing extraction and recommendation hard filters."""
 
 from __future__ import annotations
 
@@ -6,16 +5,14 @@ import asyncio
 from decimal import Decimal
 
 import pytest
-from bson import ObjectId
-
 from app.modules.ai.provider import AIProviderError, StubAIProvider
 from app.modules.ai.requirements import ProcurementRequirements
 from app.modules.ai_sourcing.recommendation import RecommendationEngine, relevance_label
+from bson import ObjectId
 
 
 def _extract(text: str):
     return asyncio.run(StubAIProvider().extract_procurement_requirements(text))
-
 
 def test_stub_extracts_supermarket_beverages() -> None:
     text = (
@@ -32,14 +29,12 @@ def test_stub_extracts_supermarket_beverages() -> None:
     assert "Bulk availability" in result.supplier_preferences
     assert result.missing_information
 
-
 def test_stub_does_not_invent_empty_products_for_vague_text() -> None:
     result = _extract(
         "I need help finding good partners for my company somewhere nearby please."
     )
     assert result.product_requirements == []
     assert "product categories you need" in result.missing_information
-
 
 def test_fallback_uses_stub_when_primary_fails() -> None:
     from app.modules.ai.provider import FallbackAIProvider
@@ -58,12 +53,10 @@ def test_fallback_uses_stub_when_primary_fails() -> None:
     assert result.business_type == "supermarket"
     assert any("beverage" in p for p in result.product_requirements)
 
-
 def test_relevance_label_bands() -> None:
     assert relevance_label(0.9) == "highly_relevant"
     assert relevance_label(0.5) == "relevant"
     assert relevance_label(0.2) == "partial"
-
 
 def test_unverified_suppliers_are_hard_filtered() -> None:
     engine = RecommendationEngine()
@@ -109,7 +102,6 @@ def test_unverified_suppliers_are_hard_filtered() -> None:
         limit=10,
     )
     assert ranked == []
-
 
 def test_verified_matching_product_is_recommended() -> None:
     engine = RecommendationEngine()
@@ -160,9 +152,7 @@ def test_verified_matching_product_is_recommended() -> None:
     assert ranked[0].score > 0
     assert any("verified" in r.lower() for r in ranked[0].reasons)
 
-
 def test_similar_recommendations_require_topic_overlap() -> None:
-    """Unrelated catalog (food) must not fill a specialty ask; related items can."""
     engine = RecommendationEngine()
     requirements = ProcurementRequirements(
         business_description="I need rare volcanic glass beads for a boutique",
@@ -266,44 +256,26 @@ def test_similar_recommendations_require_topic_overlap() -> None:
     )
     assert ranked == []
 
-
 def test_stub_rejects_too_short() -> None:
     with pytest.raises(AIProviderError):
         _extract("Hi")
 
+def test_adaptive_answers_become_retriever_terms() -> None:
+    from app.modules.business_planner.market import retrieval_requirements
 
-def test_lexical_rag_retrieves_overlapping_catalog_chunk() -> None:
-    from app.modules.ai.rag import InMemoryLexicalRagRetriever, RagChunk, format_rag_context
-
-    store = InMemoryLexicalRagRetriever()
-    asyncio.run(
-        store.upsert(
-            [
-                RagChunk(
-                    id="product:1",
-                    text="Product: Lebanese Olive Oil Extra Virgin. Category: Grocery. Cold pressed.",
-                    source_type="product",
-                    metadata={"name": "Lebanese Olive Oil Extra Virgin", "category": "Grocery"},
-                ),
-                RagChunk(
-                    id="product:2",
-                    text="Product: Steel Rebar 12mm. Category: Construction. Local mill.",
-                    source_type="product",
-                    metadata={"name": "Steel Rebar 12mm", "category": "Construction"},
-                ),
-            ]
-        )
+    requirements = retrieval_requirements(
+        {
+            "business_goal": "grocery",
+            "product_preferences": ["olive oil"],
+            "category_hints": ["Grocery"],
+            "adaptive": {"audience": "small shops", "margin_confirm": "20-30%"},
+        }
     )
-    hits = asyncio.run(store.retrieve("I need olive oil for my grocery store", top_k=2))
-    assert hits
-    assert "Olive Oil" in hits[0].text
-    assert hits[0].score > hits[-1].score or len(hits) == 1
-    ctx = format_rag_context(hits)
-    assert "catalog vocabulary" in ctx.lower()
-    assert "Olive Oil" in ctx
+    assert "olive oil" in requirements.product_requirements
+    assert "small shops" in requirements.product_requirements
+    assert all("20-30%" not in term for term in requirements.product_requirements)
 
-
-def test_stub_uses_rag_context_for_catalog_vocabulary() -> None:
+def test_stub_uses_supplied_context_for_catalog_vocabulary() -> None:
     context = (
         "Retrieved TradeBay catalog vocabulary:\n\n"
         "1. [product] Lebanese Olive Oil\n"
@@ -317,11 +289,3 @@ def test_stub_uses_rag_context_for_catalog_vocabulary() -> None:
     )
     assert any("olive" in p.lower() for p in result.product_requirements)
     assert any("grocery" in c.lower() for c in result.categories)
-
-
-def test_noop_rag_returns_empty() -> None:
-    from app.modules.ai.rag import NoOpRagRetriever
-
-    store = NoOpRagRetriever()
-    assert asyncio.run(store.retrieve("bottled water")) == []
-    assert store.size == 0

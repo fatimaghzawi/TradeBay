@@ -3,6 +3,7 @@
 import { AdminAct, AdminPage } from "@/components/admin/AdminUi";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { DirectoryMast } from "@/components/shared/DirectoryMast";
+import { BackLink } from "@/components/ui/BackLink";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { FieldError, NumberInput } from "@/components/ui/FormField";
 import { useToast } from "@/components/ui/Toast";
@@ -162,9 +163,7 @@ function SettingsInner() {
         mark="Platform"
         size="page"
         actions={
-          <AdminAct href={ROUTES.admin.home} tone="soft">
-            ← Command center
-          </AdminAct>
+          <BackLink href={ROUTES.admin.home}>Command center</BackLink>
         }
       />
 
@@ -228,7 +227,7 @@ function SettingsInner() {
             <FieldError error={platformLive.errors.payment_provider} />
           </label>
         </div>
-        <div className="flex justify-end gap-2 border-t border-[#e4eee8] px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
           <AdminAct
             tone="go"
             busy={busy === "platform"}
@@ -239,7 +238,7 @@ function SettingsInner() {
           </AdminAct>
         </div>
         {platform ? (
-          <p className="px-5 pb-4 text-xs text-[#5a6a62]">
+          <p className="px-5 pb-4 text-xs text-muted-foreground">
             Current commission {platform.commission_rate} · type {platform.commission_type}
           </p>
         ) : null}
@@ -272,7 +271,7 @@ function SettingsInner() {
             <FieldError error={taxLive.errors.rate} />
           </label>
         </div>
-        <div className="flex justify-end gap-2 border-t border-[#e4eee8] px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
           <AdminAct
             tone="go"
             busy={busy === "tax"}
@@ -283,7 +282,7 @@ function SettingsInner() {
           </AdminAct>
         </div>
         {tax ? (
-          <p className="px-5 pb-4 text-xs text-[#5a6a62]">
+          <p className="px-5 pb-4 text-xs text-muted-foreground">
             Active {tax.name} @ {tax.rate}
             {tax.effective_from ? ` from ${tax.effective_from.slice(0, 10)}` : ""}
           </p>
@@ -342,7 +341,7 @@ function SettingsInner() {
             <FieldError error={businessLive.errors.invoice_prefix} />
           </label>
         </div>
-        <div className="flex justify-end gap-2 border-t border-[#e4eee8] px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
           <AdminAct
             tone="go"
             busy={busy === "business"}
@@ -353,7 +352,7 @@ function SettingsInner() {
           </AdminAct>
         </div>
         {business ? (
-          <p className="px-5 pb-4 text-xs text-[#5a6a62]">
+          <p className="px-5 pb-4 text-xs text-muted-foreground">
             Invoices use prefix {business.invoice_prefix}-YYYY-####
           </p>
         ) : null}

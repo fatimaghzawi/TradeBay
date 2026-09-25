@@ -6,20 +6,35 @@ class CommissionStatus(StrEnum):
     RECOGNIZED = "recognized"
     REVERSED = "reversed"
 
-
 class PayableStatus(StrEnum):
     OPEN = "open"
     PARTIALLY_SETTLED = "partially_settled"
     SETTLED = "settled"
     DISPUTED = "disputed"
+                                                                            
+    CANCELLED = "cancelled"
 
+class SupplierLedgerEntryType(StrEnum):
+    SALE = "sale"
+    PLATFORM_FEE = "platform_fee"
+    FUNDS_RELEASED = "funds_released"
+    PAYOUT = "payout"
+    ADJUSTMENT = "adjustment"
+
+class SupplierLedgerDirection(StrEnum):
+    CREDIT = "credit"
+    DEBIT = "debit"
+
+class SupplierBalanceBucket(StrEnum):
+
+    PENDING = "pending"
+    AVAILABLE = "available"
 
 class PayoutStatus(StrEnum):
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
-
 
 class SettlementStatus(StrEnum):
     DRAFT = "draft"
@@ -29,19 +44,15 @@ class SettlementStatus(StrEnum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
-
 class PlatformLedgerStatus(StrEnum):
     POSTED = "posted"
     REVERSED = "reversed"
 
-
 class FundsState(StrEnum):
-    """TradeBay's internal money lifecycle. Not legal escrow — the provider holds the cash."""
 
     HELD = "held"
     RELEASED = "released"
     REFUNDED = "refunded"
-
 
 class PlatformTransactionType(StrEnum):
     BUYER_PAYMENT = "buyer_payment"
@@ -52,18 +63,14 @@ class PlatformTransactionType(StrEnum):
     ADJUSTMENT = "adjustment"
     CREDIT = "credit"
 
-
 class CommissionBase(StrEnum):
-    """Which part of the order the commission rate applies to."""
 
     ORDER_SUBTOTAL = "order_subtotal"
     ORDER_TOTAL = "order_total"
 
-
 class CommissionType(StrEnum):
     PERCENTAGE = "percentage"
     FIXED = "fixed"
-
 
 COMMISSION_STATUS_TRANSITIONS: dict[str, set[str]] = {
     CommissionStatus.PENDING: {CommissionStatus.RECOGNIZED, CommissionStatus.REVERSED},
@@ -75,6 +82,7 @@ PAYABLE_STATUS_TRANSITIONS: dict[str, set[str]] = {
         PayableStatus.PARTIALLY_SETTLED,
         PayableStatus.SETTLED,
         PayableStatus.DISPUTED,
+        PayableStatus.CANCELLED,
     },
     PayableStatus.PARTIALLY_SETTLED: {PayableStatus.SETTLED, PayableStatus.DISPUTED},
     PayableStatus.DISPUTED: {PayableStatus.OPEN, PayableStatus.SETTLED},
@@ -91,7 +99,6 @@ SETTLEMENT_STATUS_TRANSITIONS: dict[str, set[str]] = {
     SettlementStatus.APPROVED: {SettlementStatus.PAID, SettlementStatus.FAILED},
 }
 
-
 def assert_platform_transition(
     transitions: dict[str, set[str]], current: str, target: str, *, label: str = "status"
 ) -> None:
@@ -101,6 +108,5 @@ def assert_platform_transition(
     if target not in allowed:
         raise BadRequestError("This action isn't available for the current status")
 
-
-# Alias for scaffolded services
+                               
 SettlementBatchStatus = SettlementStatus

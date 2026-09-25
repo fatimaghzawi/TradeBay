@@ -11,7 +11,6 @@ type Props = {
   chapters: StoryChapter[];
 };
 
-/** Visual connector between landing chapters — the “road” linking sections. */
 export function StoryBridge({ from, to }: { from: string; to: string }) {
   return (
     <div className="tb-lp-bridge" aria-hidden>
@@ -28,10 +27,6 @@ export function StoryBridge({ from, to }: { from: string; to: string }) {
   );
 }
 
-/**
- * Continuous story chrome: top progress, left trade-route spine,
- * and scroll-triggered reveals for chapters + bridges.
- */
 export function LandingStoryChrome({ chapters }: Props) {
   const [progress, setProgress] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);

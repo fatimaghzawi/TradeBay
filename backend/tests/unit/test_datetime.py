@@ -1,4 +1,3 @@
-"""UTC datetime helper tests."""
 
 from datetime import UTC, datetime
 
@@ -10,7 +9,6 @@ def test_as_utc_treats_naive_as_utc() -> None:
     aware = as_utc(naive)
     assert aware.tzinfo is UTC
     assert aware.replace(tzinfo=None) == naive
-
 
 def test_as_utc_preserves_aware_instant() -> None:
     original = datetime(2026, 9, 17, 6, 0, 0, tzinfo=UTC)

@@ -1,4 +1,3 @@
-"""Identity API schemas."""
 
 from __future__ import annotations
 
@@ -24,7 +23,6 @@ def _normalize_lebanon_phone(value: str | None) -> str | None:
         raise ValueError("Phone must be +961 followed by exactly 8 digits")
     return f"+961{digits}"
 
-
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
@@ -46,7 +44,7 @@ class RegisterRequest(BaseModel):
             return None
         normalized = value.strip().lower()
         if normalized not in {"buyer", "supplier"}:
-            raise ValueError("business_type must be buyer or supplier")
+            raise ValueError("Choose whether your company buys or sells on TradeBay")
         return normalized
 
     @field_validator("invitation_token")
@@ -57,11 +55,9 @@ class RegisterRequest(BaseModel):
         cleaned = value.strip()
         return cleaned or None
 
-
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
-
 
 class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -74,7 +70,6 @@ class UserPublic(BaseModel):
     avatar_url: str | None = None
     email_verified_at: datetime | None = None
 
-
 class AddressInput(BaseModel):
     street: str | None = None
     city: str | None = None
@@ -82,7 +77,6 @@ class AddressInput(BaseModel):
     governorate: str | None = None
     postal_code: str | None = None
     country: str | None = None
-
 
 class BusinessPublic(BaseModel):
     id: str
@@ -108,13 +102,11 @@ class BusinessPublic(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
-
 class MembershipPublic(BaseModel):
     id: str
     business_account_id: str
     role_id: str
     status: str
-
 
 class AuthMeResponse(BaseModel):
     user: UserPublic
@@ -122,7 +114,6 @@ class AuthMeResponse(BaseModel):
     membership: MembershipPublic | None = None
     role_name: str | None = None
     permissions: list[str] = Field(default_factory=list)
-
 
 class CreateBusinessRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
@@ -148,13 +139,10 @@ class CreateBusinessRequest(BaseModel):
             return None
         return validate_company_email_domain(value)
 
-
 class SwitchBusinessRequest(BaseModel):
     business_id: str = Field(min_length=24, max_length=24)
 
-
 class VerifyEmailRequest(BaseModel):
-    """Email OTP (6 digits). Slightly wider max for validation-error test inputs."""
 
     token: str = Field(min_length=6, max_length=64)
     email: EmailStr | None = None
@@ -162,10 +150,9 @@ class VerifyEmailRequest(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
-
 class ResetPasswordRequest(BaseModel):
-    """Password reset OTP (6 digits). Slightly wider max for validation-error test inputs."""
 
+    email: EmailStr
     token: str = Field(min_length=6, max_length=64)
     password: str = Field(min_length=8, max_length=128)
 
@@ -173,7 +160,6 @@ class ResetPasswordRequest(BaseModel):
     @classmethod
     def password_policy(cls, value: str) -> str:
         return validate_password(value)
-
 
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=1, max_length=128)
@@ -184,18 +170,10 @@ class ChangePasswordRequest(BaseModel):
     def password_policy(cls, value: str) -> str:
         return validate_password(value)
 
-
 class ResendVerificationRequest(BaseModel):
     email: EmailStr | None = None
 
-
 class CreateInvitationRequest(BaseModel):
-    """Invite a teammate.
-
-    `email` is the personal inbox that receives the invitation link.
-    `company_email` is the TradeBay login identity (must use the company domain).
-    When omitted, the server generates `{local-part}@{company_domain}` from `email`.
-    """
 
     email: EmailStr
     company_email: EmailStr | None = None
@@ -203,31 +181,24 @@ class CreateInvitationRequest(BaseModel):
     """Permission codes to grant (required; must be a subset of the role and the inviter)."""
     permissions: list[str] = Field(min_length=1)
 
-
 class AcceptInvitationRequest(BaseModel):
     token: str = Field(min_length=8, max_length=256)
 
-
 class UpdateMemberRoleRequest(BaseModel):
     role_id: str = Field(min_length=24, max_length=24)
-
 
 class CreateRoleRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     permissions: list[str] = Field(min_length=1)
 
-
 class UpdateRoleRequest(BaseModel):
     permissions: list[str] = Field(min_length=1)
-
 
 class SuspendUserRequest(BaseModel):
     user_id: str = Field(min_length=24, max_length=24)
     reason: str = Field(min_length=1, max_length=500)
 
-
 class PlatformCreateUserRequest(BaseModel):
-    """Platform staff provision a login account (no trading company)."""
 
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
@@ -239,9 +210,7 @@ class PlatformCreateUserRequest(BaseModel):
     def password_policy(cls, value: str) -> str:
         return validate_password(value)
 
-
 class PlatformCreateTradingBusinessRequest(BaseModel):
-    """Platform staff provision a buyer or supplier with an owner admin."""
 
     account_type: str = Field(min_length=5, max_length=20)
     business_name: str = Field(min_length=1, max_length=200)
@@ -283,15 +252,12 @@ class PlatformCreateTradingBusinessRequest(BaseModel):
             return None
         return validate_company_email_domain(value)
 
-
 class SuspendMembershipRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
-
 
 class UpdateProfileRequest(BaseModel):
     first_name: str | None = Field(default=None, min_length=1, max_length=100)
     last_name: str | None = Field(default=None, min_length=1, max_length=100)
-
 
 class UpdateBusinessRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
@@ -334,16 +300,13 @@ class UpdateBusinessRequest(BaseModel):
                 cleaned.append(label)
         return cleaned[:12]
 
-
 class VerificationDocumentInput(BaseModel):
     document_type: str = Field(min_length=1, max_length=64)
     file_name: str | None = Field(default=None, max_length=255)
     url: str | None = Field(default=None, max_length=1000)
 
-
 class SubmitSupplierVerificationRequest(BaseModel):
     documents: list[VerificationDocumentInput] = Field(min_length=3, max_length=10)
-
 
 class ReviewSupplierVerificationRequest(BaseModel):
     decision: str = Field(min_length=6, max_length=16)

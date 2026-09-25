@@ -1,9 +1,3 @@
-"""System Settings service — platform, tax/VAT, business letterhead.
-
-Historical invoices and commission records snapshot rates at issue time;
-changing these settings never rewrites past financial documents.
-Provider secrets are never stored here.
-"""
 
 from __future__ import annotations
 
@@ -14,6 +8,7 @@ from bson import ObjectId
 
 from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from app.db.transactions import run_in_transaction
+from app.modules.platform_money.commission import commission_rate
 from app.modules.platform_money.constants import CommissionBase, CommissionType
 from app.modules.settings.constants import SINGLETON_KEY, TaxType
 from app.modules.settings.repository import (
@@ -30,12 +25,10 @@ from app.shared.utils.objectid import parse_object_id
 
 ALLOWED_CURRENCIES = frozenset({"USD", "LBP"})
 
-
 def _money_out(value: Any) -> str | None:
     if value is None:
         return None
     return format(money(value), "f")
-
 
 class SettingsService:
     def __init__(
@@ -75,7 +68,7 @@ class SettingsService:
         for row in rows:
             if tax_is_effective(row, at=moment):
                 return row
-        # Fallback: most recent non-active still effective by date window
+                                                                         
         history = await self.tax.find_many({}, limit=50, sort=[("effective_from", -1)])
         for row in history:
             start = row.get("effective_from")
@@ -124,8 +117,8 @@ class SettingsService:
             rate = as_decimal(payload["commission_rate"])
             if rate < 0 or rate > 1:
                 raise BadRequestError("Commission rate must be between 0 and 1 (for example, 0.05 for 5%)")
-            rate_m = money(rate)
-            if rate_m != money(current.get("commission_rate")):
+            rate_m = commission_rate(rate)
+            if rate_m != commission_rate(current.get("commission_rate")):
                 changes["commission_rate"] = {
                     "from": _money_out(current.get("commission_rate")),
                     "to": format(rate_m, "f"),
@@ -161,7 +154,7 @@ class SettingsService:
                 updates["minimum_order_value"] = to_decimal128(mov)
 
         if "payment_provider" in payload:
-            # Non-secret provider name only — never API keys.
+                                                             
             prov = payload["payment_provider"]
             if prov is not None:
                 prov = str(prov).strip() or None
@@ -247,7 +240,7 @@ class SettingsService:
 
         async def _work(session: MongoSession) -> dict[str, Any]:
             if active and not rate_changed:
-                # Metadata-only update on the active row
+                                                        
                 updates: dict[str, Any] = {
                     "name": name,
                     "type": tax_type,
@@ -265,7 +258,7 @@ class SettingsService:
                 assert refreshed is not None
                 return refreshed
 
-            # Rate change (or first seed): close previous active, open new row
+                                                                              
             if active:
                 await self.tax.update(
                     active["_id"],
@@ -403,7 +396,9 @@ class SettingsService:
             "id": str(doc["_id"]),
             "platform_name": doc.get("platform_name"),
             "default_currency": doc.get("default_currency") or "USD",
-            "commission_rate": _money_out(doc.get("commission_rate")),
+            "commission_rate": format(commission_rate(doc.get("commission_rate")), "f")
+            if doc.get("commission_rate") is not None
+            else None,
             "commission_type": doc.get("commission_type"),
             "commission_base": doc.get("commission_base"),
             "minimum_order_value": _money_out(doc.get("minimum_order_value")),

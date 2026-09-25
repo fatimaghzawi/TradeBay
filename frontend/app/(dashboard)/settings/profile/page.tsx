@@ -1,5 +1,6 @@
 "use client";
 
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { IdentityPageShell } from "@/components/identity/IdentityPageShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { TextField } from "@/components/ui/FormField";
@@ -15,6 +16,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BusyText } from "@/components/ui/LoadingState";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function ProfilePage() {
   const { user, business, refreshSession } = useAuth();
@@ -74,12 +76,7 @@ export default function ProfilePage() {
       quote="“Your name on the quay should match the person behind the desk.”"
     >
       <p className="mb-2">
-        <Link
-          href={ROUTES.settings}
-          className="text-sm font-semibold text-[var(--tb-accent)] hover:underline"
-        >
-          ← Account settings
-        </Link>
+        <BackLink href={ROUTES.settings}>Account settings</BackLink>
       </p>
 
       <ul className="tb-roles-list mb-3">
@@ -110,7 +107,7 @@ export default function ProfilePage() {
                 : "Company logo appears once you join a business"}
             </p>
           </div>
-          <span className="tb-roles-status">Profile</span>
+          <StatusBadge status="profile" tone="info" />
         </li>
       </ul>
 
@@ -147,13 +144,14 @@ export default function ProfilePage() {
             <p className="tb-roles-row-name">{user?.email}</p>
             <p className="tb-roles-row-desc">Primary sign-in email</p>
           </div>
-          <span className="tb-roles-status">
-            {verified ? "Verified" : "Unverified"}
-          </span>
+          <StatusBadge
+            status={verified ? "verified" : "pending"}
+            label={verified ? "Verified" : "Unverified"}
+          />
           {!verified ? (
             <button
               type="button"
-              className="text-sm font-bold text-[var(--tb-accent)] hover:underline"
+              className="text-sm font-bold text-accent hover:underline"
               onClick={() => {
                 setVerifyError(null);
                 void authApi
@@ -181,7 +179,7 @@ export default function ProfilePage() {
       </ul>
 
       <form
-        className="mt-4 space-y-4 rounded-[1rem] border border-[var(--tb-line)] bg-[var(--tb-surface)] p-5"
+        className="mt-4 space-y-4 rounded-[1rem] border border-border bg-card p-5"
         onSubmit={(e) => {
           e.preventDefault();
           setError(null);
@@ -230,7 +228,7 @@ export default function ProfilePage() {
         <button
           type="submit"
           disabled={pending}
-          className="tb-ov-btn-primary disabled:opacity-60"
+          className="tb-btn tb-btn--primary"
          aria-busy={pending || undefined}>
           <BusyText busy={pending}>{pending ? "Saving…" : "Save profile"}</BusyText>
         </button>

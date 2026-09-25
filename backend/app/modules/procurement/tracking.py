@@ -1,8 +1,3 @@
-"""Shipment tracking provider abstraction.
-
-Manual updates are the default. Carrier APIs / webhooks plug in without
-changing Shipment document shape.
-"""
 
 from __future__ import annotations
 
@@ -22,7 +17,6 @@ class TrackingUpdate:
     source: str = "manual"
     tracking_number: str | None = None
 
-
 class TrackingProvider(ABC):
     name: str = "base"
 
@@ -31,9 +25,7 @@ class TrackingProvider(ABC):
         raise NotImplementedError
 
     def parse_webhook(self, payload: dict[str, Any]) -> TrackingUpdate | None:
-        """Optional: map a carrier webhook body to a TrackingUpdate."""
         return None
-
 
 class ManualTrackingProvider(TrackingProvider):
     name = "manual"
@@ -41,19 +33,7 @@ class ManualTrackingProvider(TrackingProvider):
     async def fetch_updates(self, *, tracking_number: str, carrier: str | None = None) -> list[TrackingUpdate]:
         return []
 
-
 class CarrierWebhookProvider(TrackingProvider):
-    """Generic carrier webhook adapter.
-
-    Expected payload (normalized TradeBay shape or mapped below):
-    {
-      "tracking_number": "...",
-      "status": "in_transit",
-      "description": "...",
-      "location": "...",
-      "occurred_at": "ISO-8601 optional"
-    }
-    """
 
     name = "carrier_webhook"
 
@@ -72,7 +52,7 @@ class CarrierWebhookProvider(TrackingProvider):
     }
 
     async def fetch_updates(self, *, tracking_number: str, carrier: str | None = None) -> list[TrackingUpdate]:
-        # Polling not implemented — webhooks push into the domain.
+                                                                  
         return []
 
     def parse_webhook(self, payload: dict[str, Any]) -> TrackingUpdate | None:
@@ -109,18 +89,15 @@ class CarrierWebhookProvider(TrackingProvider):
             tracking_number=str(tracking_number),
         )
 
-
 _PROVIDERS: dict[str, TrackingProvider] = {
     ManualTrackingProvider.name: ManualTrackingProvider(),
     CarrierWebhookProvider.name: CarrierWebhookProvider(),
 }
 
-
 def get_tracking_provider(name: str | None = None) -> TrackingProvider:
     if not name:
         return _PROVIDERS[ManualTrackingProvider.name]
     return _PROVIDERS.get(name, _PROVIDERS[ManualTrackingProvider.name])
-
 
 def list_tracking_providers() -> list[str]:
     return list(_PROVIDERS.keys())

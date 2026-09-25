@@ -5,7 +5,6 @@ import { ROUTES } from "@/lib/constants";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-/** Footer newsletter → register with email prefilled (business lead capture). */
 export function LandingNewsletterForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");

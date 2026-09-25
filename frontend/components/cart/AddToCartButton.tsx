@@ -87,7 +87,7 @@ export function AddToCartButton({
         type="button"
         className={cn(
           shell,
-          "border border-[color-mix(in_srgb,var(--tb-success)_40%,var(--tb-line))] bg-[var(--tb-success-soft)] text-[var(--tb-success)] hover:bg-[var(--tb-hover-strong)]",
+          "border border-[color-mix(in_srgb,var(--tb-success)_40%,var(--tb-line))] bg-success-soft text-success hover:bg-[var(--tb-hover-strong)]",
           className,
         )}
         title="In cart — open cart"
@@ -110,10 +110,10 @@ export function AddToCartButton({
 
   const toneClass =
     tone === "soft"
-      ? "border border-[var(--tb-line)] bg-[var(--tb-surface-muted)] text-[var(--tb-ink)] hover:bg-[var(--tb-hover-strong)]"
+      ? "border border-border bg-muted text-foreground hover:bg-[var(--tb-hover-strong)]"
       : tone === "ghost"
-        ? "border border-transparent text-[var(--tb-ink)] hover:bg-[var(--tb-hover)]"
-        : "bg-[var(--tb-primary)] text-[var(--tb-primary-foreground)] hover:brightness-95";
+        ? "border border-transparent text-foreground hover:bg-[var(--tb-hover)]"
+        : "bg-primary text-primary-foreground hover:brightness-95";
 
   return (
     <button

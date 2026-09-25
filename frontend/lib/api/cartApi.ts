@@ -36,21 +36,6 @@ export type CartCheckoutResult = {
   cart: Cart;
 };
 
-export type CartOrderSummary = {
-  id: string;
-  order_number?: string;
-  supplier_business_id: string;
-  total?: string | null;
-  currency?: string;
-  status?: string;
-};
-
-export type CartOrderResult = {
-  orders: CartOrderSummary[];
-  order_count: number;
-  cart: Cart;
-};
-
 export type CartChangedDetail = {
   item_count: number;
   product_ids: string[];
@@ -90,7 +75,6 @@ export function emitCartChanged(cart?: Cart | null) {
   );
 }
 
-/** One shared GET /cart so product grids don't stampede the API. */
 export function hydrateCartCache(): Promise<void> {
   if (typeof window === "undefined" || cartHydrated) return Promise.resolve();
   if (!hydratePromise) {
@@ -111,8 +95,8 @@ export const cartApi = {
   get: (opts?: { emit?: boolean }) =>
     apiClient.get<Cart>("/cart").then((cart) => {
       rememberCart(cart);
-      // Reads must not emit — ShoppingTrays refetches on this event, which
-      // would GET /cart again and loop until the proxy dies.
+      
+      
       if (opts?.emit) emitCartChanged(cart);
       return cart;
     }),
@@ -138,14 +122,6 @@ export const cartApi = {
   checkout: (body?: { title?: string; notes?: string; publish?: boolean }) =>
     apiClient
       .post<CartCheckoutResult>("/cart/checkout", { publish: false, ...body })
-      .then((result) => {
-        rememberCart(result.cart);
-        emitCartChanged(result.cart);
-        return result;
-      }),
-  placeOrders: (body?: { notes?: string }) =>
-    apiClient
-      .post<CartOrderResult>("/cart/order", body ?? {})
       .then((result) => {
         rememberCart(result.cart);
         emitCartChanged(result.cart);

@@ -1,4 +1,3 @@
-"""Integration tests for Business Planner discovery → generate → ownership."""
 
 from __future__ import annotations
 
@@ -15,13 +14,12 @@ async def _login(client: AsyncClient, email: str, password: str) -> None:
     )
     assert response.status_code == 200, response.text
 
-
 @pytest.mark.anyio
 async def test_planner_session_to_generate(
     client: AsyncClient,
     registered_user: dict[str, Any],
 ) -> None:
-    # Verify email if required
+                              
     token = registered_user.get("verification_token")
     if token:
         await client.post("/api/v1/auth/verify-email", json={"token": token})
@@ -110,7 +108,6 @@ async def test_planner_session_to_generate(
     assert draft_body["sourcing_request_id"]
     assert "not send" in draft_body["message"].lower() or "review" in draft_body["message"].lower()
 
-
 @pytest.mark.anyio
 async def test_planner_ownership_enforced(
     client: AsyncClient,
@@ -152,7 +149,7 @@ async def test_planner_ownership_enforced(
         await client.post(f"/api/v1/business-planner/sessions/{session_id}/generate")
     ).json()["data"]
 
-    # Clear cookies — unauthenticated
+                                     
     client.cookies.clear()
     forbidden = await client.get(f"/api/v1/business-plans/{plan['id']}")
     assert forbidden.status_code in {401, 403}

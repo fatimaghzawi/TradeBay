@@ -1,4 +1,3 @@
-"""Central async MongoDB connection manager."""
 
 from __future__ import annotations
 
@@ -14,9 +13,7 @@ from app.db.indexes import ensure_indexes
 
 logger = get_logger(__name__)
 
-
 class MongoManager:
-    """Process-wide Motor client. Created on startup, closed on shutdown."""
 
     def __init__(self) -> None:
         self._client: AsyncIOMotorClient[Any] | None = None
@@ -89,12 +86,12 @@ class MongoManager:
             assert last_error is not None
             raise last_error
 
-        # Atlas index + demo seed take ~80s. Blocking lifespan on that makes
-        # uvicorn --reload look like a 500 in the Next.js proxy (ECONNREFUSED).
-        # Tests and production still wait so schema is deterministic.
+                                                                            
+                                                                               
+                                                                     
         if settings.is_production or settings.is_test:
             await self._ensure_schema(settings)
-            # Only mark ready after schema succeeds (raise on failure above).
+                                                                             
             self._indexes_ready = True
         else:
             self._indexes_ready = True
@@ -115,7 +112,7 @@ class MongoManager:
         except Exception:
             logger.exception("mongodb_schema_ensure_failed")
             if settings.is_production or settings.is_test:
-                # Fail closed: do not pretend the API is ready without indexes.
+                                                                               
                 self._indexes_ready = False
                 raise
 
@@ -147,6 +144,5 @@ class MongoManager:
     @property
     def is_ready(self) -> bool:
         return self._client is not None and self._indexes_ready
-
 
 mongo_manager = MongoManager()

@@ -1,4 +1,3 @@
-"""Local disk storage for business logo and cover images."""
 
 from __future__ import annotations
 
@@ -26,7 +25,6 @@ ALLOWED_CONTENT_TYPES = frozenset(
 ALLOWED_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif"})
 MAX_BYTES = 8 * 1024 * 1024
 
-
 def _safe_ext(filename: str | None, content_type: str | None) -> str:
     name = (filename or "").lower()
     match = re.search(r"(\.[a-z0-9]{2,5})$", name)
@@ -43,14 +41,12 @@ def _safe_ext(filename: str | None, content_type: str | None) -> str:
         return mapping[content_type.lower()]
     raise BadRequestError("Unsupported image type. Use JPG, PNG, WEBP, or GIF.")
 
-
 async def save_business_image(
     *,
     business_id: str,
     kind: str,
     upload: UploadFile,
 ) -> str:
-    """Persist logo/cover and return public URL `/uploads/businesses/...`."""
     if kind not in {"logo", "cover"}:
         raise BadRequestError("kind must be logo or cover")
 
@@ -71,8 +67,7 @@ async def save_business_image(
     (folder / filename).write_bytes(data)
     return f"/uploads/businesses/{business_id}/{kind}/{filename}"
 
-
-# ── Supplier verification documents (authenticated download, not public) ──────
+                                                                                
 
 VERIFICATION_DIR = UPLOAD_ROOT / "verification"
 
@@ -87,7 +82,6 @@ VERIFICATION_CONTENT_TYPES = frozenset(
 )
 VERIFICATION_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".pdf"})
 VERIFICATION_MAX_BYTES = 10 * 1024 * 1024
-
 
 def _verification_ext(filename: str | None, content_type: str | None) -> str:
     name = (filename or "").lower()
@@ -105,16 +99,13 @@ def _verification_ext(filename: str | None, content_type: str | None) -> str:
         return mapping[content_type.lower()]
     raise BadRequestError("Unsupported document type. Use PDF, JPG, or PNG.")
 
-
 def verification_file_url(*, business_id: str, document_type: str, filename: str) -> str:
     return (
         f"/api/v1/businesses/{business_id}/verification/documents/"
         f"{document_type}/files/{filename}"
     )
 
-
 def parse_verification_url(url: str | None) -> tuple[str, str, str] | None:
-    """Return ``(business_id, document_type, filename)`` for a stored file URL."""
     if not url:
         return None
     path = url.strip()
@@ -123,7 +114,7 @@ def parse_verification_url(url: str | None) -> tuple[str, str, str] | None:
 
         path = urlparse(path).path
     parts = path.split("/")
-    # /api/v1/businesses/{id}/verification/documents/{type}/files/{filename}
+                                                                            
     if (
         len(parts) != 10
         or parts[1:4] != ["api", "v1", "businesses"]
@@ -136,11 +127,9 @@ def parse_verification_url(url: str | None) -> tuple[str, str, str] | None:
         return None
     return business_id, document_type, filename
 
-
 def resolve_verification_path(
     *, business_id: str, document_type: str, filename: str
 ) -> Path:
-    """Resolve a stored verification file, rejecting path traversal."""
     if document_type not in REQUIRED_SUPPLIER_DOCUMENT_TYPES:
         raise BadRequestError("Unknown verification document type")
     safe_name = Path(filename).name
@@ -153,7 +142,6 @@ def resolve_verification_path(
     if not path.is_relative_to(folder) or not path.is_file():
         raise NotFoundError("Verification document not found")
     return path
-
 
 def is_stored_verification_url(business_id: str, document_type: str, url: str | None) -> bool:
     parsed = parse_verification_url(url)
@@ -172,7 +160,6 @@ def is_stored_verification_url(business_id: str, document_type: str, url: str | 
         return False
     return True
 
-
 def delete_verification_file_from_url(url: str | None) -> None:
     parsed = parse_verification_url(url)
     if parsed is None:
@@ -188,7 +175,6 @@ def delete_verification_file_from_url(url: str | None) -> None:
         return
     path.unlink(missing_ok=True)
 
-
 def media_type_for_verification_file(path: Path) -> str:
     return {
         ".pdf": "application/pdf",
@@ -198,14 +184,21 @@ def media_type_for_verification_file(path: Path) -> str:
         ".webp": "image/webp",
     }.get(path.suffix.lower(), "application/octet-stream")
 
+def _looks_like_verification_file(data: bytes) -> bool:
+    return (
+        data.startswith(b"%PDF-")
+        or data.startswith(b"\xff\xd8\xff")
+        or data.startswith(b"\x89PNG\r\n\x1a\n")
+        or (data[:4] == b"RIFF" and data[8:12] == b"WEBP")
+    )
 
 async def save_verification_document(
     *,
     business_id: str,
     document_type: str,
     upload: UploadFile,
+    keep_urls: set[str] | None = None,
 ) -> str:
-    """Persist a KYC file and return the authenticated download URL."""
     if document_type not in REQUIRED_SUPPLIER_DOCUMENT_TYPES:
         raise BadRequestError("Unknown verification document type")
 
@@ -215,15 +208,25 @@ async def save_verification_document(
 
     data = await upload.read()
     if not data:
-        raise BadRequestError("Empty file")
+        raise BadRequestError("This file is empty. Choose another file.")
     if len(data) > VERIFICATION_MAX_BYTES:
         raise BadRequestError("Document must be 10 MB or smaller")
+    if not _looks_like_verification_file(data):
+        raise BadRequestError(
+            "This file doesn't look like a PDF or image. Export it as PDF, JPG, or PNG and try again."
+        )
 
     ext = _verification_ext(upload.filename, content_type or None)
     folder = VERIFICATION_DIR / business_id
     folder.mkdir(parents=True, exist_ok=True)
+    kept_names = {
+        parsed[2]
+        for parsed in (parse_verification_url(url) for url in (keep_urls or set()))
+        if parsed is not None
+    }
     for leftover in folder.glob(f"{document_type}-*"):
-        leftover.unlink(missing_ok=True)
+        if leftover.name not in kept_names:
+            leftover.unlink(missing_ok=True)
     filename = f"{document_type}-{uuid.uuid4().hex}{ext}"
     (folder / filename).write_bytes(data)
     return verification_file_url(

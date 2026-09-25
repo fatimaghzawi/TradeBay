@@ -1,5 +1,7 @@
 "use client";
 
+import { OrderTimeline, TimelineIcon, timelineHeadline } from "@/components/commerce/OrderTimeline";
+import { DirectoryMast } from "@/components/shared/DirectoryMast";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { BusyText, LoadingEntity } from "@/components/ui/LoadingState";
 import { ApiError } from "@/lib/api/client";
@@ -10,98 +12,47 @@ import {
   type Shipment,
 } from "@/lib/api/procurementApi";
 import { ROUTES } from "@/lib/constants";
-import {
-  JOURNEY_STAGES,
-  autoJourneyEvents,
-  journeyHeadline,
-  journeyStageIndex,
-  primaryShipment,
-  remainingQty,
-  trackingCardMeta,
-  type JourneyStageId,
-} from "@/lib/procurement/orderTracking";
-import {
-  ORDER_STATUS_LABEL,
-  SHIPMENT_STATUS_LABEL,
-  formatEta,
-} from "@/lib/procurement/rfqLifecycle";
+import { primaryShipment, recordedEvents, remainingQty } from "@/lib/procurement/orderTracking";
+import { SHIPMENT_STATUS_LABEL, formatEta, orderArrivalHint } from "@/lib/procurement/rfqLifecycle";
+import { statusLabel } from "@/lib/status";
 import { useAuth } from "@/providers/AuthProvider";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { BackLink } from "@/components/ui/BackLink";
 
-/** Clean stroke icons — Shein-style, not illustrated scenes. */
-function StageIcon({ id }: { id: JourneyStageId }) {
-  const common = {
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.7,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-  switch (id) {
-    case "ordered":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden>
-          <path d="M7 4h10v16H7z" {...common} />
-          <path d="M9 8h6M9 12h6M9 16h4" {...common} />
-        </svg>
-      );
-    case "packing":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden>
-          <path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5v-7Z" {...common} />
-          <path d="M12 12v8M4 8.5 12 12l8-3.5" {...common} />
-        </svg>
-      );
-    case "driving":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden>
-          <path d="M3 13h11V8H3v5Z" {...common} />
-          <path d="M14 13h3.5L20 16v3h-6v-6Z" {...common} />
-          <circle cx="7" cy="19" r="1.6" {...common} />
-          <circle cx="17" cy="19" r="1.6" {...common} />
-        </svg>
-      );
-    case "nearby":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden>
-          <path d="M12 21s6.5-5.2 6.5-10.2a6.5 6.5 0 1 0-13 0C5.5 15.8 12 21 12 21Z" {...common} />
-          <circle cx="12" cy="10.8" r="2.2" {...common} />
-        </svg>
-      );
+const UNTRACKABLE = new Set(["draft", "awaiting_payment"]);
+
+function headlineCopy(key: string | undefined, isBuyer: boolean, isCash: boolean): string {
+  switch (key) {
+    case "paid":
+      return isBuyer ? "Waiting for your payment to be confirmed." : "Waiting for the buyer's payment.";
+    case "confirmed":
+      return isBuyer ? "Waiting for the supplier to confirm your order." : "Confirm the order to start preparing it.";
+    case "shipped":
+      return isBuyer ? "The supplier is preparing your goods." : "Ship the goods and set a delivery date.";
+    case "delivered":
+      return isBuyer
+        ? "Your goods are on the way. Confirm delivery when they arrive."
+        : "On the way. The buyer confirms delivery on arrival.";
+    case "completed":
+      if (isBuyer) return isCash ? "Delivered. Have the cash ready for the supplier if you haven't paid yet." : "Delivered.";
+      return "Delivered. The order closes once receipt is confirmed.";
+    case "cancelled":
+      return "This order was cancelled.";
     default:
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden>
-          <circle cx="12" cy="12" r="8" {...common} />
-          <path d="m8.5 12.2 2.4 2.4 4.6-5" {...common} />
-        </svg>
-      );
+      return isBuyer ? "Your order is complete." : "Order complete.";
   }
 }
 
-function JourneyStepper({ stageIdx }: { stageIdx: number }) {
-  const fillPct = (stageIdx / (JOURNEY_STAGES.length - 1)) * 100;
+function MiniSteps({ order }: { order: PurchaseOrder }) {
+  const steps = (order.timeline || []).filter((s) => s.state !== "cancelled");
   return (
-    <div className="tb-shein-stepper">
-      <div className="tb-shein-stepper__line" aria-hidden>
-        <span style={{ width: `${fillPct}%` }} />
-      </div>
-      <ol className="tb-shein-stepper__list">
-        {JOURNEY_STAGES.map((stage, i) => (
-          <li
-            key={stage.id}
-            data-done={i < stageIdx || undefined}
-            data-current={i === stageIdx || undefined}
-            data-todo={i > stageIdx || undefined}
-          >
-            <span className="tb-shein-stepper__icon">
-              <StageIcon id={stage.id} />
-            </span>
-            <strong>{stage.label}</strong>
-            <em>{stage.blurb}</em>
-          </li>
-        ))}
-      </ol>
+    <div className="tb-shein-card__mini" aria-hidden>
+      {steps.map((s) => (
+        <span key={s.key} data-on={s.state === "done" || undefined} data-now={s.state === "current" || undefined}>
+          <TimelineIcon step={s.key} />
+        </span>
+      ))}
     </div>
   );
 }
@@ -117,31 +68,17 @@ export function TrackingHub() {
     void (async () => {
       try {
         const page = await procurementApi.listOrders({ page_size: 50 });
-        const trackable = page.data.filter((o) => !["draft", "cancelled"].includes(o.status));
+        const trackable = page.data.filter((o) => !UNTRACKABLE.has(o.status) && o.status !== "cancelled");
         const detailed = await Promise.all(
           trackable.slice(0, 24).map(async (summary: PurchaseOrderSummary) => {
             try {
               return await procurementApi.getOrder(summary.id);
             } catch {
-              return {
-                ...summary,
-                subtotal: summary.total,
-                discount_total: "0",
-                charge_total: "0",
-                tax_total: "0",
-                payment_terms: null,
-                delivery_terms: null,
-                payment_status: null,
-                shipping_address: null,
-                rejection_reason: null,
-                status_history: [],
-                items: [],
-                shipments: [],
-              } satisfies PurchaseOrder;
+              return null;
             }
           }),
         );
-        setOrders(detailed);
+        setOrders(detailed.filter((o): o is PurchaseOrder => o !== null));
         setError(null);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Couldn't load tracking");
@@ -153,15 +90,16 @@ export function TrackingHub() {
 
   return (
     <div className="tb-shein">
-      <header className="tb-shein-hero">
-        <p className="tb-shein-kicker">Tracking</p>
-        <h1>{isBuyer ? "Track my orders" : "Track & ship"}</h1>
-        <p>
-          {isBuyer
-            ? "See where each order is and when it should arrive."
-            : "Dispatch once with an ETA — progress updates automatically."}
-        </p>
-      </header>
+      <DirectoryMast
+        title={isBuyer ? "Track my orders" : "Track & ship"}
+        size="page"
+        mark="Tracking"
+        lede={
+          isBuyer
+            ? "Each supplier ships separately, so every order has its own progress."
+            : "Confirm, ship and follow each order until the buyer receives it."
+        }
+      />
 
       {error ? (
         <FeedbackBanner tone="error" title="Something went wrong">
@@ -176,17 +114,19 @@ export function TrackingHub() {
           <h2>No orders to track</h2>
           <p>
             {isBuyer
-              ? "Issued purchase orders appear here once fulfilment starts."
-              : "Acknowledge a PO and dispatch with an ETA to begin."}
+              ? "Orders appear here once they're placed with a supplier."
+              : "New orders appear here as soon as buyers place them."}
           </p>
-          <Link href={ROUTES.orders} className="tb-inv-btn tb-inv-btn-accent">
-            Open purchase orders
+          <Link href={ROUTES.orders} className="tb-btn tb-btn--primary">
+            Open orders
           </Link>
         </div>
       ) : (
         <ul className="tb-shein-list">
           {orders.map((order) => {
-            const meta = trackingCardMeta(order);
+            const head = timelineHeadline(order.timeline);
+            const arrival = orderArrivalHint(order.shipments || []);
+            const eta = formatEta(arrival.at);
             const peer = isBuyer ? order.supplier_name || "Supplier" : order.buyer_name || "Buyer";
             return (
               <li key={order.id}>
@@ -196,25 +136,11 @@ export function TrackingHub() {
                       <strong>{order.order_number}</strong>
                       <span>{peer}</span>
                     </div>
-                    <em>{meta.stage?.label ?? "Tracking"}</em>
+                    <em>{head?.state === "current" ? `Next: ${head.label}` : head?.label ?? statusLabel(order.status)}</em>
                   </div>
-                  <div className="tb-shein-card__mini" aria-hidden>
-                    {JOURNEY_STAGES.map((stage, i) => (
-                      <span
-                        key={stage.id}
-                        data-on={i <= meta.stageIdx || undefined}
-                        data-now={i === meta.stageIdx || undefined}
-                      >
-                        <StageIcon id={stage.id} />
-                      </span>
-                    ))}
-                  </div>
+                  <MiniSteps order={order} />
                   <p className="tb-shein-card__eta">
-                    {meta.etaLabel
-                      ? `${meta.arrivalLabel} · ${meta.etaLabel}`
-                      : isBuyer
-                        ? "ETA pending dispatch"
-                        : "Set ETA when you dispatch"}
+                    {eta ? `${arrival.label} · ${eta}` : isBuyer ? "Delivery date set when shipped" : "Set a delivery date when you ship"}
                   </p>
                 </Link>
               </li>
@@ -241,12 +167,6 @@ export function TrackingJourney({ orderId }: JourneyProps) {
   const [origin, setOrigin] = useState("");
   const [etaLocal, setEtaLocal] = useState("");
   const [shipNotes, setShipNotes] = useState("");
-  const [nowMs, setNowMs] = useState(() => Date.now());
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
-    return () => window.clearInterval(id);
-  }, []);
 
   async function load() {
     try {
@@ -270,6 +190,7 @@ export function TrackingJourney({ orderId }: JourneyProps) {
 
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
   const shippableLines = useMemo(() => {
@@ -302,27 +223,20 @@ export function TrackingJourney({ orderId }: JourneyProps) {
   }
 
   const primary = primaryShipment(order.shipments || []);
-  const shipLike = shipment
-    ? {
-        status: shipment.status,
-        estimated_delivery_at: shipment.estimated_delivery_at,
-        shipped_at: shipment.shipped_at,
-        delivered_at: shipment.delivered_at,
-        received_at: shipment.received_at,
-      }
-    : primary;
-  const stageIdx = journeyStageIndex(order, shipLike, nowMs);
-  const eta =
-    formatEta(primary?.estimated_delivery_at) ||
-    formatEta(shipment?.estimated_delivery_at) ||
-    null;
-  const headline = journeyHeadline(stageIdx, Boolean(isBuyer));
-  const journeyLog = autoJourneyEvents(order, shipLike, stageIdx, nowMs);
-  const stage = JOURNEY_STAGES[stageIdx] ?? JOURNEY_STAGES[0];
-  if (!stage) return null;
+  const head = timelineHeadline(order.timeline);
+  const arrived = ["delivered", "completed"].includes(order.status);
+  const cancelled = order.status === "cancelled";
+  const eta = formatEta(shipment?.estimated_delivery_at) || formatEta(primary?.estimated_delivery_at) || null;
+  const isCash = order.payment_method === "cash";
+  const events = recordedEvents(order, shipment);
+  const headKey = cancelled ? "cancelled" : head?.state === "current" ? head.key : undefined;
+  const title = cancelled
+    ? "Cancelled"
+    : head?.state === "current"
+      ? `Next: ${head.label}`
+      : head?.label ?? statusLabel(order.status);
 
-  const canAcknowledge =
-    isSupplier && order.status === "pending" && hasPermission("orders.confirm");
+  const canAcknowledge = isSupplier && order.status === "pending" && hasPermission("orders.confirm");
   const canCreateShipment =
     isSupplier &&
     ["confirmed", "processing", "shipped"].includes(order.status) &&
@@ -332,17 +246,14 @@ export function TrackingJourney({ orderId }: JourneyProps) {
   return (
     <div className="tb-shein tb-shein--detail">
       <div className="tb-shein-nav">
-        <Link href={ROUTES.tracking}>← All orders</Link>
+        <BackLink href={ROUTES.tracking}>All orders</BackLink>
         <div className="tb-shein-nav__actions">
-          <Link href={ROUTES.procurementOrder(order.id)} className="tb-inv-btn tb-inv-btn-soft">
-            Purchase order
+          <Link href={ROUTES.procurementOrder(order.id)} className="tb-btn tb-btn--secondary">
+            Order details
           </Link>
           {primary ? (
-            <Link
-              href={ROUTES.procurementShipment(primary.id)}
-              className="tb-inv-btn tb-inv-btn-soft"
-            >
-              Shipment
+            <Link href={ROUTES.procurementShipment(primary.id)} className="tb-btn tb-btn--secondary">
+              {isBuyer && !arrived ? "Confirm delivery" : "Shipment"}
             </Link>
           ) : null}
         </div>
@@ -356,44 +267,52 @@ export function TrackingJourney({ orderId }: JourneyProps) {
 
       <section className="tb-shein-status">
         <div className="tb-shein-status__badge" aria-hidden>
-          <StageIcon id={stage.id} />
+          <TimelineIcon step={head?.key ?? "placed"} />
         </div>
         <div className="tb-shein-status__copy">
-          <p className="tb-shein-kicker">{order.order_number}</p>
-          <h1>{stage.label}</h1>
-          <p>{headline}</p>
+          <p className="tb-shein-kicker">
+            {order.order_number} · {isBuyer ? order.supplier_name : order.buyer_name}
+          </p>
+          <h1>{title}</h1>
+          <p>{headlineCopy(headKey, Boolean(isBuyer), isCash)}</p>
         </div>
         <div className="tb-shein-status__eta">
-          <span>{stageIdx >= 4 ? "Arrived" : "Estimated arrival"}</span>
+          <span>{arrived ? "Delivered" : "Estimated arrival"}</span>
           <strong>
-            {stageIdx >= 4
+            {arrived
               ? formatEta(primary?.delivered_at) || "Complete"
-              : eta || "Awaiting dispatch"}
+              : cancelled
+                ? "—"
+                : eta || "Set when shipped"}
           </strong>
           <em>
-            {ORDER_STATUS_LABEL[order.status] || order.status}
+            {statusLabel(order.status)}
             {primary?.carrier_name ? ` · ${primary.carrier_name}` : ""}
           </em>
         </div>
       </section>
 
-      <JourneyStepper stageIdx={stageIdx} />
+      <OrderTimeline steps={order.timeline} />
 
       <div className="tb-shein-split">
         <section className="tb-shein-panel">
           <h2>Tracking history</h2>
-          <ol className="tb-shein-timeline">
-            {journeyLog.map((ev, i) => (
-              <li key={`${ev.label}-${ev.at}-${i}`} data-first={i === 0 || undefined}>
-                <span className="tb-shein-timeline__dot" />
-                <div>
-                  <strong>{ev.label}</strong>
-                  <p>{ev.description}</p>
-                  <time>{ev.at ? new Date(ev.at).toLocaleString() : ""}</time>
-                </div>
-              </li>
-            ))}
-          </ol>
+          {events.length === 0 ? (
+            <p className="tb-shein-hint">Updates appear here as the order moves.</p>
+          ) : (
+            <ol className="tb-shein-timeline">
+              {events.map((ev, i) => (
+                <li key={`${ev.label}-${ev.at}-${i}`} data-first={i === 0 || undefined}>
+                  <span className="tb-shein-timeline__dot" />
+                  <div>
+                    <strong>{ev.label}</strong>
+                    <p>{ev.description}</p>
+                    <time>{ev.at ? new Date(ev.at).toLocaleString() : ""}</time>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
 
           {(order.shipments || []).length > 1 ? (
             <>
@@ -404,11 +323,7 @@ export function TrackingJourney({ orderId }: JourneyProps) {
                     <Link href={ROUTES.procurementShipment(s.id)}>
                       <strong>{s.shipment_number}</strong>
                       <span>{SHIPMENT_STATUS_LABEL[s.status] || s.status}</span>
-                      <span>
-                        {s.estimated_delivery_at
-                          ? `ETA ${formatEta(s.estimated_delivery_at)}`
-                          : "No ETA"}
-                      </span>
+                      <span>{s.estimated_delivery_at ? `ETA ${formatEta(s.estimated_delivery_at)}` : "No ETA"}</span>
                     </Link>
                   </li>
                 ))}
@@ -425,7 +340,7 @@ export function TrackingJourney({ orderId }: JourneyProps) {
                 <strong>{item.product_name_snapshot}</strong>
                 <span>
                   {item.quantity} {item.unit}
-                  {item.shipped_quantity ? ` · ${item.shipped_quantity} shipped` : ""}
+                  {item.shipped_quantity && Number(item.shipped_quantity) > 0 ? ` · ${item.shipped_quantity} shipped` : ""}
                 </span>
               </li>
             ))}
@@ -435,25 +350,19 @@ export function TrackingJourney({ orderId }: JourneyProps) {
             <div className="tb-shein-actions">
               <button
                 type="button"
-                className="tb-inv-btn tb-inv-btn-accent"
+                className="tb-btn tb-btn--primary"
                 disabled={busy}
-                onClick={() =>
-                  void run(() =>
-                    procurementApi.acknowledgeOrder(orderId).then(() => undefined),
-                  )
-                }
+                onClick={() => void run(() => procurementApi.acknowledgeOrder(orderId).then(() => undefined))}
               >
-                <BusyText busy={busy}>Confirm purchase order</BusyText>
+                <BusyText busy={busy}>Confirm order</BusyText>
               </button>
             </div>
           ) : null}
 
           {canCreateShipment ? (
             <div className="tb-shein-actions">
-              <h3>Dispatch</h3>
-              <p className="tb-shein-hint">
-                One step: ship and set ETA. Tracking then advances on its own.
-              </p>
+              <h3>Ship</h3>
+              <p className="tb-shein-hint">Enter the delivery date so the buyer knows when to expect it.</p>
               <label>
                 Carrier
                 <input
@@ -464,19 +373,11 @@ export function TrackingJourney({ orderId }: JourneyProps) {
               </label>
               <label>
                 Origin
-                <input
-                  value={origin}
-                  onChange={(e) => setOrigin(e.target.value)}
-                  placeholder="Warehouse / city"
-                />
+                <input value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="Warehouse / city" />
               </label>
               <label>
                 Estimated arrival
-                <input
-                  type="datetime-local"
-                  value={etaLocal}
-                  onChange={(e) => setEtaLocal(e.target.value)}
-                />
+                <input type="datetime-local" value={etaLocal} onChange={(e) => setEtaLocal(e.target.value)} />
               </label>
               <label>
                 Notes
@@ -484,7 +385,7 @@ export function TrackingJourney({ orderId }: JourneyProps) {
               </label>
               <button
                 type="button"
-                className="tb-inv-btn tb-inv-btn-accent"
+                className="tb-btn tb-btn--primary"
                 disabled={busy || !etaLocal}
                 onClick={() =>
                   void run(async () => {
@@ -505,27 +406,21 @@ export function TrackingJourney({ orderId }: JourneyProps) {
                   })
                 }
               >
-                <BusyText busy={busy}>Dispatch &amp; set ETA</BusyText>
+                <BusyText busy={busy}>Mark as shipped</BusyText>
               </button>
             </div>
           ) : null}
 
-          {isSupplier && primary && !canCreateShipment ? (
-            <p className="tb-shein-hint">
-              Dispatched. Stages follow the ETA. Buyer confirms receipt on arrival.
-            </p>
+          {isSupplier && primary && !canCreateShipment && !arrived ? (
+            <p className="tb-shein-hint">Shipped. Add carrier updates from the shipment page. The buyer confirms delivery.</p>
           ) : null}
 
-          {isBuyer && stageIdx < 1 ? (
-            <p className="tb-shein-hint">
-              Waiting for the supplier to acknowledge and dispatch.
-            </p>
+          {isBuyer && order.status === "pending" ? (
+            <p className="tb-shein-hint">Waiting for the supplier to confirm your order.</p>
           ) : null}
 
-          {isBuyer && primary && stageIdx >= 3 && stageIdx < 4 ? (
-            <p className="tb-shein-hint">
-              Near delivery — open the shipment to confirm receipt when goods arrive.
-            </p>
+          {isBuyer && primary && !arrived ? (
+            <p className="tb-shein-hint">When the goods arrive, open the shipment to confirm delivery.</p>
           ) : null}
         </section>
       </div>

@@ -1,4 +1,3 @@
-"""Communication HTTP API — BRD §8.7 poll inbox and messages (v1)."""
 
 from __future__ import annotations
 
@@ -15,10 +14,8 @@ from app.shared.schemas.response import paginated, success
 
 router = APIRouter(prefix="/conversations", tags=["Communication"])
 
-
 def get_communication_service() -> CommunicationService:
     return CommunicationService()
-
 
 class OpenConversationRequest(BaseModel):
     counterparty_business_id: str = Field(min_length=24, max_length=24)
@@ -27,7 +24,6 @@ class OpenConversationRequest(BaseModel):
     context_id: str | None = None
     subject: str | None = Field(default=None, max_length=200)
 
-
 class SendMessageRequest(BaseModel):
     body: str | None = Field(default=None, max_length=8000)
     message_type: str = MessageType.TEXT
@@ -35,10 +31,8 @@ class SendMessageRequest(BaseModel):
     reference_type: str | None = None
     reference_id: str | None = Field(default=None, min_length=24, max_length=24)
 
-
 class EditMessageRequest(BaseModel):
     body: str = Field(min_length=1, max_length=8000)
-
 
 @router.get("", summary="List conversations for the active business")
 async def list_conversations(
@@ -54,7 +48,6 @@ async def list_conversations(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @router.get("/unread-count", summary="Unread message count for the navbar")
 async def unread_conversation_count(
     auth: Annotated[AuthContext, Depends(require_permission("conversations", "read"))],
@@ -68,7 +61,6 @@ async def unread_conversation_count(
             )
         }
     )
-
 
 @router.post("", summary="Open or resume a two-company conversation")
 async def open_conversation(
@@ -88,7 +80,6 @@ async def open_conversation(
         )
     )
 
-
 @router.get("/{conversation_id}", summary="Get conversation detail")
 async def get_conversation(
     conversation_id: str,
@@ -104,7 +95,6 @@ async def get_conversation(
         )
     )
 
-
 @router.post("/{conversation_id}/read", summary="Mark conversation read (FR-MSG-06)")
 async def mark_conversation_read(
     conversation_id: str,
@@ -118,7 +108,6 @@ async def mark_conversation_read(
             conversation_id=conversation_id,
         )
     )
-
 
 @router.get("/{conversation_id}/messages", summary="List messages (poll)")
 async def list_messages(
@@ -137,7 +126,6 @@ async def list_messages(
         after=after,
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
-
 
 @router.post("/{conversation_id}/messages", summary="Send a message")
 async def send_message(
@@ -159,7 +147,6 @@ async def send_message(
         )
     )
 
-
 @router.patch("/{conversation_id}/messages/{message_id}", summary="Edit own text message")
 async def edit_message(
     conversation_id: str,
@@ -177,7 +164,6 @@ async def edit_message(
             body=body.body,
         )
     )
-
 
 @router.delete("/{conversation_id}/messages/{message_id}", summary="Soft-delete own message")
 async def delete_message(

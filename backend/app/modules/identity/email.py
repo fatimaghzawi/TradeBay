@@ -1,8 +1,3 @@
-"""Replaceable email port. Identity never talks to a vendor SDK in domain services.
-
-Default production path: Elastic Email transactional API (same as WorkNest).
-Tests use MemoryEmailSender. Local runs without a key use LogEmailSender.
-"""
 
 from __future__ import annotations
 
@@ -24,10 +19,8 @@ _ELASTIC_URL = "https://api.elasticemail.com/v4/emails/transactional"
 _quota_blocked_until: float = 0.0
 _QUOTA_COOLDOWN_SECONDS = 30 * 60
 
-
 class EmailQuotaExhaustedError(RuntimeError):
-    """Elastic Email (or similar) refused send because the plan has no credits."""
-
+    pass
 
 def elastic_quota_exhausted(status_code: int, body: str) -> bool:
     if status_code != 400:
@@ -43,7 +36,7 @@ def elastic_quota_exhausted(status_code: int, body: str) -> bool:
         )
     )
 
-# TradeBay brand (aligned with auth / landing UI)
+                                                 
 _CREAM = "#faf8f4"
 _GREEN = "#0d3b2a"
 _GREEN_MID = "#1a6b4f"
@@ -54,14 +47,11 @@ _MUTED = "#5a6a62"
 _BORDER = "#d9e2dc"
 _WHITE = "#ffffff"
 
-
 class EmailSender(Protocol):
     async def send(self, *, to: str, template: str, context: dict[str, Any]) -> None: ...
 
-
 def _safe_context(context: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in context.items() if key not in _SECRET_CONTEXT_KEYS}
-
 
 def _parse_from_address(from_header: str) -> tuple[str | None, str]:
     stripped = from_header.strip()
@@ -69,7 +59,6 @@ def _parse_from_address(from_header: str) -> tuple[str | None, str]:
         name, _, rest = stripped.partition("<")
         return name.strip() or None, rest[:-1].strip()
     return None, stripped
-
 
 def _frontend_link(settings: Settings, path: str, token: str = "", **query: str) -> str:
     base = settings.frontend_url.rstrip("/")
@@ -82,15 +71,12 @@ def _frontend_link(settings: Settings, path: str, token: str = "", **query: str)
     qs = f"?{'&'.join(params)}" if params else ""
     return f"{base}{path}{qs}"
 
-
 def _is_insecure_app_url(url: str) -> bool:
-    """Gmail Safe Browsing flags localhost and plain-http links as phishing."""
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
     if host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
         return True
     return parsed.scheme.lower() != "https"
-
 
 def _cta_html(url: str, label: str, *, tone: str = "orange", omit_insecure_links: bool = False) -> str:
     if omit_insecure_links and _is_insecure_app_url(url):
@@ -100,9 +86,7 @@ def _cta_html(url: str, label: str, *, tone: str = "orange", omit_insecure_links
         )
     return _button(url, label, tone=tone)
 
-
 def _invite_cta_html(url: str, *, omit_insecure_links: bool = False) -> str:
-    """Invites need the token. Local/http URLs are shown as copy-paste, not <a href>."""
     if omit_insecure_links and _is_insecure_app_url(url):
         escaped = escape(url)
         return (
@@ -114,7 +98,6 @@ def _invite_cta_html(url: str, *, omit_insecure_links: bool = False) -> str:
         )
     return _button(url, "Accept invitation", tone="green")
 
-
 def _wordmark() -> str:
     return (
         f'<p style="margin:0;font-size:30px;line-height:1;font-weight:800;letter-spacing:-0.04em;'
@@ -122,9 +105,7 @@ def _wordmark() -> str:
         f'Trade<span style="color:{_ORANGE};">Bay</span></p>'
     )
 
-
 def _brand_header(settings: Settings, *, embedded_logo: bool = False) -> str:
-    """Always use a styled wordmark — never attach/embed logo images (clients treat them as files)."""
     del settings, embedded_logo
     return f"""
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
@@ -138,9 +119,7 @@ def _brand_header(settings: Settings, *, embedded_logo: bool = False) -> str:
       </table>
     """
 
-
 def _petal_bar() -> str:
-    """Decorative leaf strip echoing auth wave accents."""
     return f"""
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
         <tr>
@@ -152,7 +131,6 @@ def _petal_bar() -> str:
         </tr>
       </table>
     """
-
 
 def _wrap_html(
     *,
@@ -224,7 +202,6 @@ def _wrap_html(
 </body>
 </html>"""
 
-
 def _button(url: str, label: str, *, tone: str = "orange") -> str:
     bg = _ORANGE if tone == "orange" else _GREEN
     hover_note = ""
@@ -243,7 +220,6 @@ def _button(url: str, label: str, *, tone: str = "orange") -> str:
   <a href="{escape(url)}" style="color:{_GREEN_MID};text-decoration:underline;">{escape(url)}</a>
 </p>"""
 
-
 def _otp_block(otp: str) -> str:
     digits = "".join(ch for ch in otp if ch.isdigit()) or otp
     cells = []
@@ -255,7 +231,7 @@ def _otp_block(otp: str) -> str:
         )
         cells.append('<td style="width:8px;font-size:0;">&nbsp;</td>')
     if cells:
-        cells.pop()  # trailing spacer
+        cells.pop()                   
     row = "".join(cells)
     return f"""
 <p style="margin:0;text-align:center;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;
@@ -268,7 +244,6 @@ def _otp_block(otp: str) -> str:
 </p>
 """
 
-
 def render_message(
     *,
     template: str,
@@ -277,7 +252,6 @@ def render_message(
     embedded_logo: bool = False,
     omit_insecure_links: bool = False,
 ) -> tuple[str, str, str]:
-    """Return (subject, html, text)."""
     app_name = settings.app_name
     token = str(context.get("token") or "")
     otp = str(context.get("otp") or token)
@@ -452,9 +426,7 @@ def render_message(
     )
     return subject, html, subject
 
-
 class LogEmailSender:
-    """Development sender when no provider is configured. Never logs secrets."""
 
     async def send(self, *, to: str, template: str, context: dict[str, Any]) -> None:
         logger.info(
@@ -465,9 +437,7 @@ class LogEmailSender:
             context_keys=sorted(_safe_context(context).keys()),
         )
 
-
 class MemoryEmailSender:
-    """Test inbox. Tokens are stored in memory only — never returned by HTTP APIs."""
 
     def __init__(self) -> None:
         self.messages: list[dict[str, Any]] = []
@@ -492,9 +462,7 @@ class MemoryEmailSender:
     def clear(self) -> None:
         self.messages.clear()
 
-
 class ElasticEmailSender:
-    """WorkNest-compatible Elastic Email v4 transactional API."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -530,8 +498,8 @@ class ElasticEmailSender:
         payload = {
             "Recipients": {"To": [to]},
             "Content": content,
-            # Account-level tracking wraps every URL through Elastic Email's
-            # bounce/click domains. Gmail flags those as phishing.
+                                                                            
+                                                                  
             "Options": {
                 "TrackOpens": False,
                 "TrackClicks": False,
@@ -586,26 +554,19 @@ class ElasticEmailSender:
             context_keys=sorted(_safe_context(context).keys()),
         )
 
-
 _sender: EmailSender = LogEmailSender()
-
 
 def get_email_sender() -> EmailSender:
     return _sender
 
-
 def outbound_email_is_remote() -> bool:
-    """True when send() talks to Elastic Email (do not await it on API requests)."""
     return isinstance(_sender, ElasticEmailSender)
-
 
 def set_email_sender(sender: EmailSender) -> None:
     global _sender
     _sender = sender
 
-
 def configure_email_sender(settings: Settings | None = None) -> EmailSender:
-    """Pick the outbound provider from settings. Tests override via set_email_sender."""
     settings = settings or get_settings()
     if settings.is_test:
         sender: EmailSender = LogEmailSender()

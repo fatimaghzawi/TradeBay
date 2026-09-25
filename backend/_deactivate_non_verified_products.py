@@ -1,4 +1,3 @@
-"""One-shot: take listings offline for suppliers that cannot sell."""
 
 from __future__ import annotations
 
@@ -11,7 +10,6 @@ from app.modules.identity.constants import (
     SupplierVerificationStatus,
 )
 from app.shared.utils.datetime import utc_now
-
 
 async def main() -> None:
     await mongo_manager.connect()
@@ -66,7 +64,6 @@ async def main() -> None:
         print("businesses_suspended", br.modified_count)
 
     await mongo_manager.disconnect()
-
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -4,20 +4,18 @@ import { ROUTES } from "@/lib/constants";
 export function notificationHref(n: AppNotification): string {
   const path = n.cta_path?.trim();
   if (path?.startsWith("/") && !path.startsWith("//")) {
-    // Route unfinished order/finance deep links to Coming Soon surfaces.
-    if (
-      path.startsWith("/orders") ||
-      path.startsWith("/procurement/orders") ||
-      path.startsWith("/tracking")
-    ) {
-      return ROUTES.orders;
-    }
-    if (path.startsWith("/finance") || path.startsWith("/admin/finance")) {
-      return ROUTES.finance;
-    }
     return path;
   }
+  if (n.reference_type === "invoice" && n.reference_id) {
+    return ROUTES.financeInvoice(n.reference_id);
+  }
   if (n.reference_type === "invoice") return ROUTES.finance;
+  if (n.reference_type === "checkout" && n.reference_id) {
+    return ROUTES.checkoutDetail(n.reference_id);
+  }
+  if (n.reference_type === "order" && n.reference_id) {
+    return ROUTES.procurementOrder(n.reference_id);
+  }
   if (n.reference_type === "order") return ROUTES.orders;
   if (n.reference_type === "rfq" && n.reference_id) {
     return ROUTES.procurementRfq(n.reference_id);

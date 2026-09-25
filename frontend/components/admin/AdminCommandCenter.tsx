@@ -32,6 +32,62 @@ const LEBANON_CITIES = [
   { name: "Nabatieh", count: 164, x: 52, y: 72 },
 ] as const;
 
+function LebanonFootprintMap() {
+  const [selected, setSelected] = useState<string | null>(null);
+  const active = LEBANON_CITIES.find((city) => city.name === selected) ?? null;
+
+  function toggle(name: string) {
+    setSelected((current) => (current === name ? null : name));
+  }
+
+  return (
+    <div className="tb-cc-map__body">
+      <div className="tb-cc-map__canvas">
+        <Image
+          src="/images/admin/lebanon-map.png"
+          alt=""
+          fill
+          sizes="420px"
+          className="object-contain"
+        />
+        {LEBANON_CITIES.map((city) => (
+          <button
+            key={city.name}
+            type="button"
+            className="tb-cc-map__pin"
+            data-active={selected === city.name || undefined}
+            style={{ left: `${city.x}%`, top: `${city.y}%` }}
+            aria-pressed={selected === city.name}
+            aria-label={`${city.name}, ${city.count.toLocaleString()} businesses`}
+            onClick={() => toggle(city.name)}
+          />
+        ))}
+        {active ? (
+          <p className="tb-cc-map__tip" style={{ left: `${active.x}%`, top: `${active.y}%` }}>
+            <strong>{active.name}</strong>
+            <span>{active.count.toLocaleString()} businesses</span>
+          </p>
+        ) : null}
+      </div>
+      <ul className="tb-cc-map__list">
+        {LEBANON_CITIES.map((city) => (
+          <li key={city.name}>
+            <button
+              type="button"
+              data-active={selected === city.name || undefined}
+              aria-pressed={selected === city.name}
+              onClick={() => toggle(city.name)}
+            >
+              <span>{city.name}</span>
+              <strong>{city.count.toLocaleString()}</strong>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 const CATEGORIES = [
   { name: "Electronics", pct: 28 },
   { name: "Home & Furniture", pct: 18 },
@@ -426,7 +482,7 @@ export function AdminCommandCenter() {
           },
         ]}
         actions={
-          <Link href={ROUTES.admin.suppliers} className="tb-cc-sign-cta">
+          <Link href={ROUTES.admin.suppliers} className="tb-btn tb-btn--primary">
             Review queue →
           </Link>
         }
@@ -467,33 +523,7 @@ export function AdminCommandCenter() {
             <h2>TradeBay Across Lebanon</h2>
             <span>Live footprint</span>
           </header>
-          <div className="tb-cc-map__body">
-            <div className="tb-cc-map__canvas">
-              <Image
-                src="/images/admin/lebanon-map.png"
-                alt="Lebanon activity map"
-                fill
-                sizes="420px"
-                className="object-contain"
-              />
-              {LEBANON_CITIES.map((city) => (
-                <span
-                  key={city.name}
-                  className="tb-cc-map__pin"
-                  style={{ left: `${city.x}%`, top: `${city.y}%` }}
-                  title={`${city.name}: ${city.count}`}
-                />
-              ))}
-            </div>
-            <ul className="tb-cc-map__list">
-              {LEBANON_CITIES.map((city) => (
-                <li key={city.name}>
-                  <span>{city.name}</span>
-                  <strong>{city.count.toLocaleString()}</strong>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <LebanonFootprintMap />
         </article>
 
         <article className="tb-cc-panel tb-cc-activity">

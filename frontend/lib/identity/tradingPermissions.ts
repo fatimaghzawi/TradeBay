@@ -1,4 +1,4 @@
-/** Platform-only codes — never assignable on buyer/supplier roles. */
+
 export const PLATFORM_ONLY_PERMISSION_CODES = new Set([
   "suppliers.verify",
   "disputes.resolve",

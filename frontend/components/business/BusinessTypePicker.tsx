@@ -62,7 +62,7 @@ function TypeCard({
             {badge}
           </span>
         </div>
-        <span className="mt-3 font-[family-name:var(--font-outfit)] text-base font-bold text-[var(--tb-card-fg)]">
+        <span className="mt-3 font-[family-name:var(--font-outfit)] text-base font-bold text-card-foreground">
           {title}
         </span>
         <span className="mt-2 block flex-1 text-sm leading-relaxed text-[var(--tb-card-muted)]">

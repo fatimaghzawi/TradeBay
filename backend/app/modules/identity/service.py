@@ -1,10 +1,3 @@
-"""Identity application services.
-
-- ``AuthService`` — register, login, sessions, email verify, password flows
-- ``BusinessService`` — create/update companies, supplier verification
-
-Routers call these; they call repositories. No FastAPI types here.
-"""
 
 from __future__ import annotations
 
@@ -16,14 +9,16 @@ from typing import Any
 from bson import ObjectId
 
 from app.core.config import Settings, get_settings
-from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
+from app.core.exceptions import BadRequestError, ConflictError, ForbiddenError, NotFoundError
 from app.core.logging import get_logger
 from app.core.security import (
     create_access_token,
     generate_otp_code,
     generate_refresh_token,
+    hash_otp,
     hash_password,
     hash_token,
+    otp_matches,
     verify_password,
 )
 from app.db.seed import seed_trading_roles
@@ -53,16 +48,18 @@ from app.modules.identity.exceptions import (
     BusinessInactiveError,
     CompanyDomainTakenError,
     EmailAlreadyRegisteredError,
+    EmailPendingVerificationError,
     InvalidCredentialsError,
     InvalidOtpError,
     InvitationInvalidError,
+    LoginThrottledError,
     MembershipRequiredError,
     OtpAttemptsExceededError,
     SessionRevokedError,
     VerifiedBusinessLockedError,
 )
 from app.modules.identity.guards import assert_not_last_admin
-from app.modules.identity.rate_limit import challenge_limiter
+from app.modules.identity.rate_limit import challenge_limiter, login_failure_limiter
 from app.modules.identity.repository import (
     AuthTokenRepository,
     BusinessRepository,
@@ -83,9 +80,19 @@ from app.shared.utils.objectid import parse_object_id
 
 logger = get_logger(__name__)
 
+                                                                          
+                                                                             
+REFRESH_REUSE_GRACE_SECONDS = 30
 
-# ── Response serializers (dict → API-safe payload) ───────────────────────────
+_DUMMY_PASSWORD_HASH: str | None = None
 
+def _dummy_password_hash() -> str:
+    global _DUMMY_PASSWORD_HASH
+    if _DUMMY_PASSWORD_HASH is None:
+        _DUMMY_PASSWORD_HASH = hash_password("not-a-real-account-0")
+    return _DUMMY_PASSWORD_HASH
+
+                                                                               
 
 def _serialize_user(doc: dict[str, Any], *, company_logo_url: str | None = None) -> dict[str, Any]:
     return {
@@ -97,7 +104,6 @@ def _serialize_user(doc: dict[str, Any], *, company_logo_url: str | None = None)
         "avatar_url": company_logo_url or doc.get("avatar_url"),
         "email_verified_at": doc.get("email_verified_at"),
     }
-
 
 def _serialize_address(doc: dict[str, Any] | None) -> dict[str, Any] | None:
     if not doc:
@@ -111,12 +117,10 @@ def _serialize_address(doc: dict[str, Any] | None) -> dict[str, Any] | None:
         "country": doc.get("country"),
     }
 
-
 def _norm_identity_text(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
-
 
 def _norm_identity_address(address: dict[str, Any] | None) -> tuple[str, ...]:
     addr = address if isinstance(address, dict) else {}
@@ -129,7 +133,6 @@ def _norm_identity_address(address: dict[str, Any] | None) -> tuple[str, ...]:
         _norm_identity_text(addr.get("country") or "Lebanon").lower(),
     )
 
-
 def verified_supplier_identity_changes(
     business: dict[str, Any],
     *,
@@ -139,7 +142,6 @@ def verified_supplier_identity_changes(
     email_domain: str | None = None,
     address: dict[str, Any] | None = None,
 ) -> list[str]:
-    """Return locked identity fields that would actually change."""
     changed: list[str] = []
     if name is not None and _norm_identity_text(name) != _norm_identity_text(business.get("name")):
         changed.append("name")
@@ -159,7 +161,6 @@ def verified_supplier_identity_changes(
     if address is not None and _norm_identity_address(address) != _norm_identity_address(stored_address):
         changed.append("address")
     return changed
-
 
 def _serialize_business(
     doc: dict[str, Any],
@@ -198,7 +199,6 @@ def _serialize_business(
         payload["rejection_reason"] = rejection_reason
     return payload
 
-
 def _serialize_verification_documents(profile: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not profile:
         return []
@@ -218,7 +218,6 @@ def _serialize_verification_documents(profile: dict[str, Any] | None) -> list[di
             }
         )
     return rows
-
 
 async def _serialize_business_enriched(
     doc: dict[str, Any],
@@ -249,13 +248,11 @@ async def _serialize_business_enriched(
         rejection_reason=rejection_reason,
     )
 
-
 def _serialize_public_company(
     doc: dict[str, Any],
     *,
     verification_status: str | None = None,
 ) -> dict[str, Any]:
-    """Counterparty-facing company card — no tax, contacts, or verification files."""
     raw_address = doc.get("address") if isinstance(doc.get("address"), dict) else None
     address: dict[str, Any] | None = None
     if raw_address:
@@ -288,12 +285,16 @@ def _serialize_public_company(
         payload["verification_status"] = verification_status
     return payload
 
+def _verification_decision_conflict(decision: str, current: str) -> str:
+    if decision == "approve" and current == SupplierVerificationStatus.VERIFIED:
+        return "This supplier is already verified."
+    if decision == "revoke":
+        return "Only verified suppliers can have their verification revoked."
+    return "This supplier has no documents waiting for review."
 
-# ── AuthService — authentication & sessions ──────────────────────────────────
-
+                                                                               
 
 class AuthService:
-    """Register / login / logout / refresh / current user foundation."""
 
     def __init__(
         self,
@@ -324,7 +325,7 @@ class AuthService:
         self.audit = audit or AuditService()
         self.settings = settings or get_settings()
 
-    # —— Register / login / logout / refresh ————————————————————————————————
+                                                                             
 
     async def register(
         self,
@@ -355,9 +356,9 @@ class AuthService:
                 user_agent=user_agent,
             )
 
-        # Invitee signup: join an existing company — never create a trading business here.
-        # Company login emails are often not real mailboxes; the invitation link (delivered
-        # to the personal delivery_email) is the proof of identity instead of OTP.
+                                                                                          
+                                                                                           
+                                                                                  
         via_invitation = False
         personal_email: str | None = None
         if invitation_token:
@@ -465,7 +466,7 @@ class AuthService:
                 try:
                     await email_task
                 except Exception:
-                    # Account exists; verification can be resent. Don't fail registration on provider blips.
+                                                                                                            
                     logger.exception("verification_email_failed", email=normalized)
 
         return {
@@ -486,19 +487,38 @@ class AuthService:
         ip_address: str | None,
         user_agent: str | None,
     ) -> dict[str, Any]:
-        """Retry signup when the account exists but the inbox was never verified.
-
-        A failed first OTP must not permanently lock the email. Verified accounts
-        still raise EmailAlreadyRegisteredError.
-        """
         if existing.get("email_verified_at") or existing.get("status") != UserStatus.PENDING:
             raise EmailAlreadyRegisteredError()
+
+        challenge_limiter.hit(f"email_verification_email:{existing['email']}")
+        raw_verify = await self._issue_auth_token(
+            existing["_id"], AuthTokenPurpose.EMAIL_VERIFICATION
+        )
+        inbox = (existing.get("personal_email") or existing["email"]).strip().lower()
+
+        if not verify_password(password, existing["password_hash"]):
+            try:
+                await get_email_sender().send(
+                    to=inbox,
+                    template="email_verification",
+                    context={"user_id": str(existing["_id"]), "token": raw_verify, "otp": raw_verify},
+                )
+            except Exception:
+                logger.exception("verification_email_failed", email=inbox)
+            await self.audit.log(
+                action="USER_REGISTRATION_RETRY_REJECTED",
+                resource_type="user",
+                resource_id=existing["_id"],
+                user_id=None,
+                ip_address=ip_address,
+                metadata={"reason": "password_mismatch"},
+            )
+            raise EmailPendingVerificationError()
 
         now = utc_now()
         user = await self.users.update(
             existing["_id"],
             {
-                "password_hash": hash_password(password),
                 "first_name": first_name.strip(),
                 "last_name": last_name.strip(),
                 "updated_at": now,
@@ -507,9 +527,6 @@ class AuthService:
         if user is None:
             raise EmailAlreadyRegisteredError()
 
-        challenge_limiter.hit(f"email_verification_email:{user['email']}")
-        raw_verify = await self._issue_auth_token(user["_id"], AuthTokenPurpose.EMAIL_VERIFICATION)
-        inbox = (user.get("personal_email") or user["email"]).strip().lower()
         email_task = asyncio.create_task(
             get_email_sender().send(
                 to=inbox,
@@ -575,16 +592,23 @@ class AuthService:
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> dict[str, Any]:
-        user = await self.users.get_by_email(email.lower().strip())
-        if user is None or not verify_password(password, user["password_hash"]):
+        normalized = email.lower().strip()
+        throttle_key = f"login:{normalized}"
+        if login_failure_limiter.is_blocked(throttle_key):
+            raise LoginThrottledError()
+
+        user = await self.users.get_by_email(normalized)
+                                                                                        
+        password_hash = user["password_hash"] if user else _dummy_password_hash()
+        password_ok = verify_password(password, password_hash)
+        if user is None or not password_ok:
+            login_failure_limiter.record(throttle_key)
             raise InvalidCredentialsError()
+        login_failure_limiter.clear(throttle_key)
         if user["status"] not in {UserStatus.ACTIVE, UserStatus.PENDING}:
             raise AccountInactiveError()
 
-        memberships = await self.memberships.list_for_user(user["_id"])
-        active_business_id = None
-        if memberships:
-            active_business_id = memberships[0]["business_account_id"]
+        active_business_id = await self._pick_active_business_id(user["_id"])
 
         tokens = await self._issue_session(
             user=user,
@@ -627,6 +651,7 @@ class AuthService:
         if session is None:
             raise SessionRevokedError()
         if session.get("revoked_at") is not None:
+            await self._handle_refresh_reuse(session, ip_address=ip_address)
             raise SessionRevokedError()
         if as_utc(session["expires_at"]) < utc_now():
             raise SessionRevokedError()
@@ -638,23 +663,58 @@ class AuthService:
         claimed = await self.sessions.revoke_if_active(session["_id"], utc_now())
         if claimed is None:
             raise SessionRevokedError()
+        active_business_id = await self._pick_active_business_id(
+            user["_id"], preferred=session.get("active_business_account_id")
+        )
         tokens = await self._issue_session(
             user=user,
-            business_account_id=session.get("active_business_account_id"),
+            business_account_id=active_business_id,
             ip_address=ip_address,
             user_agent=user_agent,
-        )
-        await self.audit.log(
-            action="SESSION_REFRESHED",
-            resource_type="session",
-            resource_id=tokens["session_id"],
-            business_account_id=session.get("active_business_account_id"),
-            user_id=user["_id"],
-            ip_address=ip_address,
+            family_id=session.get("family_id") or session["_id"],
         )
         return {"user": _serialize_user(user), **tokens}
 
-    # —— Profile / me ——————————————————————————————————————————————————————
+    async def _handle_refresh_reuse(
+        self, session: dict[str, Any], *, ip_address: str | None
+    ) -> None:
+        revoked_at = session.get("revoked_at")
+        if revoked_at is None:
+            return
+        if utc_now() - as_utc(revoked_at) < timedelta(seconds=REFRESH_REUSE_GRACE_SECONDS):
+            return
+        family_id = session.get("family_id") or session["_id"]
+        revoked = await self.sessions.revoke_family(family_id, utc_now())
+        if not revoked:
+            return
+        invalidate_session_auth()
+        await self.audit.log(
+            action="REFRESH_TOKEN_REUSE_DETECTED",
+            resource_type="session",
+            resource_id=session["_id"],
+            business_account_id=session.get("active_business_account_id"),
+            user_id=session["user_id"],
+            ip_address=ip_address,
+            metadata={"revoked_count": revoked},
+        )
+
+    async def _pick_active_business_id(
+        self, user_id: ObjectId | str, *, preferred: ObjectId | str | None = None
+    ) -> ObjectId | None:
+        memberships = await self.memberships.list_for_user(user_id)
+        candidates = [m["business_account_id"] for m in memberships]
+        if preferred is not None:
+            preferred_oid = parse_object_id(str(preferred))
+            if preferred_oid in candidates:
+                candidates.remove(preferred_oid)
+                candidates.insert(0, preferred_oid)
+        for business_id in candidates:
+            business = await self.businesses.get_by_id(business_id)
+            if business is not None and is_business_operational(str(business.get("status", ""))):
+                return business["_id"]
+        return candidates[0] if candidates else None
+
+                                                                            
 
     async def get_me(self, *, user_id: str, session: dict[str, Any]) -> dict[str, Any]:
         user = await self.users.get_by_id(user_id)
@@ -697,27 +757,35 @@ class AuthService:
             "permissions": permission_codes,
         }
 
-    # —— Email verification ————————————————————————————————————————————————
+                                                                            
 
     async def verify_email(
         self,
         *,
         raw_token: str,
         email: str | None = None,
+        user_id: str | None = None,
         ip_address: str | None = None,
     ) -> dict[str, Any]:
+        if email:
+            owner = await self._find_user_for_code(email)
+        elif user_id:
+            owner = await self.users.get_by_id(user_id)
+        else:
+            raise BadRequestError("Enter the email address the code was sent to.")
+        if owner is None:
+            raise InvalidOtpError()
         token_row = await self._consume_auth_token(
-            raw_token,
-            AuthTokenPurpose.EMAIL_VERIFICATION,
-            email=email,
+            raw_token, AuthTokenPurpose.EMAIL_VERIFICATION, user=owner
         )
         now = utc_now()
-        user = await self.users.update(
-            token_row["user_id"],
-            {"status": UserStatus.ACTIVE, "email_verified_at": now, "updated_at": now},
-        )
+        updates: dict[str, Any] = {"email_verified_at": now, "updated_at": now}
+        if owner.get("status") == UserStatus.PENDING:
+            updates["status"] = UserStatus.ACTIVE
+        user = await self.users.update(token_row["user_id"], updates)
         if user is None:
             raise InvalidCredentialsError()
+        invalidate_session_auth()
         await self.audit.log(
             action="USER_EMAIL_VERIFIED",
             resource_type="user",
@@ -741,7 +809,7 @@ class AuthService:
             context={"user_id": str(user["_id"]), "token": raw, "otp": raw},
         )
 
-    # —— Password reset / change ————————————————————————————————————————————
+                                                                             
 
     async def request_password_reset(self, *, email: str) -> None:
         normalized = email.lower().strip()
@@ -759,14 +827,25 @@ class AuthService:
         )
 
     async def reset_password(
-        self, *, raw_token: str, new_password: str, ip_address: str | None = None
+        self,
+        *,
+        raw_token: str,
+        email: str,
+        new_password: str,
+        ip_address: str | None = None,
     ) -> None:
-        token_row = await self._require_open_auth_token(raw_token, AuthTokenPurpose.PASSWORD_RESET)
+        owner = await self._find_user_for_code(email)
+        if owner is None:
+            raise InvalidOtpError()
+        token_row = await self._require_open_auth_token(
+            raw_token, AuthTokenPurpose.PASSWORD_RESET, user=owner
+        )
         now = utc_now()
         password_hash = hash_password(new_password)
 
         async def work(session: MongoSession) -> None:
-            await self.auth_tokens.update(token_row["_id"], {"used_at": now}, session=session)
+            if not await self.auth_tokens.mark_used_if_open(token_row["_id"], now, session=session):
+                raise InvalidOtpError()
             await self.users.update(
                 token_row["user_id"],
                 {"password_hash": password_hash, "updated_at": now},
@@ -775,6 +854,8 @@ class AuthService:
             await self.sessions.revoke_all_for_user(token_row["user_id"], now, session=session)
 
         await run_in_transaction(work)
+        invalidate_session_auth()
+        login_failure_limiter.clear(f"login:{owner['email']}")
         await self.audit.log(
             action="USER_PASSWORD_RESET",
             resource_type="user",
@@ -804,6 +885,7 @@ class AuthService:
             await self.sessions.revoke_all_for_user(user_id, now, session=session)
 
         await run_in_transaction(work)
+        invalidate_session_auth()
         await self.audit.log(
             action="USER_PASSWORD_CHANGED",
             resource_type="user",
@@ -838,10 +920,10 @@ class AuthService:
         )
         return {"revoked": revoked}
 
-    # —— Session list / revoke / profile update ——————————————————————————————
+                                                                              
 
     async def list_sessions(self, *, user_id: str, current_session_id: str) -> list[dict[str, Any]]:
-        rows = await self.sessions.list_active_for_user(user_id)
+        rows = await self.sessions.list_active_for_user(user_id, now=utc_now())
         return [
             {
                 "id": str(row["_id"]),
@@ -905,7 +987,6 @@ class AuthService:
         return _serialize_user(user)
 
     async def resend_verification_for_email(self, *, email: str) -> None:
-        """Public resend — always silent to avoid account enumeration."""
         normalized = email.lower().strip()
         challenge_limiter.hit(f"email_verification_email:{normalized}")
         user = await self.users.get_by_email(normalized)
@@ -920,7 +1001,7 @@ class AuthService:
             context={"user_id": str(user["_id"]), "token": raw, "otp": raw},
         )
 
-    # —— Switch active business on the current session ——————————————————————
+                                                                             
 
     async def switch_business(self, *, session_id: str, user_id: str, business_id: str) -> dict[str, Any]:
         membership = await self.memberships.get_active_membership(user_id, business_id)
@@ -956,7 +1037,7 @@ class AuthService:
             "access_token_expires_in_minutes": self.settings.access_token_expire_minutes,
         }
 
-    # —— Private helpers (tokens, OTP, session issue, bootstrap company) ——————
+                                                                               
 
     async def _issue_auth_token(self, user_id: ObjectId, purpose: AuthTokenPurpose) -> str:
         raw = generate_otp_code(length=EMAIL_OTP_LENGTH)
@@ -970,7 +1051,9 @@ class AuthService:
             {
                 "user_id": user_id,
                 "purpose": purpose,
-                "token_hash": hash_token(raw),
+                "token_hash": hash_otp(
+                    raw, user_id=str(user_id), purpose=purpose, settings=self.settings
+                ),
                 "expires_at": now + ttl,
                 "used_at": None,
                 "invalidated_at": None,
@@ -980,70 +1063,56 @@ class AuthService:
         )
         return raw
 
+    async def _find_user_for_code(self, email: str) -> dict[str, Any] | None:
+        normalized = email.lower().strip()
+        user = await self.users.get_by_email(normalized)
+        if user is None:
+            user = await self.users.find_one({"personal_email": normalized})
+        return user
+
     async def _require_open_auth_token(
         self,
         raw_token: str,
         purpose: AuthTokenPurpose,
         *,
-        email: str | None = None,
+        user: dict[str, Any],
     ) -> dict[str, Any]:
-        now = utc_now()
-        cleaned = raw_token.strip()
-        row = await self.auth_tokens.get_by_hash(hash_token(cleaned))
+        challenge = await self.auth_tokens.get_latest_open(user["_id"], purpose)
+        if challenge is None or as_utc(challenge["expires_at"]) < utc_now():
+            raise InvalidOtpError()
 
-        # Wrong OTP: hash miss. Attribute the attempt to the open challenge when email is known.
-        if row is None:
-            challenge = None
-            if email:
-                user = await self.users.get_by_email(email.lower().strip())
-                if user is not None:
-                    challenge = await self.auth_tokens.get_latest_open(user["_id"], purpose)
-            if challenge is None:
-                raise InvalidOtpError()
-            return await self._register_failed_otp_attempt(challenge, now=now)
-
-        attempts = int(row.get("attempts") or 0)
-        if attempts >= AUTH_TOKEN_MAX_ATTEMPTS:
+        claimed = await self.auth_tokens.claim_attempt(
+            challenge["_id"], max_attempts=AUTH_TOKEN_MAX_ATTEMPTS
+        )
+        if claimed is None:
             raise OtpAttemptsExceededError(max_attempts=AUTH_TOKEN_MAX_ATTEMPTS)
 
-        attempts += 1
-        await self.auth_tokens.update(row["_id"], {"attempts": attempts})
-
-        if (
-            row.get("purpose") != purpose
-            or row.get("used_at") is not None
-            or row.get("invalidated_at") is not None
-            or as_utc(row["expires_at"]) < now
+        if otp_matches(
+            raw_token,
+            str(claimed.get("token_hash") or ""),
+            user_id=str(user["_id"]),
+            purpose=purpose,
+            settings=self.settings,
         ):
-            raise InvalidOtpError()
-        return row
+            return claimed
 
-    async def _register_failed_otp_attempt(
-        self, challenge: dict[str, Any], *, now: Any
-    ) -> dict[str, Any]:
-        attempts = int(challenge.get("attempts") or 0)
+        attempts = int(claimed.get("attempts") or 0)
         if attempts >= AUTH_TOKEN_MAX_ATTEMPTS:
             raise OtpAttemptsExceededError(max_attempts=AUTH_TOKEN_MAX_ATTEMPTS)
-        if as_utc(challenge["expires_at"]) < now:
-            raise InvalidOtpError()
-
-        attempts += 1
-        await self.auth_tokens.update(challenge["_id"], {"attempts": attempts})
-        if attempts >= AUTH_TOKEN_MAX_ATTEMPTS:
-            raise OtpAttemptsExceededError(max_attempts=AUTH_TOKEN_MAX_ATTEMPTS)
-
-        remaining = AUTH_TOKEN_MAX_ATTEMPTS - attempts
-        raise InvalidOtpError(remaining=remaining, max_attempts=AUTH_TOKEN_MAX_ATTEMPTS)
+        raise InvalidOtpError(
+            remaining=AUTH_TOKEN_MAX_ATTEMPTS - attempts, max_attempts=AUTH_TOKEN_MAX_ATTEMPTS
+        )
 
     async def _consume_auth_token(
         self,
         raw_token: str,
         purpose: AuthTokenPurpose,
         *,
-        email: str | None = None,
+        user: dict[str, Any],
     ) -> dict[str, Any]:
-        row = await self._require_open_auth_token(raw_token, purpose, email=email)
-        await self.auth_tokens.update(row["_id"], {"used_at": utc_now()})
+        row = await self._require_open_auth_token(raw_token, purpose, user=user)
+        if not await self.auth_tokens.mark_used_if_open(row["_id"], utc_now()):
+            raise InvalidOtpError()
         return row
 
     async def _permission_codes_for_role(self, role_id: ObjectId) -> list[str]:
@@ -1065,7 +1134,6 @@ class AuthService:
         actor_user_id: str,
         ip_address: str | None = None,
     ) -> dict[str, Any]:
-        """Create an active, email-verified login account (no trading company)."""
         normalized = email.lower().strip()
         if await self.users.get_by_email(normalized):
             raise EmailAlreadyRegisteredError()
@@ -1124,7 +1192,6 @@ class AuthService:
         verify_supplier: bool = True,
         ip_address: str | None = None,
     ) -> dict[str, Any]:
-        """Create a buyer/supplier company with an owner Business Admin."""
         from app.modules.identity.company_domain import (
             email_local_domain,
             email_matches_company_domain,
@@ -1272,15 +1339,15 @@ class AuthService:
         from app.modules.identity.exceptions import CompanyDomainRequiredError
 
         now = utc_now()
-        # Buyers are operational immediately. Suppliers stay pending until platform
-        # staff approve verification documents (FR-BIZ-02 / FR-BIZ-04).
+                                                                                   
+                                                                       
         initial_status = (
             BusinessAccountStatus.PENDING
             if account_type == BusinessAccountType.SUPPLIER
             else BusinessAccountStatus.VERIFIED
         )
-        # Self-serve owners register with a personal inbox so they can receive OTP.
-        # Only an explicit company domain (or a custom-domain mailbox) is stored.
+                                                                                   
+                                                                                 
         try:
             if email_domain and str(email_domain).strip():
                 resolved_domain = validate_company_email_domain(email_domain, required=True)
@@ -1349,12 +1416,16 @@ class AuthService:
         business_account_id: ObjectId | None,
         ip_address: str | None,
         user_agent: str | None,
+        family_id: ObjectId | None = None,
     ) -> dict[str, Any]:
         raw_refresh = generate_refresh_token()
         now = utc_now()
         expires_at = now + timedelta(days=self.settings.refresh_token_expire_days)
+        session_id = ObjectId()
         session = await self.sessions.create(
             {
+                "_id": session_id,
+                "family_id": family_id or session_id,
                 "user_id": user["_id"],
                 "active_business_account_id": business_account_id,
                 "refresh_token_hash": hash_token(raw_refresh),
@@ -1379,12 +1450,9 @@ class AuthService:
             "access_token_expires_in_minutes": self.settings.access_token_expire_minutes,
         }
 
-
-# ── BusinessService — companies & supplier verification ──────────────────────
-
+                                                                               
 
 class BusinessService:
-    """Business account foundation — create / list / current / supplier verification."""
 
     def __init__(
         self,
@@ -1468,8 +1536,8 @@ class BusinessService:
             raise ForbiddenError("Platform businesses cannot be created through this API")
         existing = await self.memberships.list_for_user(user_id)
         if existing:
-            # One trading business per account — invited platform memberships are rare;
-            # any active membership means create is closed.
+                                                                                       
+                                                           
             for membership in existing:
                 business = await self.businesses.get_by_id(membership["business_account_id"])
                 if business and business.get("type") != BusinessAccountType.PLATFORM:
@@ -1636,7 +1704,6 @@ class BusinessService:
         url: str,
         ip_address: str | None = None,
     ) -> dict[str, Any]:
-        """Persist logo or cover URL on the business account."""
         membership = await self.memberships.get_active_membership(user_id, business_id)
         if membership is None:
             raise MembershipRequiredError()
@@ -1694,12 +1761,12 @@ class BusinessService:
             raise ForbiddenError("Supplier profile not found")
 
         current = str(profile.get("verification_status") or SupplierVerificationStatus.UNVERIFIED)
-        # Allow replacing the package while already pending.
+                                                            
         if current != SupplierVerificationStatus.PENDING:
             allowed = VERIFICATION_TRANSITIONS.get(current, set())
             if SupplierVerificationStatus.PENDING not in allowed:
-                raise ForbiddenError(
-                    f"Cannot submit verification from status '{current}'"
+                raise ConflictError(
+                    "Your company is already verified, so there's nothing to submit."
                 )
 
         now = utc_now()
@@ -1756,7 +1823,7 @@ class BusinessService:
                 "updated_at": now,
             },
         )
-        # Keep company pending until platform staff approve.
+                                                            
         if business.get("status") != BusinessAccountStatus.PENDING:
             await self.businesses.update(
                 business_id,
@@ -1815,12 +1882,12 @@ class BusinessService:
             SupplierVerificationStatus.UNVERIFIED,
             SupplierVerificationStatus.REJECTED,
         }:
-            raise ForbiddenError(f"Cannot withdraw documents from status '{current}'")
+            raise ConflictError("Documents can't be withdrawn at this stage of the review.")
 
         docs = [row for row in (profile.get("documents") or []) if isinstance(row, dict)]
         remaining = [row for row in docs if row.get("document_type") != document_type]
         if len(remaining) == len(docs):
-            raise ForbiddenError("Document not found")
+            raise NotFoundError("That document isn't part of your submission.")
         from app.modules.identity.storage import delete_verification_file_from_url
 
         for removed in docs:
@@ -1931,7 +1998,6 @@ class BusinessService:
         skip: int = 0,
         limit: int = 20,
     ) -> tuple[list[dict[str, Any]], int]:
-        """Platform directory of buyer/supplier companies (excludes the platform tenant)."""
         query: dict[str, Any] = {
             "type": {"$in": [BusinessAccountType.BUYER, BusinessAccountType.SUPPLIER]}
         }
@@ -1984,7 +2050,6 @@ class BusinessService:
         return results, total
 
     async def get_trading_business(self, business_id: str) -> dict[str, Any]:
-        """Platform staff profile view of a buyer or supplier (not the platform tenant)."""
         business = await self.businesses.get_by_id(business_id)
         if business is None or business.get("type") not in {
             BusinessAccountType.BUYER,
@@ -1996,7 +2061,6 @@ class BusinessService:
         )
 
     async def get_public_company(self, business_id: str) -> dict[str, Any]:
-        """Authenticated trading counterparties can open a buyer or supplier profile."""
         business = await self.businesses.get_by_id(business_id)
         if business is None or business.get("type") not in {
             BusinessAccountType.BUYER,
@@ -2026,10 +2090,10 @@ class BusinessService:
     ) -> dict[str, Any]:
         business = await self.businesses.get_by_id(business_id)
         if business is None or business.get("type") != BusinessAccountType.SUPPLIER:
-            raise ForbiddenError("Supplier business not found")
+            raise NotFoundError("We couldn't find that supplier.")
         profile = await self.supplier_profiles.get_by_business(business_id)
         if profile is None:
-            raise ForbiddenError("Supplier profile not found")
+            raise NotFoundError("This supplier hasn't set up a supplier profile yet.")
 
         current = str(profile.get("verification_status") or SupplierVerificationStatus.UNVERIFIED)
         if decision == "approve":
@@ -2037,20 +2101,19 @@ class BusinessService:
             business_status = BusinessAccountStatus.VERIFIED
         elif decision == "reject":
             target = SupplierVerificationStatus.REJECTED
-            # Stay pending so the supplier can re-submit documents after fixes.
+                                                                               
             business_status = BusinessAccountStatus.PENDING
         elif decision == "revoke":
             target = SupplierVerificationStatus.REVOKED
-            # Lose marketplace rights until they re-submit and are approved again.
-            business_status = BusinessAccountStatus.SUSPENDED
+                                                                           
+                                                                        
+            business_status = BusinessAccountStatus.PENDING
         else:
-            raise ForbiddenError("decision must be approve, reject, or revoke")
+            raise BadRequestError("Choose approve, reject, or revoke.")
 
         allowed = VERIFICATION_TRANSITIONS.get(current, set())
         if target not in allowed:
-            raise ForbiddenError(
-                f"Cannot {decision} verification from status '{current}'"
-            )
+            raise ConflictError(_verification_decision_conflict(decision, current))
 
         now = utc_now()
         profile_updates: dict[str, Any] = {
@@ -2067,17 +2130,25 @@ class BusinessService:
             profile_updates["verified_by"] = parse_object_id(actor_user_id)
             profile_updates["rejection_reason"] = None
         elif decision == "revoke":
-            # Keep verified_at for audit trail of prior approval; clear for reject.
+                                                                                   
             profile_updates["verified_by"] = None
         else:
             profile_updates["verified_at"] = None
             profile_updates["verified_by"] = None
 
-        await self.supplier_profiles.update(profile["_id"], profile_updates)
+        claimed = await self.supplier_profiles.collection.find_one_and_update(
+            {"_id": profile["_id"], "verification_status": profile.get("verification_status")},
+            {"$set": profile_updates},
+        )
+        if claimed is None:
+            raise ConflictError(
+                "Someone else just reviewed this supplier. Refresh to see the latest status."
+            )
         await self.businesses.update(
             business_id,
             {"status": business_status, "updated_at": now},
         )
+        invalidate_session_auth()
 
         deactivated = 0
         if decision == "revoke":
@@ -2159,7 +2230,6 @@ class BusinessService:
     async def assert_not_last_admin(
         self, *, business_account_id: str, membership: dict[str, Any]
     ) -> None:
-        """Guard for future remove/demote. Does not implement those workflows."""
         await assert_not_last_admin(
             business_account_id=business_account_id,
             membership=membership,

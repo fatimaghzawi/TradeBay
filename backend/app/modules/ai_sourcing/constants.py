@@ -52,8 +52,7 @@ class ManufacturabilityStatus(StrEnum):
     WITH_MODIFICATIONS = "with_modifications"
     CANNOT_FULFILL = "cannot_fulfill"
 
-
-# Soft weights for ranking (not shown raw to buyers).
+                                                     
 WEIGHT_CATEGORY = 0.28
 WEIGHT_NAME = 0.30
 WEIGHT_DESCRIPTION = 0.12

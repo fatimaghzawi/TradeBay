@@ -98,7 +98,7 @@ export function RfqThread({
       });
       lastCreatedRef.current = page.data.at(-1)?.created_at ?? lastCreatedRef.current;
     } catch {
-      /* keep the last good thread */
+      
     }
   }, [conversation?.id]);
 
@@ -181,7 +181,7 @@ export function RfqThread({
         {opening && !conversation ? (
           <div className="tb-deal-talk__empty">
             <span className="tb-deal-talk__empty-mark" aria-hidden />
-            <p>Opening the sidebar…</p>
+            <p>Opening the conversation…</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="tb-deal-talk__empty">
@@ -264,7 +264,7 @@ export function RfqThread({
           </label>
           <button
             type="submit"
-            className="tb-inv-btn tb-inv-btn-accent tb-deal-talk__send"
+            className="tb-btn tb-btn--primary tb-deal-talk__send"
             disabled={busy || !draft.trim()}
           >
             <BusyText busy={busy}>Send across</BusyText>

@@ -1,10 +1,8 @@
-"""Audit serialization / enrichment helpers."""
 
 from __future__ import annotations
 
-from bson import ObjectId
-
 from app.shared.services.audit import AuditService, _sanitize_metadata
+from bson import ObjectId
 
 
 def test_sanitize_drops_none_and_secrets() -> None:
@@ -17,7 +15,6 @@ def test_sanitize_drops_none_and_secrets() -> None:
         }
     )
     assert cleaned == {"invited_email": "a@b.com"}
-
 
 def test_serialize_fills_actor_and_invite_subject() -> None:
     actor_id = ObjectId()
@@ -41,7 +38,6 @@ def test_serialize_fills_actor_and_invite_subject() -> None:
     )
     assert out["metadata"]["actor_name"] == "Lina Admin"
     assert out["metadata"]["invited_email"] == "sales@acme.com"
-
 
 def test_serialize_accept_uses_member_not_role_as_person() -> None:
     user_id = ObjectId()

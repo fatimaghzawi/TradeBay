@@ -1,10 +1,9 @@
-"""Idempotent MongoDB indexes. Created once at startup, never per request."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from pymongo import ASCENDING, IndexModel
+from pymongo import ASCENDING, DESCENDING, TEXT, IndexModel
 from pymongo.errors import OperationFailure
 
 from app.core.logging import get_logger
@@ -13,7 +12,6 @@ from app.db.collections import CollectionName
 logger = get_logger(__name__)
 
 IndexSpec = tuple[str, list[IndexModel]]
-
 
 def _index_plan() -> list[IndexSpec]:
     return [
@@ -30,6 +28,13 @@ def _index_plan() -> list[IndexSpec]:
             IndexModel(
                 [("email_domain", ASCENDING)],
                 name="idx_business_accounts_email_domain",
+            ),
+                                                                                         
+            IndexModel(
+                [("type", ASCENDING)],
+                unique=True,
+                partialFilterExpression={"type": "platform"},
+                name="uniq_platform_business",
             ),
         ]),
         (
@@ -76,13 +81,22 @@ def _index_plan() -> list[IndexSpec]:
                 IndexModel([("refresh_token_hash", ASCENDING)], unique=True, name="uniq_sessions_refresh_token_hash"),
                 IndexModel([("user_id", ASCENDING)], name="idx_sessions_user_id"),
                 IndexModel([("active_business_account_id", ASCENDING)], name="idx_sessions_active_business"),
+                IndexModel([("family_id", ASCENDING)], sparse=True, name="idx_sessions_family"),
             ],
         ),
         (
             CollectionName.AUTH_TOKENS,
             [
-                IndexModel([("token_hash", ASCENDING)], unique=True, name="uniq_auth_tokens_token_hash"),
-                IndexModel([("user_id", ASCENDING), ("purpose", ASCENDING)], name="idx_auth_tokens_user_purpose"),
+                IndexModel(
+                    [("user_id", ASCENDING), ("purpose", ASCENDING), ("created_at", DESCENDING)],
+                    name="idx_auth_tokens_user_purpose_created",
+                ),
+                                                                                         
+                IndexModel(
+                    [("expires_at", ASCENDING)],
+                    expireAfterSeconds=7 * 24 * 60 * 60,
+                    name="ttl_auth_tokens_expires_at",
+                ),
             ],
         ),
         (
@@ -126,6 +140,15 @@ def _index_plan() -> list[IndexSpec]:
                 IndexModel(
                     [("is_featured", ASCENDING), ("status", ASCENDING)],
                     name="idx_products_featured_status",
+                ),
+                IndexModel(
+                    [("status", ASCENDING), ("category_id", ASCENDING)],
+                    name="idx_products_status_category",
+                ),
+                IndexModel(
+                    [("name", TEXT), ("description", TEXT)],
+                    name="idx_products_name_description_text",
+                    default_language="english",
                 ),
             ],
         ),
@@ -237,11 +260,62 @@ def _index_plan() -> list[IndexSpec]:
             CollectionName.ORDERS,
             [
                 IndexModel([("order_number", ASCENDING)], unique=True, name="uniq_orders_number"),
-                IndexModel([("quotation_id", ASCENDING)], unique=True, name="uniq_orders_quotation_id"),
+                                                                                               
+                IndexModel(
+                    [("quotation_id", ASCENDING)],
+                    unique=True,
+                    partialFilterExpression={"quotation_id": {"$type": "objectId"}},
+                    name="uniq_orders_quotation_id_present",
+                ),
                 IndexModel([("buyer_business_id", ASCENDING)], name="idx_orders_buyer_business_id"),
                 IndexModel([("supplier_business_id", ASCENDING)], name="idx_orders_supplier_business_id"),
                 IndexModel([("rfq_id", ASCENDING)], name="idx_orders_rfq_id"),
                 IndexModel([("status", ASCENDING)], name="idx_orders_status"),
+                                                                        
+                IndexModel(
+                    [("checkout_id", ASCENDING), ("supplier_business_id", ASCENDING)],
+                    unique=True,
+                    partialFilterExpression={"checkout_id": {"$type": "objectId"}},
+                    name="uniq_orders_checkout_supplier",
+                ),
+            ],
+        ),
+        (
+            CollectionName.CHECKOUTS,
+            [
+                IndexModel([("checkout_number", ASCENDING)], unique=True, name="uniq_checkouts_number"),
+                                                                                                   
+                IndexModel(
+                    [("buyer_business_id", ASCENDING), ("idempotency_key", ASCENDING)],
+                    unique=True,
+                    name="uniq_checkouts_buyer_idempotency_key",
+                ),
+                IndexModel(
+                    [("buyer_business_id", ASCENDING), ("created_at", DESCENDING)],
+                    name="idx_checkouts_buyer_created",
+                ),
+                IndexModel([("status", ASCENDING)], name="idx_checkouts_status"),
+            ],
+        ),
+        (
+            CollectionName.PAYMENT_PROVIDER_EVENTS,
+            [
+                IndexModel(
+                    [("provider", ASCENDING), ("event_id", ASCENDING)],
+                    unique=True,
+                    name="uniq_payment_provider_events_event",
+                ),
+            ],
+        ),
+        (
+            CollectionName.SUPPLIER_LEDGER_ENTRIES,
+            [
+                IndexModel([("idempotency_key", ASCENDING)], unique=True, name="uniq_supplier_ledger_idempotency_key"),
+                IndexModel(
+                    [("supplier_business_id", ASCENDING), ("created_at", DESCENDING)],
+                    name="idx_supplier_ledger_supplier_created",
+                ),
+                IndexModel([("order_id", ASCENDING)], name="idx_supplier_ledger_order_id"),
             ],
         ),
         (CollectionName.ORDER_ITEMS, [IndexModel([("order_id", ASCENDING)], name="idx_order_items_order_id")]),
@@ -268,6 +342,8 @@ def _index_plan() -> list[IndexSpec]:
                 IndexModel([("order_id", ASCENDING)], unique=True, name="uniq_invoices_order_id"),
                 IndexModel([("order_id", ASCENDING)], name="idx_invoices_order_id"),
                 IndexModel([("buyer_business_id", ASCENDING)], name="idx_invoices_buyer_business_id"),
+                IndexModel([("supplier_business_id", ASCENDING)], name="idx_invoices_supplier_business_id"),
+                IndexModel([("checkout_id", ASCENDING)], name="idx_invoices_checkout_id"),
                 IndexModel([("status", ASCENDING), ("due_at", ASCENDING)], name="idx_invoices_status_due"),
             ],
         ),
@@ -277,10 +353,17 @@ def _index_plan() -> list[IndexSpec]:
                 IndexModel([("payment_reference", ASCENDING)], unique=True, name="uniq_payments_reference"),
                 IndexModel([("idempotency_key", ASCENDING)], unique=True, sparse=True, name="uniq_payments_idempotency_key"),
                 IndexModel([("provider_event_id", ASCENDING)], unique=True, sparse=True, name="uniq_payments_provider_event_id"),
-                # A payment may settle several invoices, so the link lives on the allocations array.
+                                                                                                    
                 IndexModel([("allocations.invoice_id", ASCENDING)], name="idx_payments_allocations_invoice_id"),
                 IndexModel([("payer_business_id", ASCENDING)], name="idx_payments_payer_business_id"),
                 IndexModel([("status", ASCENDING)], name="idx_payments_status"),
+                IndexModel([("checkout_id", ASCENDING)], name="idx_payments_checkout_id"),
+                IndexModel(
+                    [("provider", ASCENDING), ("provider_payment_id", ASCENDING)],
+                    unique=True,
+                    partialFilterExpression={"provider_payment_id": {"$type": "string"}},
+                    name="uniq_payments_provider_payment_id",
+                ),
             ],
         ),
         (
@@ -307,7 +390,7 @@ def _index_plan() -> list[IndexSpec]:
             CollectionName.FINANCIAL_TRANSACTIONS,
             [
                 IndexModel([("transaction_number", ASCENDING)], unique=True, name="uniq_financial_tx_number"),
-                # Buyer statement, outstanding and aging are all computed off this index.
+                                                                                         
                 IndexModel([("business_account_id", ASCENDING), ("posted_at", ASCENDING)], name="idx_financial_tx_business_posted"),
                 IndexModel([("source_type", ASCENDING), ("source_id", ASCENDING)], name="idx_financial_tx_source"),
                 IndexModel([("invoice_id", ASCENDING)], name="idx_financial_tx_invoice_id"),
@@ -353,7 +436,7 @@ def _index_plan() -> list[IndexSpec]:
             CollectionName.PLATFORM_TRANSACTIONS,
             [
                 IndexModel([("transaction_number", ASCENDING)], unique=True, name="uniq_platform_tx_number"),
-                # {source}:{event_id}:{type} — one provider event may post several row types.
+                                                                                             
                 IndexModel([("idempotency_key", ASCENDING)], unique=True, sparse=True, name="uniq_platform_tx_idempotency_key"),
                 IndexModel([("type", ASCENDING), ("posted_at", ASCENDING)], name="idx_platform_tx_type_posted"),
                 IndexModel([("reference_type", ASCENDING), ("reference_id", ASCENDING)], name="idx_platform_tx_reference"),
@@ -377,7 +460,7 @@ def _index_plan() -> list[IndexSpec]:
                 IndexModel([("recipient_user_id", ASCENDING), ("is_read", ASCENDING)], name="idx_notifications_recipient_is_read"),
             ],
         ),
-        # System settings — singletons keyed on "default"
+                                                         
         (CollectionName.PLATFORM_SETTINGS, [IndexModel([("key", ASCENDING)], unique=True, name="uniq_platform_settings_key")]),
         (CollectionName.BUSINESS_SETTINGS, [IndexModel([("key", ASCENDING)], unique=True, name="uniq_business_settings_key")]),
         (
@@ -392,12 +475,12 @@ def _index_plan() -> list[IndexSpec]:
                 IndexModel([("is_active", ASCENDING), ("effective_from", ASCENDING)], name="idx_tax_settings_active_effective"),
             ],
         ),
-        # Communication
+                       
         (
             CollectionName.CONVERSATIONS,
             [
-                # Context is a breadcrumb (latest RFQ/order), not a unique thread key.
-                # One inbox thread per company pair is enforced in CommunicationService.
+                                                                                      
+                                                                                        
                 IndexModel(
                     [("context_type", ASCENDING), ("context_id", ASCENDING)],
                     name="idx_conversations_context",
@@ -428,11 +511,11 @@ def _index_plan() -> list[IndexSpec]:
                 IndexModel([("reply_to_message_id", ASCENDING)], name="idx_messages_reply_to_message_id"),
             ],
         ),
-        # Negotiation
+                     
         (
             CollectionName.NEGOTIATIONS,
             [
-                # Sparse but NOT unique: a conversation is optional in both directions.
+                                                                                       
                 IndexModel([("conversation_id", ASCENDING)], sparse=True, name="idx_negotiations_conversation_id"),
                 IndexModel([("rfq_id", ASCENDING)], name="idx_negotiations_rfq_id"),
                 IndexModel([("quotation_id", ASCENDING)], name="idx_negotiations_quotation_id"),
@@ -458,7 +541,7 @@ def _index_plan() -> list[IndexSpec]:
                 IndexModel([("negotiation_id", ASCENDING)], name="idx_offer_items_negotiation_id"),
             ],
         ),
-        # AI Sourcing
+                     
         (
             CollectionName.SOURCING_REQUESTS,
             [
@@ -472,6 +555,25 @@ def _index_plan() -> list[IndexSpec]:
         (
             CollectionName.SOURCING_REQUEST_ITEMS,
             [IndexModel([("sourcing_request_id", ASCENDING)], name="idx_sourcing_items_request_id")],
+        ),
+        (
+            CollectionName.CATALOG_EMBEDDINGS,
+            [
+                IndexModel([("product_id", ASCENDING)], unique=True, name="uniq_catalog_embeddings_product"),
+                IndexModel([("category_id", ASCENDING)], name="idx_catalog_embeddings_category"),
+                IndexModel([("content_hash", ASCENDING)], name="idx_catalog_embeddings_hash"),
+            ],
+        ),
+        (
+            CollectionName.AI_USAGE,
+            [
+                IndexModel(
+                    [("subject_id", ASCENDING), ("day", ASCENDING)],
+                    unique=True,
+                    name="uniq_ai_usage_subject_day",
+                ),
+                IndexModel([("expires_at", ASCENDING)], expireAfterSeconds=0, name="ttl_ai_usage"),
+            ],
         ),
         (
             CollectionName.SOURCING_RECOMMENDATIONS,
@@ -491,7 +593,7 @@ def _index_plan() -> list[IndexSpec]:
                 ),
             ],
         ),
-        # Business Planner
+                          
         (
             CollectionName.BUSINESS_PLANS,
             [
@@ -525,12 +627,15 @@ def _index_plan() -> list[IndexSpec]:
         ),
     ]
 
-
 _INDEXES_TO_DROP: tuple[tuple[str, str], ...] = (
-    # Replaced by idx_conversations_context — one chat per company pair, not per RFQ.
+                                                                                     
     (CollectionName.CONVERSATIONS, "uniq_conversations_context"),
+                                                                                        
+    (CollectionName.AUTH_TOKENS, "uniq_auth_tokens_token_hash"),
+    (CollectionName.AUTH_TOKENS, "idx_auth_tokens_user_purpose"),
+                                                                                                                
+    (CollectionName.ORDERS, "uniq_orders_quotation_id"),
 )
-
 
 async def ensure_indexes(database: Any, *, fail_fast: bool = False) -> None:
     for collection_name, index_name in _INDEXES_TO_DROP:
@@ -555,3 +660,31 @@ async def ensure_indexes(database: Any, *, fail_fast: bool = False) -> None:
                 collection=str(collection_name),
                 reason=str(exc.details) if exc.details else str(exc),
             )
+                                                                                     
+                                                                        
+    existing = set(await database.list_collection_names())
+    for name in _TRANSACTIONAL_COLLECTIONS:
+        if str(name) not in existing:
+            try:
+                await database.create_collection(str(name))
+            except OperationFailure:
+                pass
+
+_TRANSACTIONAL_COLLECTIONS = (
+    CollectionName.DOCUMENT_COUNTERS,
+    CollectionName.CHECKOUTS,
+    CollectionName.ORDERS,
+    CollectionName.ORDER_ITEMS,
+    CollectionName.CUSTOMER_INVOICES,
+    CollectionName.PAYMENTS,
+    CollectionName.FINANCIAL_TRANSACTIONS,
+    CollectionName.SUPPLIER_PAYOUTS,
+    CollectionName.COMMISSION_RECORDS,
+    CollectionName.SUPPLIER_PAYABLES,
+    CollectionName.PLATFORM_TRANSACTIONS,
+    CollectionName.SUPPLIER_LEDGER_ENTRIES,
+    CollectionName.PAYMENT_PROVIDER_EVENTS,
+    CollectionName.INVENTORIES,
+    CollectionName.INVENTORY_TRANSACTIONS,
+    CollectionName.CART_ITEMS,
+)

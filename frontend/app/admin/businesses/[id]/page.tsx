@@ -18,6 +18,7 @@ import {
   statusTone,
 } from "@/lib/admin/identityDirectory";
 import { ApiError } from "@/lib/api/client";
+import { SupplierFinancials } from "@/components/admin/SupplierFinancials";
 import { catalogApi, type Product } from "@/lib/api/catalogApi";
 import {
   identityApi,
@@ -41,7 +42,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-type ProfileTab = "overview" | "roles" | "products" | "orders" | "activity";
+type ProfileTab = "overview" | "roles" | "products" | "orders" | "financials" | "activity";
 type ProductStatusFilter = "all" | "active" | "draft" | "inactive";
 type OrderStatusFilter = "all" | "pending" | "confirmed" | "cancelled" | "completed";
 type PurchaseSubView = "orders" | "rfqs";
@@ -49,8 +50,8 @@ type PurchaseSubView = "orders" | "rfqs";
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">{label}</p>
-      <p className="mt-1 text-sm text-[#0c1612]">{value}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm text-foreground">{value}</p>
     </div>
   );
 }
@@ -82,6 +83,7 @@ export default function AdminBusinessProfilePage() {
   const canReadRfqs = hasPermission("rfqs.read");
   const canReadAudit = hasPermission("audit_logs.read");
   const canReadRoles = hasPermission("roles.read");
+  const canReadPayables = hasPermission("payables.read");
   const canManageRoles = hasPermission("roles.manage");
   const { success, error: toastError } = useToast();
 
@@ -283,7 +285,7 @@ export default function AdminBusinessProfilePage() {
     loadBusiness();
   }, [loadBusiness]);
 
-  // Prefetch totals for tab badges when profile + type are known.
+  
   useEffect(() => {
     if (!businessId || !business) return;
     const isSupplierBiz = business.type === "supplier";
@@ -298,7 +300,7 @@ export default function AdminBusinessProfilePage() {
         .then((result) => setProductsTotal(result.meta.total))
         .catch(() => undefined);
     }
-    if (isBuyerBiz && canReadOrders) {
+    if ((isBuyerBiz || isSupplierBiz) && canReadOrders) {
       void identityApi
         .listPlatformBusinessOrders(businessId, { page: 1, page_size: 1 })
         .then((result) => setOrdersTotal(result.meta.total))
@@ -360,11 +362,13 @@ export default function AdminBusinessProfilePage() {
     loadActivity();
   }, [tab, canReadAudit, loadActivity]);
 
-  // Leave commercial tabs that don't apply to this company type.
+  
   useEffect(() => {
     if (!business) return;
     if (tab === "products" && business.type !== "supplier") setTab("overview");
-    if (tab === "orders" && business.type !== "buyer") setTab("overview");
+    if (tab === "orders" && business.type !== "buyer" && business.type !== "supplier") setTab("overview");
+    if (tab === "financials" && business.type !== "supplier") setTab("overview");
+    if (tab === "roles" && business.type === "supplier") setTab("overview");
   }, [business, tab]);
 
   const membersPageCount = Math.max(1, Math.ceil(membersTotal / membersPageSize) || 1);
@@ -419,19 +423,33 @@ export default function AdminBusinessProfilePage() {
 
   const tabs: { id: ProfileTab; label: string; hint?: string; locked?: boolean }[] = [
     { id: "overview", label: "Overview" },
-    {
+  ];
+  if (!isSupplier) {
+    tabs.push({
       id: "roles",
       label: "Roles",
       hint: canReadRoles ? undefined : "Access unavailable",
       locked: !canReadRoles,
-    },
-  ];
+    });
+  }
   if (isSupplier) {
     tabs.push({
       id: "products",
       label: "Products",
       hint: canReadProducts ? undefined : "Access unavailable",
       locked: !canReadProducts,
+    });
+    tabs.push({
+      id: "orders",
+      label: "Orders",
+      hint: canReadOrders ? undefined : "Access unavailable",
+      locked: !canReadOrders,
+    });
+    tabs.push({
+      id: "financials",
+      label: "Financials",
+      hint: canReadPayables ? undefined : "Access unavailable",
+      locked: !canReadPayables,
     });
   }
   if (isBuyer) {
@@ -572,7 +590,7 @@ export default function AdminBusinessProfilePage() {
 
           {tab === "overview" ? (
             <>
-              <div className="mt-2 grid gap-x-8 gap-y-4 border-b border-[#d4e0da] py-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-2 grid gap-x-8 gap-y-4 border-b border-input py-6 sm:grid-cols-2 lg:grid-cols-3">
                 <Field label="Legal name" value={business.legal_name || "—"} />
                 <Field label="Tax number" value={business.tax_number || "—"} />
                 <Field label="Email domain" value={business.email_domain || "—"} />
@@ -607,7 +625,7 @@ export default function AdminBusinessProfilePage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <h2 className="tb-section-label">Team members</h2>
-                    <p className="mt-1 text-sm text-[#5a6a62]">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       People with access to this company ({membersTotal}).
                     </p>
                   </div>
@@ -616,7 +634,7 @@ export default function AdminBusinessProfilePage() {
                       value={memberQuery}
                       onChange={(e) => setMemberQuery(e.target.value)}
                       placeholder="Search member name or email…"
-                      className="h-9 w-full max-w-xs rounded-lg border border-[#d4e0da] px-3 text-sm outline-none focus:border-[#e86f2a]"
+                      className="h-9 w-full max-w-xs rounded-lg border border-input px-3 text-sm outline-none focus:border-ring"
                     />
                     {(
                       [
@@ -652,7 +670,7 @@ export default function AdminBusinessProfilePage() {
                 {membersLoading ? (
                   <LoadingEntity entity="members" />
                 ) : members.length === 0 ? (
-                  <p className="mt-4 text-sm text-[#5a6a62]">No members match this filter.</p>
+                  <p className="mt-4 text-sm text-muted-foreground">No members match this filter.</p>
                 ) : (
                   <>
                     <ul className="tb-data mt-3">
@@ -671,10 +689,10 @@ export default function AdminBusinessProfilePage() {
                               )}
                             </div>
                             <div className="min-w-0">
-                            <p className="font-semibold text-[#0c1612]">
+                            <p className="font-semibold text-foreground">
                               {memberDisplayName(member)}
                             </p>
-                            <p className="mt-0.5 text-sm text-[#5a6a62]">
+                            <p className="mt-0.5 text-sm text-muted-foreground">
                               {member.email || "No email"}
                               {member.role_name ? ` · ${member.role_name}` : ""}
                               {member.joined_at
@@ -739,13 +757,13 @@ export default function AdminBusinessProfilePage() {
                 <section className="mt-10">
                   <div>
                     <h2 className="tb-section-label">Verification documents</h2>
-                    <p className="mt-2 text-sm text-[#4a5f55]">
+                    <p className="mt-2 text-sm text-muted-foreground">
                       Files submitted for supplier selling rights.
                     </p>
                   </div>
 
                   {docs.length === 0 ? (
-                    <p className="mt-3 text-sm text-[#5a6a62]">No documents on file.</p>
+                    <p className="mt-3 text-sm text-muted-foreground">No documents on file.</p>
                   ) : (
                     <ul className="tb-data mt-3">
                       {docs.map((doc, idx) => {
@@ -756,10 +774,10 @@ export default function AdminBusinessProfilePage() {
                           className="tb-data-row grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto]"
                         >
                           <div>
-                            <p className="font-semibold text-[#0c1612]">
+                            <p className="font-semibold text-foreground">
                               {doc.document_type || "Document"}
                             </p>
-                            <p className="text-xs text-[#5a6a62]">
+                            <p className="text-xs text-muted-foreground">
                               {doc.file_name || "Untitled file"}
                               {doc.uploaded_at
                                 ? ` · ${new Date(doc.uploaded_at).toLocaleString()}`
@@ -771,12 +789,12 @@ export default function AdminBusinessProfilePage() {
                               href={href}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="rounded-lg bg-[#0d3b2a] px-3 py-1.5 text-xs font-semibold text-white"
+                              className="tb-btn tb-btn--primary tb-btn--sm"
                             >
                               Open file
                             </a>
                           ) : (
-                            <span className="text-xs text-[#5a6a62]">
+                            <span className="text-xs text-muted-foreground">
                               File not stored — ask the supplier to resubmit
                             </span>
                           )}
@@ -787,27 +805,27 @@ export default function AdminBusinessProfilePage() {
                   )}
 
                   {business.rejection_reason ? (
-                    <p className="mt-3 rounded-xl bg-[#fef3f2] px-3 py-2 text-sm text-[#b42318]">
+                    <p role="alert" className="mt-3 tb-alert tb-alert--error">
                       Last rejection reason: {business.rejection_reason}
                     </p>
                   ) : null}
 
                   {rejectOpen ? (
-                    <div className="mt-3 space-y-2 rounded-xl border border-[#f3c1bb] bg-[#fffafa] p-3">
-                      <label className="block text-sm font-semibold text-[#0c1612]">
+                    <div className="mt-3 space-y-2 rounded-xl border border-destructive/30 bg-destructive-soft p-3">
+                      <label className="block text-sm font-semibold text-foreground">
                         Rejection reason
                         <textarea
                           value={rejectReason}
                           onChange={(e) => setRejectReason(e.target.value)}
                           rows={3}
                           placeholder="Explain what the supplier must fix…"
-                          className="mt-1.5 w-full rounded-xl border border-[#dce5e0] bg-white px-3 py-2 text-sm outline-none focus:border-[#e86f2a]/55 focus:ring-2 focus:ring-[#e86f2a]/15"
+                          className="mt-1.5 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm outline-none focus:border-ring/55 focus:ring-2 focus:ring-ring/15"
                         />
                       </label>
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
-                          className="h-9 rounded-xl px-3 text-sm font-semibold text-[#5a6a62] hover:bg-[#f3f6f4]"
+                          className="tb-btn tb-btn--ghost tb-btn--sm"
                           onClick={() => {
                             setRejectOpen(false);
                             setRejectReason("");
@@ -818,7 +836,7 @@ export default function AdminBusinessProfilePage() {
                         <button
                           type="button"
                           disabled={busy || !rejectReason.trim()}
-                          className="h-9 rounded-xl bg-[#b42318] px-3 text-sm font-semibold text-white disabled:opacity-60"
+                          className="tb-btn tb-btn--destructive tb-btn--sm"
                           onClick={() => review("reject", rejectReason.trim())}
                         >
                           Confirm reject
@@ -837,7 +855,7 @@ export default function AdminBusinessProfilePage() {
                     onClick={() => setTab("products")}
                   >
                     <p className="tb-section-label">Products</p>
-                    <p className="mt-2 text-sm text-[#5a6a62]">
+                    <p className="mt-2 text-sm text-muted-foreground">
                       Open the full catalog for this supplier
                       {productsTotal > 0 ? ` (${productsTotal} listed)` : ""}.
                     </p>
@@ -850,7 +868,7 @@ export default function AdminBusinessProfilePage() {
                     onClick={() => setTab("orders")}
                   >
                     <p className="tb-section-label">Purchases &amp; orders</p>
-                    <p className="mt-2 text-sm text-[#5a6a62]">
+                    <p className="mt-2 text-sm text-muted-foreground">
                       RFQs and purchase orders for this buyer
                       {purchasesTotal > 0
                         ? ` (${ordersTotal} orders · ${rfqsTotal} RFQs)`
@@ -866,7 +884,7 @@ export default function AdminBusinessProfilePage() {
                     onClick={() => setTab("activity")}
                   >
                     <p className="tb-section-label">Activity</p>
-                    <p className="mt-2 text-sm text-[#5a6a62]">
+                    <p className="mt-2 text-sm text-muted-foreground">
                       Review identity and security events for this company.
                     </p>
                   </button>
@@ -887,7 +905,7 @@ export default function AdminBusinessProfilePage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="tb-section-label">Company products</h2>
-                  <p className="mt-1 text-sm text-[#5a6a62]">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     Full catalog for this supplier — including draft and inactive listings
                     ({productsTotal}).
                   </p>
@@ -897,7 +915,7 @@ export default function AdminBusinessProfilePage() {
                     value={productQuery}
                     onChange={(e) => setProductQuery(e.target.value)}
                     placeholder="Search product name…"
-                    className="h-9 w-full max-w-xs rounded-lg border border-[#d4e0da] px-3 text-sm outline-none focus:border-[#e86f2a]"
+                    className="h-9 w-full max-w-xs rounded-lg border border-input px-3 text-sm outline-none focus:border-ring"
                   />
                   {(
                     [
@@ -953,11 +971,11 @@ export default function AdminBusinessProfilePage() {
                           <div className="min-w-0">
                             <Link
                               href={ROUTES.admin.productDetail(product.id)}
-                              className="font-semibold text-[#0c1612] hover:underline"
+                              className="font-semibold text-foreground hover:underline"
                             >
                               {product.name}
                             </Link>
-                            <p className="mt-0.5 text-sm text-[#5a6a62]">
+                            <p className="mt-0.5 text-sm text-muted-foreground">
                               {product.sku}
                               {` · MOQ ${product.moq} ${product.unit}`}
                               {` · ${productPriceLabel(product)}`}
@@ -995,13 +1013,19 @@ export default function AdminBusinessProfilePage() {
             </section>
           ) : null}
 
-          {tab === "orders" && isBuyer && canSeePurchases ? (
+          {tab === "financials" && isSupplier && canReadPayables && business ? (
+            <SupplierFinancials supplierId={business.id} supplierName={business.name} />
+          ) : null}
+
+          {tab === "orders" && ((isBuyer && canSeePurchases) || (isSupplier && canReadOrders)) ? (
             <section className="mt-2">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <h2 className="tb-section-label">Purchases &amp; orders</h2>
-                  <p className="mt-1 text-sm text-[#5a6a62]">
-                    Buyer procurement trail — RFQs and purchase orders for this company.
+                  <h2 className="tb-section-label">{isSupplier ? "Orders" : "Purchases & orders"}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isSupplier
+                      ? "Purchase orders placed with this supplier."
+                      : "Buyer procurement trail — RFQs and purchase orders for this company."}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1015,7 +1039,7 @@ export default function AdminBusinessProfilePage() {
                       Orders{ordersTotal > 0 ? ` (${ordersTotal})` : ""}
                     </button>
                   ) : null}
-                  {canReadRfqs ? (
+                  {canReadRfqs && isBuyer ? (
                     <button
                       type="button"
                       className="tb-filter"
@@ -1067,7 +1091,11 @@ export default function AdminBusinessProfilePage() {
                   ) : orders.length === 0 ? (
                     <div className="tb-empty mt-4">
                       <h3>No purchase orders</h3>
-                      <p>This buyer has no orders matching the current filter.</p>
+                      <p>
+                        {isSupplier
+                          ? "This supplier has no orders matching the current filter."
+                          : "This buyer has no orders matching the current filter."}
+                      </p>
                     </div>
                   ) : (
                     <>
@@ -1078,10 +1106,10 @@ export default function AdminBusinessProfilePage() {
                             className="tb-data-row grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto]"
                           >
                             <div>
-                              <p className="font-semibold text-[#0c1612]">
+                              <p className="font-semibold text-foreground">
                                 {order.order_number || "Purchase order"}
                               </p>
-                              <p className="mt-0.5 text-sm text-[#5a6a62]">
+                              <p className="mt-0.5 text-sm text-muted-foreground">
                                 {order.total} {order.currency}
                                 {order.created_at
                                   ? ` · ${new Date(order.created_at).toLocaleString()}`
@@ -1098,12 +1126,20 @@ export default function AdminBusinessProfilePage() {
                               <AdminAct href={ROUTES.procurementOrder(order.id)} tone="go" arrow>
                                 Open order
                               </AdminAct>
-                              {order.supplier_business_id ? (
+                              {isBuyer && order.supplier_business_id ? (
                                 <AdminAct
                                   href={ROUTES.admin.businessDetail(order.supplier_business_id)}
                                   tone="ghost"
                                 >
                                   Supplier
+                                </AdminAct>
+                              ) : null}
+                              {isSupplier && order.buyer_business_id ? (
+                                <AdminAct
+                                  href={ROUTES.admin.businessDetail(order.buyer_business_id)}
+                                  tone="ghost"
+                                >
+                                  Buyer
                                 </AdminAct>
                               ) : null}
                             </div>
@@ -1150,10 +1186,10 @@ export default function AdminBusinessProfilePage() {
                             className="tb-data-row grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto]"
                           >
                             <div>
-                              <p className="font-semibold text-[#0c1612]">
+                              <p className="font-semibold text-foreground">
                                 {rfq.title || rfq.rfq_number || "RFQ"}
                               </p>
-                              <p className="mt-0.5 text-sm text-[#5a6a62]">
+                              <p className="mt-0.5 text-sm text-muted-foreground">
                                 {rfq.rfq_number}
                                 {` · ${rfq.currency}`}
                                 {` · ${rfq.invite_count} invite${rfq.invite_count === 1 ? "" : "s"}`}
@@ -1192,7 +1228,7 @@ export default function AdminBusinessProfilePage() {
             <section className="mt-2">
               <div>
                 <h2 className="tb-section-label">Company activity</h2>
-                <p className="mt-1 text-sm text-[#5a6a62]">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Identity and security events for this company ({activityTotal}).
                 </p>
               </div>
@@ -1225,10 +1261,10 @@ export default function AdminBusinessProfilePage() {
                           className="tb-data-row grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto]"
                         >
                           <div>
-                            <p className="font-semibold text-[#0c1612]">
+                            <p className="font-semibold text-foreground">
                               {auditHeadline(event)}
                             </p>
-                            <p className="mt-0.5 text-sm text-[#5a6a62]">
+                            <p className="mt-0.5 text-sm text-muted-foreground">
                               {event.action || "action"}
                               {event.resource_type ? ` · ${event.resource_type}` : ""}
                               {event.ip_address ? ` · ${event.ip_address}` : ""}

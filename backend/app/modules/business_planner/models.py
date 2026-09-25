@@ -29,7 +29,7 @@ class BusinessPlanDocument(MongoDocument):
     sourcing_request_id: OptionalDocumentId = None
     created_at: datetime
     updated_at: datetime
-    # Extended structured plan fields (embedded documents)
+                                                          
     title: str | None = None
     preferences: dict[str, Any] | None = None
     concept: dict[str, Any] | None = None

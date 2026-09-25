@@ -1,4 +1,4 @@
-/** Stable anonymous guest id for explore features (planner ownership, etc.). */
+
 
 const STORAGE_KEY = "tradebay.guest-id";
 

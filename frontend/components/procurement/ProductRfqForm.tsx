@@ -18,8 +18,8 @@ import { productRfqSchema } from "@/lib/validation/forms";
 import { useLiveFields } from "@/lib/validation/live";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { BackLink } from "@/components/ui/BackLink";
 
-/** Product RFQ — quote a specific listed product from its owning supplier. */
 export function ProductRfqForm() {
   const router = useRouter();
   const search = useSearchParams();
@@ -118,9 +118,7 @@ export function ProductRfqForm() {
         title="Create RFQ"
         description={undefined}
         actions={
-          <InventoryLinkBtn href={ROUTES.inventoryProduct(product.id)} tone="ghost">
-            ← Back to product
-          </InventoryLinkBtn>
+          <BackLink href={ROUTES.inventoryProduct(product.id)}>Back to product</BackLink>
         }
       />
 
@@ -132,24 +130,24 @@ export function ProductRfqForm() {
 
       <InventoryPanel title="Product">
         <div className="flex gap-4 px-5 pb-5">
-          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-[#e8f2ec]">
+          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-secondary-soft">
             {img ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={mediaUrl(img)} alt="" className="h-full w-full object-cover" />
             ) : (
-              <span className="flex h-full items-center justify-center text-sm font-bold text-[#0d3b2a]">
+              <span className="flex h-full items-center justify-center text-sm font-bold text-heading">
                 {product.name.slice(0, 2).toUpperCase()}
               </span>
             )}
           </div>
           <div>
-            <p className="text-lg font-bold text-[#0c1612]">{product.name}</p>
-            <p className="mt-1 text-sm text-[#5a6a62]">
+            <p className="text-lg font-bold text-foreground">{product.name}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
               SKU: {product.sku || "—"}
               {" · "}
               Supplier: {product.supplier_name || "Supplier"}
             </p>
-            <p className="mt-2 text-sm font-semibold text-[#0c1612]">
+            <p className="mt-2 text-sm font-semibold text-foreground">
               Listed price:{" "}
               {product.prices?.[0]?.unit_price
                 ? `${product.prices[0].currency} ${product.prices[0].unit_price}`

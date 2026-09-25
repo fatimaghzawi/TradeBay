@@ -1,4 +1,3 @@
-"""Application constants."""
 
 from enum import StrEnum
 
@@ -24,15 +23,17 @@ SENSITIVE_LOG_FIELDS = frozenset(
         "ai_api_key",
         "secret_key",
         "jwt_secret_key",
+        "stripe_secret_key",
+        "stripe_webhook_secret",
+        "elasticemail_api_key",
+        "tracking_webhook_secret",
     }
 )
-
 
 class AppEnv(StrEnum):
     DEVELOPMENT = "development"
     TEST = "test"
     PRODUCTION = "production"
-
 
 class ErrorCode(StrEnum):
     BAD_REQUEST = "BAD_REQUEST"
@@ -51,14 +52,16 @@ class ErrorCode(StrEnum):
     PERMISSION_DENIED = "PERMISSION_DENIED"
     BUSINESS_CONTEXT_REQUIRED = "BUSINESS_CONTEXT_REQUIRED"
     ACCOUNT_INACTIVE = "ACCOUNT_INACTIVE"
+    BUSINESS_INACTIVE = "BUSINESS_INACTIVE"
     EMAIL_UNVERIFIED = "EMAIL_UNVERIFIED"
+    EMAIL_PENDING_VERIFICATION = "EMAIL_PENDING_VERIFICATION"
     SELLING_NOT_VERIFIED = "SELLING_NOT_VERIFIED"
     LAST_ADMIN_PROTECTED = "LAST_ADMIN_PROTECTED"
     INVITATION_INVALID = "INVITATION_INVALID"
     PRIVILEGE_ESCALATION = "PRIVILEGE_ESCALATION"
     COMPANY_DOMAIN_MISMATCH = "COMPANY_DOMAIN_MISMATCH"
     COMPANY_DOMAIN_TAKEN = "COMPANY_DOMAIN_TAKEN"
-
+    AI_QUOTA_EXCEEDED = "AI_QUOTA_EXCEEDED"
 
 class PermissionAction(StrEnum):
     READ = "read"
@@ -75,7 +78,6 @@ class PermissionAction(StrEnum):
     VERIFY = "verify"
     RESOLVE = "resolve"
     ACCEPT = "accept"
-
 
 class PermissionResource(StrEnum):
     USERS = "users"

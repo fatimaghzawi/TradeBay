@@ -41,6 +41,7 @@ import { useLiveFields } from "@/lib/validation/live";
 import { useAuth } from "@/providers/AuthProvider";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
+import { BackLink } from "@/components/ui/BackLink";
 
 function txLabel(type: string): string {
   return type.split("_").join(" ");
@@ -48,9 +49,9 @@ function txLabel(type: string): string {
 
 function qtyTone(type: string): string {
   if (type.includes("sale") || type.includes("reserve") || type.includes("adjust_out")) {
-    return "text-[#b42318]";
+    return "text-destructive";
   }
-  return "text-[#0f6b45]";
+  return "text-success";
 }
 
 function ProductDetailInner() {
@@ -61,7 +62,7 @@ function ProductDetailInner() {
   const { hasPermission, business } = useAuth();
   const { success, error: toastError } = useToast();
 
-  // Platform staff use the admin product detail chrome (readable console contrast).
+  
   useEffect(() => {
     if (business?.type === "platform" && productId) {
       router.replace(ROUTES.admin.productDetail(productId));
@@ -135,7 +136,7 @@ function ProductDetailInner() {
     business.type === "supplier";
   const canManageProducts = hasPermission("products.manage") && isOwner;
   const canManageInventory = hasPermission("inventory.manage") && isOwner;
-  // Stock & transaction history are supplier-owner ops — buyers never see them.
+  
   const canReadInventory = hasPermission("inventory.read") && isOwner;
   const isBuyer = business?.type === "buyer";
 
@@ -200,7 +201,7 @@ function ProductDetailInner() {
       openEdit(product);
       router.replace(ROUTES.inventoryProduct(productId), { scroll: false });
     }
-    // Only react to the edit query flag once product is ready
+    
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id, canManageProducts, searchParams]);
 
@@ -314,7 +315,7 @@ function ProductDetailInner() {
   }
 
   if (isPlatform) {
-    return <p className="text-sm text-[#5a6a62]">Opening admin product…</p>;
+    return <p className="text-sm text-muted-foreground">Opening admin product…</p>;
   }
 
   if (loading) {
@@ -327,9 +328,7 @@ function ProductDetailInner() {
         <FeedbackBanner tone="error" title="Product unavailable">
           {error ?? "Not found"}
         </FeedbackBanner>
-        <InventoryLinkBtn href={ROUTES.inventoryProducts} tone="ghost">
-          ← Products
-        </InventoryLinkBtn>
+        <BackLink href={ROUTES.inventoryProducts}>Products</BackLink>
       </div>
     );
   }
@@ -401,9 +400,9 @@ function ProductDetailInner() {
         meta={<StatusBadge status={product.status} />}
         actions={
           <div className="flex flex-wrap gap-2">
-            <InventoryLinkBtn href={ROUTES.inventoryProducts} tone="ghost">
-              {isBuyer ? "← Marketplace" : "← My products"}
-            </InventoryLinkBtn>
+            <BackLink href={ROUTES.inventoryProducts}>
+              {isBuyer ? "Marketplace" : "My products"}
+            </BackLink>
             {isBuyer ? (
               <>
                 <AddToCartButton
@@ -599,7 +598,7 @@ function ProductDetailInner() {
               </dl>
             </div>
             {product.description ? (
-              <p className="mt-5 border-t border-[#eef3f0] pt-4 text-sm leading-relaxed text-[#4a5f55]">
+              <p className="mt-5 border-t border-border pt-4 text-sm leading-relaxed text-muted-foreground">
                 {product.description}
               </p>
             ) : null}
@@ -607,9 +606,9 @@ function ProductDetailInner() {
 
           {canReadInventory ? (
             <InventoryPanel title="Stock summary" subtitle="Live available vs reserved">
-              <p className="font-[family-name:var(--font-outfit)] text-2xl font-extrabold text-[#0d3b2a]">
+              <p className="font-[family-name:var(--font-outfit)] text-2xl font-extrabold text-heading">
                 {avail}{" "}
-                <span className="text-base font-semibold text-[#5a6a62]">available</span>
+                <span className="text-base font-semibold text-muted-foreground">available</span>
               </p>
               <StockBar label="Available" value={avail} max={totalUnits} tone="ok" />
               <StockBar label="Reserved" value={reserved} max={totalUnits} tone="warn" />
@@ -725,7 +724,7 @@ function ProductDetailInner() {
                         {canManageProducts ? (
                           <button
                             type="button"
-                            className="text-sm font-bold text-[#b42318] hover:underline"
+                            className="text-sm font-bold text-destructive hover:underline"
                             onClick={() => {
                               void catalogApi
                                 .deletePrice(productId, tier.id)
@@ -816,7 +815,7 @@ function ProductDetailInner() {
                   <tbody>
                     {txs.map((tx) => (
                       <tr key={tx.id}>
-                        <td className="text-xs text-[#5a6a62]">
+                        <td className="text-xs text-muted-foreground">
                           {tx.created_at
                             ? new Date(tx.created_at).toLocaleString()
                             : "—"}
@@ -831,7 +830,7 @@ function ProductDetailInner() {
                         <td>
                           {tx.new_available} avail · {tx.new_reserved} res
                         </td>
-                        <td className="text-sm text-[#5a6a62]">{tx.reason ?? "—"}</td>
+                        <td className="text-sm text-muted-foreground">{tx.reason ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -851,12 +850,12 @@ function ProductDetailInner() {
         mark="shield"
         footer={
           <>
-            <button type="button" className="tb-split-btn-ghost" onClick={() => setPriceOpen(false)}>
+            <button type="button" className="tb-btn tb-btn--outline" onClick={() => setPriceOpen(false)}>
               Cancel
             </button>
             <button
               type="button"
-              className="tb-split-btn"
+              className="tb-btn tb-btn--primary"
               disabled={busy || !unitPrice.trim()}
               onClick={submitPrice}
              aria-busy={busy || undefined}>
@@ -890,7 +889,7 @@ function ProductDetailInner() {
           />
           <FieldError error={priceLive.errors.max_quantity} />
         </label>
-        <label className="mt-2 flex items-center gap-2 text-sm text-[#5a6a62]">
+        <label className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
           <input
             type="checkbox"
             checked={openEnded}
@@ -932,12 +931,12 @@ function ProductDetailInner() {
         mark="shield"
         footer={
           <>
-            <button type="button" className="tb-split-btn-ghost" onClick={() => setStockOpen(false)}>
+            <button type="button" className="tb-btn tb-btn--outline" onClick={() => setStockOpen(false)}>
               Cancel
             </button>
             <button
               type="button"
-              className="tb-split-btn"
+              className="tb-btn tb-btn--primary"
               disabled={busy || !stockQty.trim()}
               onClick={submitStock}
              aria-busy={busy || undefined}>
@@ -979,12 +978,12 @@ function ProductDetailInner() {
         mark="shield"
         footer={
           <>
-            <button type="button" className="tb-split-btn-ghost" onClick={() => setEditOpen(false)}>
+            <button type="button" className="tb-btn tb-btn--outline" onClick={() => setEditOpen(false)}>
               Cancel
             </button>
             <button
               type="button"
-              className="tb-split-btn"
+              className="tb-btn tb-btn--primary"
               disabled={busy || !editName.trim() || !editSku.trim() || !editCategoryId}
               onClick={submitEdit}
              aria-busy={busy || undefined}>
@@ -1091,7 +1090,7 @@ function ProductDetailInner() {
           />
           <FieldError error={editLive.errors.lead_time} />
         </label>
-        <label className="mt-3 flex items-center gap-2 text-sm text-[#5a6a62]">
+        <label className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
           <input
             type="checkbox"
             checked={editFeatured}
@@ -1114,7 +1113,7 @@ function ProductDetailInner() {
           router.push(ROUTES.inventoryProducts);
         }}
       >
-        <p className="text-sm text-[#5c574e]">
+        <p className="text-sm text-muted-foreground">
           Soft-delete <strong>{product.name}</strong>? Buyers will no longer see it.
         </p>
       </ConfirmModal>

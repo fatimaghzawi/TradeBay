@@ -122,14 +122,14 @@ export default function TermsPage() {
           date. Continued use after changes constitutes acceptance. Questions:{" "}
           <a
             href="mailto:legal@tradebay.app"
-            className="font-semibold text-[#0d3b2a] underline underline-offset-2"
+            className="font-semibold text-heading underline underline-offset-2"
           >
             legal@tradebay.app
           </a>
           . See also our{" "}
           <Link
             href={ROUTES.privacy}
-            className="font-semibold text-[#0d3b2a] underline underline-offset-2"
+            className="font-semibold text-heading underline underline-offset-2"
           >
             Privacy Policy
           </Link>

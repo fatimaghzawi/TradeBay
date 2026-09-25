@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClass, type ButtonSize, type ButtonVariant } from "@/components/ui/Button";
 import { BusyText } from "@/components/ui/LoadingState";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -85,10 +86,19 @@ export function AdminCards({
   return <ul className={cn("tb-cc-cards", className)}>{children}</ul>;
 }
 
+const ACT_VARIANT: Record<ActTone, ButtonVariant> = {
+  go: "primary",
+  ghost: "outline",
+  soft: "ghost",
+  ok: "success",
+  danger: "danger",
+};
+
 export function AdminAct({
   children,
   href,
   tone = "ghost",
+  size = "sm",
   arrow: _arrow = false,
   busy = false,
   className,
@@ -100,6 +110,7 @@ export function AdminAct({
   children: ReactNode;
   href?: string;
   tone?: ActTone;
+  size?: ButtonSize;
   arrow?: boolean;
   busy?: boolean;
   className?: string;
@@ -108,7 +119,7 @@ export function AdminAct({
   type?: "button" | "submit";
   title?: string;
 }) {
-  const cls = cn("tb-cc-act", `tb-cc-act--${tone}`, className);
+  const cls = buttonClass({ variant: ACT_VARIANT[tone], size, className });
   const inner = <BusyText busy={busy}>{children}</BusyText>;
   if (href) {
     return (

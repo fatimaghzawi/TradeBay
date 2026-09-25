@@ -1,9 +1,3 @@
-"""Deletion policy for TradeBay domain records.
-
-Operational records use status / ``deleted_at`` so commercial history stays intact.
-Ephemeral records (cart lines, draft RFQ item replacements) may hard-delete.
-Financial, audit, and ledger rows are never deleted.
-"""
 
 from __future__ import annotations
 
@@ -11,7 +5,6 @@ from typing import Any
 
 from app.core.exceptions import ForbiddenError
 
-# Collections that must never be hard-deleted (void/reverse/status instead).
 PROTECTED_COLLECTIONS = frozenset(
     {
         "audit_logs",
@@ -32,7 +25,7 @@ PROTECTED_COLLECTIONS = frozenset(
     }
 )
 
-# Status / timestamp fields that hide a record from normal lists.
+                                                                 
 SOFT_DELETE_FILTERS: dict[str, dict[str, Any]] = {
     "roles": {"deleted_at": None, "is_active": {"$ne": False}},
     "product_prices": {"deleted_at": None},
@@ -44,16 +37,13 @@ SOFT_DELETE_FILTERS: dict[str, dict[str, Any]] = {
     "business_memberships": {"status": {"$nin": ["removed"]}},
 }
 
-
 def assert_not_protected_hard_delete(collection: str) -> None:
     if collection in PROTECTED_COLLECTIONS:
         raise ForbiddenError(
             "This record is kept for audit and commercial history and cannot be deleted."
         )
 
-
 def exclude_soft_deleted(collection: str, query: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Merge the default hide-deleted filter for a collection into a query."""
     merged = dict(query or {})
     extra = SOFT_DELETE_FILTERS.get(collection)
     if extra:

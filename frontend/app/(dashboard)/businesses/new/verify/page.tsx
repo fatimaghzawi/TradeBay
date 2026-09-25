@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BusyText } from "@/components/ui/LoadingState";
+import { BackLink } from "@/components/ui/BackLink";
 
 type DocKey = "commercial" | "tax" | "address";
 
@@ -75,7 +76,7 @@ export default function VerifyBusinessPage() {
 
   if (!ready) {
     return (
-      <p className="py-10 text-sm text-[#4a5f55]">Preparing verification…</p>
+      <p className="py-10 text-sm text-muted-foreground">Preparing verification…</p>
     );
   }
 
@@ -121,16 +122,11 @@ export default function VerifyBusinessPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Link
-            href={ROUTES.businesses}
-            className="text-sm font-semibold text-[#0d3b2a] hover:underline"
-          >
-            ← Back
-          </Link>
-          <h1 className="mt-2 font-[family-name:var(--font-outfit)] text-2xl font-bold text-[#0d3b2a] sm:text-3xl">
+          <BackLink href={ROUTES.businesses}>Back</BackLink>
+          <h1 className="mt-2 font-[family-name:var(--font-outfit)] text-2xl font-bold text-heading sm:text-3xl">
             Verify your supplier business
           </h1>
-          <p className="mt-1 text-sm text-[#5a6a62]">
+          <p className="mt-1 text-sm text-muted-foreground">
             Required only for suppliers. Upload documents — TradeBay staff must
             approve before you can sell. Buyers never complete this step.
           </p>
@@ -139,8 +135,8 @@ export default function VerifyBusinessPage() {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)]">
-        <div className="space-y-3 border border-[#d4e0da] bg-white p-5 sm:p-6">
-          <h2 className="font-[family-name:var(--font-outfit)] text-base font-bold text-[#0d3b2a]">
+        <div className="space-y-3 border border-input bg-card p-5 sm:p-6">
+          <h2 className="font-[family-name:var(--font-outfit)] text-base font-bold text-heading">
             Required documents
           </h2>
           <DocumentUploadCard
@@ -164,7 +160,7 @@ export default function VerifyBusinessPage() {
           />
 
           {error ? (
-            <p className="rounded-xl bg-[#fef3f2] px-3.5 py-2.5 text-sm text-[#b42318]">
+            <p role="alert" className="tb-alert tb-alert--error">
               {error}
             </p>
           ) : null}
@@ -173,7 +169,7 @@ export default function VerifyBusinessPage() {
             type="button"
             disabled={pending}
             onClick={() => void submitForReview()}
-            className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#e86f2a] px-5 text-sm font-bold text-white disabled:opacity-60 lg:hidden"
+            className="tb-btn tb-btn--accent tb-btn--lg tb-btn--block lg:hidden"
           >
             <BusyText busy={pending}>{pending ? "Submitting…" : "Submit for verification"}</BusyText>
           </button>
@@ -192,7 +188,7 @@ export default function VerifyBusinessPage() {
               type="button"
               disabled={pending}
               onClick={() => void submitForReview()}
-              className="hidden h-12 w-full items-center justify-center rounded-xl bg-[#e86f2a] text-sm font-bold text-white disabled:opacity-60 lg:inline-flex"
+              className="hidden h-12 w-full items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-foreground disabled:opacity-60 lg:inline-flex"
             >
               <BusyText busy={pending}>{pending ? "Submitting…" : "Submit for verification"}</BusyText>
             </button>

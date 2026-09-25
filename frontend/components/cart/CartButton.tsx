@@ -9,7 +9,6 @@ import { openCartTray } from "@/lib/shoppingTrays";
 import { useAuth } from "@/providers/AuthProvider";
 import { useEffect, useState } from "react";
 
-/** Buyer cart shortcut — opens the shopping tray. */
 export function CartButton() {
   const { business, hasPermission, isAuthenticated } = useAuth();
   const [count, setCount] = useState(0);
@@ -56,7 +55,7 @@ export function CartButton() {
     <button
       type="button"
       onClick={() => openCartTray()}
-      className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[var(--tb-border)] bg-[var(--tb-surface)] text-[var(--tb-ink)] transition hover:border-[var(--tb-primary)]/45 hover:text-[var(--tb-ink)]"
+      className="relative flex h-10 w-10 items-center justify-center rounded-full border border-border-strong bg-card text-foreground transition hover:border-[var(--tb-primary)]/45 hover:text-foreground"
       aria-label={count > 0 ? `Cart, ${count} items` : "Cart"}
       title="Cart"
     >
@@ -72,7 +71,7 @@ export function CartButton() {
         <circle cx="18" cy="20" r="1.4" fill="currentColor" />
       </svg>
       {count > 0 ? (
-        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--tb-accent)] px-1 text-[10px] font-bold leading-none text-[var(--tb-accent-foreground)]">
+        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold leading-none text-[var(--tb-accent-foreground)]">
           {count > 99 ? "99+" : count}
         </span>
       ) : null}

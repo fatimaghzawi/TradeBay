@@ -1,9 +1,3 @@
-"""Request ID, security headers, access logging, and rate-limit hook.
-
-Pure ASGI middleware (not BaseHTTPMiddleware). Starlette's BaseHTTPMiddleware
-runs `call_next` in a nested anyio task, which Motor/PyMongo treats as a
-different event loop and raises RuntimeError on database I/O.
-"""
 
 from __future__ import annotations
 
@@ -27,14 +21,12 @@ from app.shared.utils.datetime import utc_now
 
 logger = get_logger(__name__)
 
-
 def _set_scope_state(scope: Scope, key: str, value: str) -> None:
     state = scope.setdefault("state", {})
     if isinstance(state, dict):
         state[key] = value
     else:
         setattr(state, key, value)
-
 
 class RequestContextMiddleware:
     def __init__(self, app: ASGIApp) -> None:
@@ -79,10 +71,10 @@ class RequestContextMiddleware:
                 request_id=request_id,
             )
 
-
 class SecurityHeadersMiddleware:
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(self, app: ASGIApp, *, settings: Settings | None = None) -> None:
         self.app = app
+        self.settings = settings
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -97,14 +89,17 @@ class SecurityHeadersMiddleware:
                 headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
                 headers.setdefault("X-XSS-Protection", "0")
                 headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+                if self.settings is not None and self.settings.is_production:
+                    headers.setdefault(
+                        "Strict-Transport-Security",
+                        "max-age=31536000; includeSubDomains",
+                    )
                 message["headers"] = headers.raw
             await send(message)
 
         await self.app(scope, receive, send_wrapper)
 
-
 class _InProcessRateLimiter:
-    """Per-process sliding window. Multi-instance deploys need a shared store."""
 
     def __init__(self, *, max_hits: int, window_seconds: int = 60) -> None:
         self.max_hits = max_hits
@@ -122,13 +117,7 @@ class _InProcessRateLimiter:
         self._hits[key] = recent
         return True
 
-
 class RateLimitMiddleware:
-    """In-process IP rate limit when RATE_LIMIT_ENABLED=true.
-
-    Health/ready probes are exempt. Shared Redis limiter remains a follow-up for
-    multi-worker production.
-    """
 
     def __init__(self, app: ASGIApp, settings: Settings) -> None:
         self.app = app

@@ -1,8 +1,3 @@
-"""Demo KYC PDFs and brand marks for the Lebanese trading directory.
-
-Logos and certificates are original TradeBay demo artwork — not third-party
-company trademarks.
-"""
 
 from __future__ import annotations
 
@@ -34,10 +29,8 @@ PALETTES: list[tuple[str, str, str]] = [
     ("#1c2030", "#9ab0c8", "#eef2f7"),
 ]
 
-
 def _esc_pdf(text: str) -> str:
     return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-
 
 def build_pdf(*, title: str, lines: list[str]) -> bytes:
     ops = ["BT", "/F1 18 Tf", "56 740 Td", f"({_esc_pdf(title)}) Tj", "/F1 11 Tf"]
@@ -83,7 +76,6 @@ def build_pdf(*, title: str, lines: list[str]) -> bytes:
     )
     return assembled + tail.encode("ascii")
 
-
 def write_logo(*, slug: str, initials: str, palette_index: int, mark: str = "circle") -> str:
     bg, accent, _paper = PALETTES[palette_index % len(PALETTES)]
     safe = (initials or "TB")[:3].upper()
@@ -113,7 +105,6 @@ def write_logo(*, slug: str, initials: str, palette_index: int, mark: str = "cir
     path.write_text(svg, encoding="utf-8")
     return f"/images/logos/{slug}.svg"
 
-
 def write_cover(*, slug: str, palette_index: int) -> str:
     bg, accent, paper = PALETTES[palette_index % len(PALETTES)]
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180" fill="none">
@@ -127,7 +118,6 @@ def write_cover(*, slug: str, palette_index: int) -> str:
     path = COVER_DIR / f"{slug}.svg"
     path.write_text(svg, encoding="utf-8")
     return f"/images/covers/{slug}.svg"
-
 
 def write_verification_pack(
     *,

@@ -1,4 +1,3 @@
-"""Pytest configuration and shared fixtures."""
 
 from __future__ import annotations
 
@@ -12,7 +11,6 @@ from httpx import ASGITransport, AsyncClient
 
 
 def _dotenv_value(key: str) -> str | None:
-    """Read one key from repo-root or backend .env without overriding a live env var."""
     existing = os.environ.get(key)
     if existing:
         return existing
@@ -30,10 +28,9 @@ def _dotenv_value(key: str) -> str | None:
                 return cleaned or None
     return None
 
-
-# Configure test env before importing the app.
-# MONGODB_URI comes from the process env or .env; tests never use the .env database
-# name so a local run cannot drop the development Atlas database.
+                                              
+                                                                                   
+                                                                 
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("APP_NAME", "TradeBay")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-min-32-characters!!")
@@ -52,13 +49,12 @@ from app.core.config import reset_settings_cache
 from app.db.mongodb import mongo_manager
 from app.main import create_app
 from app.modules.identity.email import LogEmailSender, MemoryEmailSender, set_email_sender
-from app.modules.identity.rate_limit import challenge_limiter
+from app.modules.identity.rate_limit import challenge_limiter, login_failure_limiter
 
 
 @pytest.fixture(scope="session")
 def anyio_backend() -> str:
     return "asyncio"
-
 
 @pytest.fixture(scope="session")
 async def app() -> AsyncIterator[Any]:
@@ -66,12 +62,11 @@ async def app() -> AsyncIterator[Any]:
     application = create_app()
     await mongo_manager.connect()
     yield application
-    # Drop test database collections for isolation across runs
+                                                              
     if mongo_manager.is_ready:
         await mongo_manager.database.client.drop_database(mongo_manager.database.name)
     await mongo_manager.disconnect()
     reset_settings_cache()
-
 
 @pytest.fixture
 async def client(app: Any) -> AsyncIterator[AsyncClient]:
@@ -79,17 +74,17 @@ async def client(app: Any) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-
 @pytest.fixture(autouse=True)
 def email_inbox() -> Any:
     inbox = MemoryEmailSender()
     set_email_sender(inbox)
     challenge_limiter.reset()
+    login_failure_limiter.reset()
     yield inbox
     inbox.clear()
     set_email_sender(LogEmailSender())
     challenge_limiter.reset()
-
+    login_failure_limiter.reset()
 
 @pytest.fixture
 async def registered_user(client: AsyncClient, email_inbox: MemoryEmailSender) -> dict[str, Any]:
@@ -115,3 +110,11 @@ async def registered_user(client: AsyncClient, email_inbox: MemoryEmailSender) -
         "verification_token": email_inbox.last_token(to=email, template="email_verification"),
         "cookies": response.cookies,
     }
+
+@pytest.fixture
+async def verified_user(client: AsyncClient, registered_user: dict[str, Any]) -> dict[str, Any]:
+    response = await client.post(
+        "/api/v1/auth/verify-email", json={"token": registered_user["verification_token"]}
+    )
+    assert response.status_code == 200, response.text
+    return registered_user

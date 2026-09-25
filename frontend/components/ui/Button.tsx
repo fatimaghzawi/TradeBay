@@ -2,31 +2,44 @@ import { cn } from "@/lib/utils";
 import { BusyText } from "@/components/ui/LoadingState";
 import type { ButtonHTMLAttributes } from "react";
 
-const variants = {
-  primary:
-    "bg-[var(--tb-primary)] text-[var(--tb-primary-foreground)] hover:bg-[var(--tb-secondary)] focus-visible:ring-[var(--tb-primary)] shadow-[0_8px_20px_-12px_color-mix(in_srgb,var(--tb-primary)_55%,transparent)]",
-  secondary:
-    "border border-[var(--tb-accent)] bg-[var(--tb-surface)] text-[var(--tb-accent)] hover:bg-[var(--tb-accent-soft)] focus-visible:ring-[var(--tb-accent)]",
-  accent:
-    "bg-[var(--tb-accent)] text-white hover:brightness-95 focus-visible:ring-[var(--tb-accent)] shadow-[0_8px_20px_-12px_color-mix(in_srgb,var(--tb-accent)_55%,transparent)]",
-  ghost:
-    "bg-[var(--tb-interactive)] text-[var(--tb-ink-soft)] hover:bg-[var(--tb-muted)] focus-visible:ring-[var(--tb-border)]",
-  outline:
-    "border border-[var(--tb-border)] bg-[var(--tb-surface)] text-[var(--tb-ink-soft)] hover:bg-[var(--tb-interactive)] focus-visible:ring-[var(--tb-border)]",
-  danger:
-    "border border-[var(--tb-danger)] bg-[var(--tb-surface)] text-[var(--tb-danger)] hover:bg-[var(--tb-danger-soft)] focus-visible:ring-[var(--tb-danger)]",
-} as const;
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "accent"
+  | "outline"
+  | "ghost"
+  | "destructive"
+  | "danger"
+  | "success"
+  | "link";
 
-const sizes = {
-  sm: "h-8 rounded-[var(--tb-radius-field)] px-3 text-xs",
-  md: "h-10 rounded-[var(--tb-radius-field)] px-4 text-sm",
-  lg: "h-11 rounded-[var(--tb-radius-control)] px-5 text-[0.95rem]",
-} as const;
+export type ButtonSize = "sm" | "md" | "lg" | "icon";
+
+export function buttonClass({
+  variant = "primary",
+  size = "md",
+  block = false,
+  className,
+}: {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  block?: boolean;
+  className?: string;
+} = {}) {
+  return cn(
+    "tb-btn",
+    `tb-btn--${variant}`,
+    size !== "md" && `tb-btn--${size}`,
+    block && "tb-btn--block",
+    className,
+  );
+}
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: keyof typeof variants;
-  size?: keyof typeof sizes;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   busy?: boolean;
+  block?: boolean;
 };
 
 export function Button({
@@ -35,6 +48,7 @@ export function Button({
   size = "md",
   type = "button",
   busy = false,
+  block = false,
   disabled,
   children,
   ...props
@@ -44,12 +58,7 @@ export function Button({
       type={type}
       disabled={disabled || busy}
       aria-busy={busy || undefined}
-      className={cn(
-        "inline-flex items-center justify-center gap-2 font-[family-name:var(--font-outfit)] font-semibold tracking-tight transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--tb-canvas)] disabled:pointer-events-none disabled:opacity-50 active:translate-y-px",
-        variants[variant],
-        sizes[size],
-        className,
-      )}
+      className={buttonClass({ variant, size, block, className })}
       {...props}
     >
       <BusyText busy={busy}>{children}</BusyText>

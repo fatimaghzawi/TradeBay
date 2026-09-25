@@ -92,12 +92,12 @@ export function AdminCreateBusinessModal({
       }
       footer={
         <>
-          <button type="button" className="tb-split-btn-ghost" onClick={onClose}>
+          <button type="button" className="tb-btn tb-btn--outline" onClick={onClose}>
             Cancel
           </button>
           <button
             type="button"
-            className="tb-split-btn"
+            className="tb-btn tb-btn--primary"
             disabled={pending}
             aria-busy={pending || undefined}
             onClick={() => {
@@ -250,7 +250,7 @@ export function AdminCreateBusinessModal({
         </div>
 
         {isSupplier ? (
-          <label className="flex items-start gap-2 text-sm text-[var(--tb-ink)]">
+          <label className="flex items-start gap-2 text-sm text-foreground">
             <input
               type="checkbox"
               className="mt-1"
@@ -259,7 +259,7 @@ export function AdminCreateBusinessModal({
             />
             <span>
               <strong className="font-semibold">Verify selling rights now</strong>
-              <span className="mt-0.5 block text-[var(--tb-muted-fg)]">
+              <span className="mt-0.5 block text-muted-foreground">
                 Skip the document review queue for this provisioned supplier.
               </span>
             </span>

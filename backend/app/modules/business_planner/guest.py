@@ -1,4 +1,3 @@
-"""Resolve authenticated user or stable guest owner for Business Planner."""
 
 from __future__ import annotations
 
@@ -15,12 +14,9 @@ _GUEST_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
 
-
 def guest_owner_id(guest_key: str) -> str:
-    """Map a client guest UUID to a deterministic 24-char ObjectId hex."""
     digest = hashlib.sha256(f"tradebay-guest:{guest_key.strip().lower()}".encode()).hexdigest()
     return digest[:24]
-
 
 def resolve_planner_owner_id(
     auth: AuthContext | None,
@@ -31,7 +27,6 @@ def resolve_planner_owner_id(
     if guest_key and _GUEST_RE.match(guest_key.strip()):
         return guest_owner_id(guest_key)
     raise UnauthorizedError("Sign in or continue as guest to use the business planner")
-
 
 async def get_planner_owner_id(
     auth: Annotated[AuthContext | None, Depends(get_optional_user)],

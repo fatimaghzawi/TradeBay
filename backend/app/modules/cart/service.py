@@ -1,4 +1,3 @@
-"""Buyer cart service — marketplace lines that checkout into an RFQ."""
 
 from __future__ import annotations
 
@@ -10,8 +9,6 @@ from app.modules.cart.exceptions import (
     CartEmptyError,
     CartInvalidSuggestedPriceError,
     CartItemNotFoundError,
-    CartMixedCurrencyError,
-    CartPriceRequiredError,
     CartProductUnavailableError,
 )
 from app.modules.cart.repository import CartItemRepository, CartRepository
@@ -36,14 +33,12 @@ def _money_str(value: Any) -> str | None:
         return format(value.to_decimal(), "f")
     return str(value)
 
-
 def _as_decimal(value: Any) -> Decimal:
     if isinstance(value, Decimal):
         return value
     if hasattr(value, "to_decimal"):
         return value.to_decimal()
     return Decimal(str(value))
-
 
 class CartService:
     def __init__(self) -> None:
@@ -334,7 +329,7 @@ class CartService:
         supplier_ids = sorted({str(r["supplier_business_id"]) for r in rows})
         rfq_title = (title or "").strip() or f"Cart request ({len(rows)} item{'s' if len(rows) != 1 else ''})"
 
-        # Single listed product from one supplier → Product RFQ; otherwise Sourcing.
+                                                                                    
         is_product = (
             len(rows) == 1
             and rows[0].get("product_id") is not None
@@ -413,7 +408,7 @@ class CartService:
             except Exception as exc:
                 invite_error = str(getattr(exc, "message", None) or exc)
 
-        # Keep cart lines until payment — RFQ start must not empty the cart.
+                                                                            
         return {
             "rfq_id": rfq_id,
             "rfq_number": rfq.get("rfq_number"),
@@ -423,83 +418,12 @@ class CartService:
             "cart": await self.get_cart(business=business),
         }
 
-    async def place_orders(
-        self,
-        *,
-        user_id: str,
-        business: dict[str, Any] | None,
-        notes: str | None = None,
-        ip: str | None = None,
-    ) -> dict[str, Any]:
-        """Place direct purchase orders from the cart (one PO per supplier)."""
-        buyer_id = self._require_buyer(business)
-        rows = await self.items.list_for_buyer(buyer_id)
-        if not rows:
-            raise CartEmptyError()
-
-        by_supplier: dict[str, list[dict[str, Any]]] = {}
-        for row in rows:
-            suggested = _money_str(row.get("suggested_unit_price"))
-            catalog = _money_str(row.get("unit_price"))
-            price = suggested if suggested is not None else catalog
-            if price is None:
-                raise CartPriceRequiredError()
-            sid = str(row["supplier_business_id"])
-            by_supplier.setdefault(sid, []).append(
-                {
-                    "product_id": str(row["product_id"]),
-                    "product_name": row.get("product_name") or "Product",
-                    "sku": row.get("sku"),
-                    "quantity": str(int(row["quantity"])),
-                    "unit": row.get("unit") or "unit",
-                    "unit_price": price,
-                    "currency": str(row.get("currency") or "USD"),
-                }
-            )
-
-        orders: list[dict[str, Any]] = []
-        for supplier_id, lines in by_supplier.items():
-            currencies = {ln["currency"] for ln in lines}
-            if len(currencies) != 1:
-                raise CartMixedCurrencyError()
-            currency = next(iter(currencies))
-            order = await self.procurement.create_direct_order_from_cart_lines(
-                user_id=user_id,
-                business=business,
-                supplier_business_id=supplier_id,
-                currency=currency,
-                lines=lines,
-                ip=ip,
-            )
-            if notes:
-                await self.procurement.orders.update(
-                    parse_object_id(str(order["id"])),
-                    {"notes": notes, "updated_at": utc_now()},
-                )
-            orders.append(
-                {
-                    "id": order["id"],
-                    "order_number": order.get("order_number"),
-                    "supplier_business_id": supplier_id,
-                    "total": order.get("total"),
-                    "currency": order.get("currency"),
-                    "status": order.get("status"),
-                }
-            )
-
-        return {
-            "orders": orders,
-            "order_count": len(orders),
-            "cart": await self.get_cart(business=business),
-        }
-
     async def remove_products_for_buyer(
         self,
         *,
         buyer_business_id: str,
         product_ids: list[str],
     ) -> int:
-        """Drop cart lines for paid products. Returns how many lines were removed."""
         oids = [parse_object_id(pid) for pid in product_ids if pid]
         if not oids:
             return 0

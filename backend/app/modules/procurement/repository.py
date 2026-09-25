@@ -1,4 +1,3 @@
-"""Procurement persistence."""
 
 from __future__ import annotations
 
@@ -7,6 +6,7 @@ from typing import Any
 from bson import ObjectId
 
 from app.db.collections import CollectionName
+from app.modules.procurement.constants import OrderStatus
 from app.shared.repositories.base import BaseRepository, MongoSession
 from app.shared.utils.objectid import parse_object_id
 
@@ -57,7 +57,6 @@ class RFQRepository(BaseRepository):
     async def count_by_number_prefix(self, prefix: str) -> int:
         return await self.count({"rfq_number": {"$regex": f"^{prefix}"}})
 
-
 class RFQItemRepository(BaseRepository):
     collection_name = CollectionName.RFQ_ITEMS
 
@@ -74,7 +73,6 @@ class RFQItemRepository(BaseRepository):
             session=session,
         )
         return int(result.deleted_count)
-
 
 class QuotationRepository(BaseRepository):
     collection_name = CollectionName.QUOTATIONS
@@ -104,7 +102,6 @@ class QuotationRepository(BaseRepository):
             sort=[("updated_at", -1)],
         )
 
-
 class QuotationItemRepository(BaseRepository):
     collection_name = CollectionName.QUOTATION_ITEMS
 
@@ -116,34 +113,57 @@ class QuotationItemRepository(BaseRepository):
             query["version"] = version
         return await self.find_many(query, limit=200, sort=[("rfq_item_id", 1)])
 
-
 class OrderRepository(BaseRepository):
     collection_name = CollectionName.ORDERS
 
+    @staticmethod
+    def _business_query(
+        business_id: str | None, *, as_buyer: bool, status: str | None, include_unpaid: bool | None
+    ) -> dict[str, Any]:
+        query: dict[str, Any] = {}
+        if business_id is not None:
+            field = "buyer_business_id" if as_buyer else "supplier_business_id"
+            query[field] = parse_object_id(business_id)
+                                                                                
+        hide_unpaid = (not as_buyer) if include_unpaid is None else not include_unpaid
+        if hide_unpaid:
+            if status == OrderStatus.AWAITING_PAYMENT:
+                query["status"] = {"$in": []}
+            elif status:
+                query["status"] = status
+            else:
+                query["status"] = {"$ne": OrderStatus.AWAITING_PAYMENT}
+        elif status:
+            query["status"] = status
+        return query
+
     async def list_for_business(
         self,
-        business_id: str,
+        business_id: str | None,
         *,
         as_buyer: bool = True,
         skip: int = 0,
         limit: int = 20,
         status: str | None = None,
+        include_unpaid: bool | None = None,
     ) -> list[dict[str, Any]]:
-        field = "buyer_business_id" if as_buyer else "supplier_business_id"
-        query: dict[str, Any] = {field: parse_object_id(business_id)}
-        if status:
-            query["status"] = status
+        query = self._business_query(
+            business_id, as_buyer=as_buyer, status=status, include_unpaid=include_unpaid
+        )
         return await self.find_many(query, skip=skip, limit=limit, sort=[("updated_at", -1)])
 
     async def count_for_business(
-        self, business_id: str, *, as_buyer: bool = True, status: str | None = None
+        self,
+        business_id: str | None,
+        *,
+        as_buyer: bool = True,
+        status: str | None = None,
+        include_unpaid: bool | None = None,
     ) -> int:
-        field = "buyer_business_id" if as_buyer else "supplier_business_id"
-        query: dict[str, Any] = {field: parse_object_id(business_id)}
-        if status:
-            query["status"] = status
+        query = self._business_query(
+            business_id, as_buyer=as_buyer, status=status, include_unpaid=include_unpaid
+        )
         return await self.count(query)
-
 
 class OrderItemRepository(BaseRepository):
     collection_name = CollectionName.ORDER_ITEMS
@@ -154,7 +174,6 @@ class OrderItemRepository(BaseRepository):
             limit=200,
             sort=[("product_name_snapshot", 1)],
         )
-
 
 class ShipmentRepository(BaseRepository):
     collection_name = CollectionName.SHIPMENTS
@@ -168,7 +187,6 @@ class ShipmentRepository(BaseRepository):
 
     async def find_by_tracking(self, tracking_number: str) -> dict[str, Any] | None:
         return await self.find_one({"tracking_number": tracking_number})
-
 
 class ShipmentItemRepository(BaseRepository):
     collection_name = CollectionName.SHIPMENT_ITEMS

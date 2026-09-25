@@ -19,9 +19,9 @@ import {
 
 type AuthContextValue = {
   user: AuthUser | null;
-  /** Active company from session — not client-switched. */
+  
   business: Business | null;
-  /** Memberships for gate checks only (e.g. one-company create). Not a switcher. */
+  
   businesses: Business[];
   permissions: string[];
   roleName: string | null;
@@ -105,13 +105,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (sessionQuery.isFetching && !sessionQuery.data && !sessionQuery.isError);
 
   useEffect(() => {
-    if (
-      !sessionQuery.isLoading &&
-      sessionQuery.isError &&
-      sessionQuery.error instanceof ApiError &&
-      sessionQuery.error.status === 401 &&
-      isProtectedPath(pathname)
-    ) {
+    if (sessionQuery.isLoading || !sessionQuery.isError) return;
+    const err = sessionQuery.error;
+    if (!(err instanceof ApiError)) return;
+    if (err.code === "ACCOUNT_INACTIVE" && pathname !== ROUTES.accountSuspended) {
+      router.replace(ROUTES.accountSuspended);
+      return;
+    }
+    if (err.status === 401 && isProtectedPath(pathname)) {
       router.replace(ROUTES.login);
     }
   }, [

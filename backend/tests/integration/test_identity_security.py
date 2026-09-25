@@ -1,4 +1,3 @@
-"""Identity security integration tests: OTP, recovery, sessions, RBAC, isolation."""
 
 from __future__ import annotations
 
@@ -7,13 +6,15 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
+from app.core.config import get_settings
 from app.core.constants import REFRESH_COOKIE_NAME
-from app.core.security import hash_token, verify_password
+from app.core.security import hash_otp, hash_token, verify_password
 from app.db.mongodb import mongo_manager
 from app.modules.identity.constants import SYSTEM_ROLE_PLATFORM_ADMIN, MembershipStatus
 from app.modules.identity.email import MemoryEmailSender
 from app.modules.identity.permissions import permission_code
 from app.shared.utils.datetime import utc_now
+from bson import ObjectId
 from httpx import ASGITransport, AsyncClient
 
 
@@ -45,11 +46,15 @@ async def _register(
         "verification_token": email_inbox.last_token(to=address, template="email_verification"),
     }
 
+def _otp_filter(token: str, user_id: str, purpose: str) -> dict[str, Any]:
+    return {"token_hash": hash_otp(token, user_id=user_id, purpose=purpose, settings=get_settings())}
+
+def _wrong_code(token: str) -> str:
+    return "000000" if token != "000000" else "111111"
 
 async def _verify(client: AsyncClient, token: str) -> None:
     response = await client.post("/api/v1/auth/verify-email", json={"token": token})
     assert response.status_code == 200, response.text
-
 
 @pytest.mark.asyncio
 async def test_register_hashes_password_and_starts_unverified(
@@ -61,7 +66,6 @@ async def test_register_hashes_password_and_starts_unverified(
     assert verify_password(registered_user["password"], user["password_hash"])
     assert user["status"] == "pending"
     assert user.get("email_verified_at") is None
-
 
 @pytest.mark.asyncio
 async def test_duplicate_verified_email_rejected(
@@ -81,9 +85,8 @@ async def test_duplicate_verified_email_rejected(
     )
     assert response.status_code == 409
 
-
 @pytest.mark.asyncio
-async def test_unverified_reregister_resends_code_and_updates_password(
+async def test_unverified_reregister_with_same_password_resends_code(
     client: AsyncClient,
     registered_user: dict[str, Any],
     email_inbox: MemoryEmailSender,
@@ -94,7 +97,7 @@ async def test_unverified_reregister_resends_code_and_updates_password(
         "/api/v1/auth/register",
         json={
             "email": registered_user["email"],
-            "password": "NewerPass123!",
+            "password": registered_user["password"],
             "first_name": "Ada",
             "last_name": "Lovelace",
             "business_name": "Analytical Engines Ltd",
@@ -111,12 +114,43 @@ async def test_unverified_reregister_resends_code_and_updates_password(
     assert stale.status_code == 401
     ok = await client.post("/api/v1/auth/verify-email", json={"token": second_token})
     assert ok.status_code == 200
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": registered_user["email"], "password": "NewerPass123!"},
-    )
-    assert login.status_code == 200
 
+@pytest.mark.asyncio
+async def test_unverified_reregister_with_other_password_cannot_take_over(
+    app: Any,
+    registered_user: dict[str, Any],
+    email_inbox: MemoryEmailSender,
+) -> None:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as attacker:
+        hijack = await attacker.post(
+            "/api/v1/auth/register",
+            json={
+                "email": registered_user["email"],
+                "password": "AttackerPass123!",
+                "first_name": "Mallory",
+                "last_name": "X",
+                "business_name": "Evil Co",
+            },
+        )
+        assert hijack.status_code == 409, hijack.text
+        assert hijack.json()["error"]["code"] == "EMAIL_PENDING_VERIFICATION"
+        assert "tb_access" not in hijack.cookies
+        me = await attacker.get("/api/v1/auth/me")
+        assert me.status_code == 401
+
+        attacker_login = await attacker.post(
+            "/api/v1/auth/login",
+            json={"email": registered_user["email"], "password": "AttackerPass123!"},
+        )
+        assert attacker_login.status_code == 401
+
+                                                                                     
+    fresh = email_inbox.last_token(to=registered_user["email"], template="email_verification")
+    assert fresh and fresh != registered_user["verification_token"]
+    user = await mongo_manager.database["users"].find_one({"email": registered_user["email"]})
+    assert user is not None
+    assert verify_password(registered_user["password"], user["password_hash"])
 
 @pytest.mark.asyncio
 async def test_invalid_email_and_password_rejected(client: AsyncClient) -> None:
@@ -136,7 +170,6 @@ async def test_invalid_email_and_password_rejected(client: AsyncClient) -> None:
     )
     assert no_digit.status_code == 422
 
-
 @pytest.mark.asyncio
 async def test_verify_email_invalid_expired_reused_and_wrong_purpose(
     client: AsyncClient, registered_user: dict[str, Any], email_inbox: MemoryEmailSender
@@ -154,7 +187,7 @@ async def test_verify_email_invalid_expired_reused_and_wrong_purpose(
     assert wrong_purpose.status_code == 401
 
     await mongo_manager.database["auth_tokens"].update_one(
-        {"token_hash": hash_token(token)},
+        _otp_filter(token, registered_user["user"]["id"], "email_verification"),
         {"$set": {"expires_at": utc_now() - timedelta(hours=1)}},
     )
     expired = await client.post("/api/v1/auth/verify-email", json={"token": token})
@@ -175,7 +208,6 @@ async def test_verify_email_invalid_expired_reused_and_wrong_purpose(
     already = await client.post("/api/v1/auth/resend-verification")
     assert already.status_code == 200
 
-
 @pytest.mark.asyncio
 async def test_otp_max_attempts_on_same_challenge(
     client: AsyncClient, registered_user: dict[str, Any]
@@ -183,23 +215,23 @@ async def test_otp_max_attempts_on_same_challenge(
     token = registered_user["verification_token"]
     assert token
     await mongo_manager.database["auth_tokens"].update_one(
-        {"token_hash": hash_token(token)},
+        _otp_filter(token, registered_user["user"]["id"], "email_verification"),
         {"$set": {"attempts": 5}},
     )
     response = await client.post("/api/v1/auth/verify-email", json={"token": token})
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "OTP_ATTEMPTS_EXCEEDED"
 
-
 @pytest.mark.asyncio
 async def test_wrong_otp_allows_five_attempts_then_locks(
     client: AsyncClient, registered_user: dict[str, Any]
 ) -> None:
     email = registered_user["email"]
+    wrong = _wrong_code(registered_user["verification_token"])
     for i in range(4):
         bad = await client.post(
             "/api/v1/auth/verify-email",
-            json={"token": "00000", "email": email},
+            json={"token": wrong, "email": email},
         )
         assert bad.status_code == 401, bad.text
         body = bad.json()["error"]
@@ -208,7 +240,7 @@ async def test_wrong_otp_allows_five_attempts_then_locks(
 
     fifth = await client.post(
         "/api/v1/auth/verify-email",
-        json={"token": "00000", "email": email},
+        json={"token": wrong, "email": email},
     )
     assert fifth.status_code == 401
     assert fifth.json()["error"]["code"] == "OTP_ATTEMPTS_EXCEEDED"
@@ -232,7 +264,6 @@ async def test_verified_user_cannot_create_second_owned_business(
     assert created.status_code == 409, created.text
     assert created.json()["error"]["code"] == "CONFLICT"
 
-
 @pytest.mark.asyncio
 async def test_password_reset_flow_and_session_invalidation(
     client: AsyncClient, registered_user: dict[str, Any], email_inbox: MemoryEmailSender
@@ -251,12 +282,12 @@ async def test_password_reset_flow_and_session_invalidation(
 
     reset = await client.post(
         "/api/v1/auth/reset-password",
-        json={"token": token, "password": "BrandNewPass123!"},
+        json={"email": registered_user["email"], "token": token, "password": "BrandNewPass123!"},
     )
     assert reset.status_code == 200
     reused = await client.post(
         "/api/v1/auth/reset-password",
-        json={"token": token, "password": "BrandNewPass123!"},
+        json={"email": registered_user["email"], "token": token, "password": "BrandNewPass123!"},
     )
     assert reused.status_code == 401
 
@@ -274,7 +305,6 @@ async def test_password_reset_flow_and_session_invalidation(
     )
     assert new_login.status_code == 200
 
-
 @pytest.mark.asyncio
 async def test_password_reset_expired_and_attempts(
     client: AsyncClient, registered_user: dict[str, Any], email_inbox: MemoryEmailSender
@@ -283,22 +313,164 @@ async def test_password_reset_expired_and_attempts(
     token = email_inbox.last_token(to=registered_user["email"], template="password_reset")
     assert token
     await mongo_manager.database["auth_tokens"].update_one(
-        {"token_hash": hash_token(token)},
+        _otp_filter(token, registered_user["user"]["id"], "password_reset"),
         {"$set": {"expires_at": utc_now() - timedelta(hours=3)}},
     )
     expired = await client.post(
         "/api/v1/auth/reset-password",
-        json={"token": token, "password": "BrandNewPass123!"},
+        json={"email": registered_user["email"], "token": token, "password": "BrandNewPass123!"},
     )
     assert expired.status_code == 401
 
+    await client.post("/api/v1/auth/forgot-password", json={"email": registered_user["email"]})
     verify_token = registered_user["verification_token"]
     wrong = await client.post(
         "/api/v1/auth/reset-password",
-        json={"token": verify_token, "password": "BrandNewPass123!"},
+        json={"email": registered_user["email"], "token": verify_token, "password": "BrandNewPass123!"},
     )
     assert wrong.status_code == 401
 
+@pytest.mark.asyncio
+async def test_password_reset_requires_email_and_counts_every_guess(
+    client: AsyncClient, registered_user: dict[str, Any], email_inbox: MemoryEmailSender
+) -> None:
+    await client.post("/api/v1/auth/forgot-password", json={"email": registered_user["email"]})
+    token = email_inbox.last_token(to=registered_user["email"], template="password_reset")
+    assert token
+
+    no_email = await client.post(
+        "/api/v1/auth/password/reset", json={"token": token, "password": "BrandNewPass123!"}
+    )
+    assert no_email.status_code == 422
+
+    other = await client.post(
+        "/api/v1/auth/password/reset",
+        json={"email": "someone-else@example.com", "token": token, "password": "BrandNewPass123!"},
+    )
+    assert other.status_code == 401
+
+    wrong = _wrong_code(token)
+    for _ in range(5):
+        guess = await client.post(
+            "/api/v1/auth/password/reset",
+            json={"email": registered_user["email"], "token": wrong, "password": "BrandNewPass123!"},
+        )
+        assert guess.status_code == 401
+    locked = await client.post(
+        "/api/v1/auth/password/reset",
+        json={"email": registered_user["email"], "token": token, "password": "BrandNewPass123!"},
+    )
+    assert locked.status_code == 401
+    assert locked.json()["error"]["code"] == "OTP_ATTEMPTS_EXCEEDED"
+
+@pytest.mark.asyncio
+async def test_same_code_for_two_users_only_affects_the_named_account(
+    app: Any, email_inbox: MemoryEmailSender
+) -> None:
+    transport = ASGITransport(app=app)
+    async with (
+        AsyncClient(transport=transport, base_url="http://test") as first,
+        AsyncClient(transport=transport, base_url="http://test") as second,
+    ):
+        a = await _register(first, email_inbox)
+        b = await _register(second, email_inbox)
+        shared = "424242"
+        for user in (a, b):
+            await mongo_manager.database["auth_tokens"].update_one(
+                {"user_id": ObjectId(user["user"]["id"]), "purpose": "email_verification", "used_at": None},
+                {"$set": {"token_hash": _otp_filter(shared, user["user"]["id"], "email_verification")["token_hash"]}},
+            )
+        verified = await first.post("/api/v1/auth/email/verify", json={"token": shared, "email": a["email"]})
+        assert verified.status_code == 200
+        other = await mongo_manager.database["users"].find_one({"email": b["email"]})
+        assert other is not None and other.get("email_verified_at") is None
+
+@pytest.mark.asyncio
+async def test_long_multibyte_password_is_rejected_cleanly(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": f"long_{os.urandom(4).hex()}@example.com",
+            "password": "كلمة" * 10 + "1a",
+            "first_name": "A",
+            "last_name": "B",
+        },
+    )
+    assert response.status_code == 422
+    assert "too long" in response.json()["error"]["message"]
+
+@pytest.mark.asyncio
+async def test_unverified_user_cannot_write_trading_data(
+    client: AsyncClient, registered_user: dict[str, Any]
+) -> None:
+    _ = registered_user
+    blocked = await client.post(
+        "/api/v1/cart/items", json={"product_id": "0" * 24, "quantity": 1}
+    )
+    assert blocked.status_code == 403, blocked.text
+    assert blocked.json()["error"]["code"] == "EMAIL_UNVERIFIED"
+    reads = await client.get("/api/v1/auth/me")
+    assert reads.status_code == 200
+
+@pytest.mark.asyncio
+async def test_repeated_failed_logins_are_throttled_per_email(
+    client: AsyncClient, registered_user: dict[str, Any]
+) -> None:
+    for _ in range(10):
+        bad = await client.post(
+            "/api/v1/auth/login",
+            json={"email": registered_user["email"], "password": "WrongPass999!"},
+        )
+        assert bad.status_code == 401
+    throttled = await client.post(
+        "/api/v1/auth/login",
+        json={"email": registered_user["email"], "password": registered_user["password"]},
+    )
+    assert throttled.status_code == 429
+
+@pytest.mark.asyncio
+async def test_login_skips_suspended_company_and_session_survives(
+    client: AsyncClient, registered_user: dict[str, Any]
+) -> None:
+    business_id = registered_user["business"]["id"]
+    await mongo_manager.database["business_accounts"].update_one(
+        {"_id": ObjectId(business_id)}, {"$set": {"status": "suspended"}}
+    )
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": registered_user["email"], "password": registered_user["password"]},
+    )
+    assert login.status_code == 200
+    me = await client.get("/api/v1/auth/me")
+    assert me.status_code == 200
+    assert me.json()["data"]["active_business"]["status"] == "suspended"
+    trading = await client.get("/api/v1/members")
+    assert trading.status_code == 403
+    assert trading.json()["error"]["code"] == "BUSINESS_INACTIVE"
+
+@pytest.mark.asyncio
+async def test_replayed_refresh_token_revokes_rotated_sessions(
+    client: AsyncClient, registered_user: dict[str, Any]
+) -> None:
+    _ = registered_user
+    old_refresh = client.cookies.get(REFRESH_COOKIE_NAME)
+    assert old_refresh
+    rotated = await client.post("/api/v1/auth/refresh")
+    assert rotated.status_code == 200
+    new_refresh = client.cookies.get(REFRESH_COOKIE_NAME)
+
+    await mongo_manager.database["sessions"].update_one(
+        {"refresh_token_hash": hash_token(old_refresh)},
+        {"$set": {"revoked_at": utc_now() - timedelta(minutes=5)}},
+    )
+    client.cookies.set(REFRESH_COOKIE_NAME, old_refresh)
+    replay = await client.post("/api/v1/auth/refresh")
+    assert replay.status_code == 401
+
+    live = await mongo_manager.database["sessions"].find_one(
+        {"refresh_token_hash": hash_token(new_refresh)}
+    )
+    assert live is not None and live["revoked_at"] is not None
 
 @pytest.mark.asyncio
 async def test_refresh_rotation_rejects_old_credential(
@@ -312,7 +484,6 @@ async def test_refresh_rotation_rejects_old_credential(
     client.cookies.set(REFRESH_COOKIE_NAME, old_refresh)
     reused = await client.post("/api/v1/auth/refresh")
     assert reused.status_code == 401
-
 
 @pytest.mark.asyncio
 async def test_change_password_requires_current_and_revokes_sessions(
@@ -336,7 +507,6 @@ async def test_change_password_requires_current_and_revokes_sessions(
     )
     assert login.status_code == 200
 
-
 @pytest.mark.asyncio
 async def test_company_email_domain_stored_on_register(
     client: AsyncClient, registered_user: dict[str, Any]
@@ -348,7 +518,6 @@ async def test_company_email_domain_stored_on_register(
     assert me.status_code == 200
     active = me.json()["data"]["active_business"]
     assert active["email_domain"] == "example.com"
-
 
 @pytest.mark.asyncio
 async def test_register_with_personal_gmail_sends_verification(
@@ -375,7 +544,6 @@ async def test_register_with_personal_gmail_sends_verification(
     token = email_inbox.last_token(to=email, template="email_verification")
     assert token
 
-
 @pytest.mark.asyncio
 async def test_invitation_rejects_foreign_company_login_domain(
     client: AsyncClient,
@@ -398,7 +566,6 @@ async def test_invitation_rejects_foreign_company_login_domain(
     assert invited.status_code == 403, invited.text
     body = invited.json()["error"]
     assert body["code"] == "COMPANY_DOMAIN_MISMATCH"
-
 
 @pytest.mark.asyncio
 async def test_invitation_delivers_to_personal_email_login_is_company_email(
@@ -427,7 +594,6 @@ async def test_invitation_delivers_to_personal_email_login_is_company_email(
     assert email_inbox.last_token(to=personal, template="invitation")
     assert email_inbox.last_token(to=company_login, template="invitation") is None
 
-
 @pytest.mark.asyncio
 async def test_invite_signup_skips_otp_and_marks_verified(
     client: AsyncClient,
@@ -435,7 +601,6 @@ async def test_invite_signup_skips_otp_and_marks_verified(
     registered_user: dict[str, Any],
     email_inbox: MemoryEmailSender,
 ) -> None:
-    """Company login emails are not mailboxes — invitation proof replaces OTP."""
     await _verify(client, registered_user["verification_token"])
     roles = (await client.get("/api/v1/roles")).json()["data"]
     viewer = next(item for item in roles if item["name"] == "Viewer")
@@ -480,11 +645,10 @@ async def test_invite_signup_skips_otp_and_marks_verified(
         assert me.status_code == 200
         assert me.json()["data"]["user"]["email_verified_at"] is not None
 
-        # Idempotent re-accept should succeed without error.
+                                                            
         again = await other.post("/api/v1/invitations/accept", json={"token": invite_token})
         assert again.status_code == 200, again.text
         assert again.json()["data"].get("already_accepted") is True
-
 
 @pytest.mark.asyncio
 async def test_invitation_allows_same_company_domain(
@@ -508,14 +672,13 @@ async def test_invitation_allows_same_company_domain(
     assert invited.json()["data"]["invited_email"] == teammate
     assert email_inbox.last_token(to=teammate, template="invitation")
 
-
 @pytest.mark.asyncio
 async def test_unauthorized_business_switch_rejected(
     client: AsyncClient, registered_user: dict[str, Any], email_inbox: MemoryEmailSender
 ) -> None:
     other = await _register(client, email_inbox, business_name="Other Co")
     other_id = other["business"]["id"]
-    # Restore first user's cookies by logging in again.
+                                                       
     login = await client.post(
         "/api/v1/auth/login",
         json={"email": registered_user["email"], "password": registered_user["password"]},
@@ -524,7 +687,6 @@ async def test_unauthorized_business_switch_rejected(
     switch = await client.post("/api/v1/businesses/current/switch", json={"business_id": other_id})
     assert switch.status_code == 403
 
-
 @pytest.mark.asyncio
 async def test_multi_business_permission_isolation(
     client: AsyncClient,
@@ -532,7 +694,6 @@ async def test_multi_business_permission_isolation(
     registered_user: dict[str, Any],
     email_inbox: MemoryEmailSender,
 ) -> None:
-    """Cross-business isolation via invitation join (one owned business per account)."""
     await _verify(client, registered_user["verification_token"])
     first_id = registered_user["business"]["id"]
     roles_a = (await client.get("/api/v1/roles")).json()["data"]
@@ -546,7 +707,7 @@ async def test_multi_business_permission_isolation(
         roles_b = (await other.get("/api/v1/roles")).json()["data"]
         viewer_b = next(item for item in roles_b if item["name"] == "Viewer")
 
-        # Invite registered_user into other company as Viewer.
+                                                              
         invited = await other.post(
             "/api/v1/invitations",
             json={
@@ -577,9 +738,8 @@ async def test_multi_business_permission_isolation(
         json={"permissions": ["users.read"]},
     )
     assert patch.status_code == 403
-    # Sanity: own Viewer role still addressable in active business.
+                                                                   
     assert any(item["id"] == viewer_a["id"] for item in roles_on_a)
-
 
 @pytest.mark.asyncio
 async def test_invitation_accept_wrong_recipient_and_reuse(
@@ -588,6 +748,7 @@ async def test_invitation_accept_wrong_recipient_and_reuse(
     registered_user: dict[str, Any],
     email_inbox: MemoryEmailSender,
 ) -> None:
+    await _verify(client, registered_user["verification_token"])
     roles = (await client.get("/api/v1/roles")).json()["data"]
     viewer = next(item for item in roles if item["name"] == "Viewer")
     invitee_email = f"invitee_{os.urandom(3).hex()}@example.com"
@@ -620,13 +781,13 @@ async def test_invitation_accept_wrong_recipient_and_reuse(
 
     other_transport = ASGITransport(app=app)
     async with AsyncClient(transport=other_transport, base_url="http://test") as other_client:
-        await _register(other_client, email_inbox, email=invitee_email, business_name=None)
+        invitee = await _register(other_client, email_inbox, email=invitee_email, business_name=None)
+        await _verify(other_client, invitee["verification_token"])
         accepted = await other_client.post("/api/v1/invitations/accept", json={"token": token})
         assert accepted.status_code == 200, accepted.text
         reused = await other_client.post("/api/v1/invitations/accept", json={"token": token})
         assert reused.status_code == 200, reused.text
         assert reused.json()["data"].get("already_accepted") is True
-
 
 @pytest.mark.asyncio
 async def test_invitation_expired_and_revoked(
@@ -635,6 +796,7 @@ async def test_invitation_expired_and_revoked(
     registered_user: dict[str, Any],
     email_inbox: MemoryEmailSender,
 ) -> None:
+    await _verify(client, registered_user["verification_token"])
     roles = (await client.get("/api/v1/roles")).json()["data"]
     viewer = next(item for item in roles if item["name"] == "Viewer")
     email = f"later_{os.urandom(3).hex()}@example.com"
@@ -647,16 +809,17 @@ async def test_invitation_expired_and_revoked(
     revoked = await client.post(f"/api/v1/invitations/{invitation_id}/revoke")
     assert revoked.status_code == 200
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as other:
-        await _register(other, email_inbox, email=email, business_name=None)
+        invitee = await _register(other, email_inbox, email=email, business_name=None)
+        await _verify(other, invitee["verification_token"])
         accepted = await other.post("/api/v1/invitations/accept", json={"token": token})
         assert accepted.status_code == 403
-
 
 @pytest.mark.asyncio
 async def test_duplicate_pending_invitation_is_friendly(
     client: AsyncClient,
     registered_user: dict[str, Any],
 ) -> None:
+    await _verify(client, registered_user["verification_token"])
     roles = (await client.get("/api/v1/roles")).json()["data"]
     viewer = next(item for item in roles if item["name"] == "Viewer")
     email = f"dup_{os.urandom(3).hex()}@example.com"
@@ -675,12 +838,11 @@ async def test_duplicate_pending_invitation_is_friendly(
     assert body["id"] == first.json()["data"]["id"]
     assert "pending invitation" in (body.get("message") or "").lower()
 
-
 @pytest.mark.asyncio
 async def test_custom_role_and_system_role_protection(
     client: AsyncClient, registered_user: dict[str, Any]
 ) -> None:
-    _ = registered_user
+    await _verify(client, registered_user["verification_token"])
     created = await client.post(
         "/api/v1/roles",
         json={"name": "Ops Desk", "permissions": ["users.read", "roles.read"]},
@@ -694,7 +856,6 @@ async def test_custom_role_and_system_role_protection(
     blocked = await client.delete(f"/api/v1/roles/{admin['id']}")
     assert blocked.status_code == 409
 
-
 @pytest.mark.asyncio
 async def test_permission_denied_uses_resource_action_not_role_name(
     client: AsyncClient,
@@ -702,6 +863,7 @@ async def test_permission_denied_uses_resource_action_not_role_name(
     registered_user: dict[str, Any],
     email_inbox: MemoryEmailSender,
 ) -> None:
+    await _verify(client, registered_user["verification_token"])
     roles = (await client.get("/api/v1/roles")).json()["data"]
     viewer = next(item for item in roles if item["name"] == "Viewer")
     email = f"viewer_{os.urandom(3).hex()}@example.com"
@@ -711,7 +873,8 @@ async def test_permission_denied_uses_resource_action_not_role_name(
     )
     token = email_inbox.last_token(to=email, template="invitation")
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as other:
-        await _register(other, email_inbox, email=email, business_name=None)
+        invitee = await _register(other, email_inbox, email=email, business_name=None)
+        await _verify(other, invitee["verification_token"])
         await other.post("/api/v1/invitations/accept", json={"token": token})
         await other.post(
             "/api/v1/businesses/current/switch",
@@ -723,7 +886,6 @@ async def test_permission_denied_uses_resource_action_not_role_name(
         assert denied.json()["error"]["details"]["resource"] == "roles"
         assert denied.json()["error"]["details"]["action"] == "manage"
 
-
 @pytest.mark.asyncio
 async def test_trading_admin_cannot_global_suspend_users(
     client: AsyncClient,
@@ -731,7 +893,6 @@ async def test_trading_admin_cannot_global_suspend_users(
     registered_user: dict[str, Any],
     email_inbox: MemoryEmailSender,
 ) -> None:
-    """Global account suspend is platform-only — trading Business Admin must not ban outsiders."""
     other_email = f"target_{os.urandom(3).hex()}@example.com"
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as other:
         other_reg = await _register(other, email_inbox, email=other_email, business_name="Target Co")
@@ -746,12 +907,14 @@ async def test_trading_admin_cannot_global_suspend_users(
     assert still is not None
     assert still["status"] != "suspended"
 
-
 @pytest.mark.asyncio
 async def test_suspend_requires_reason_blocks_sessions_and_audits(
-    client: AsyncClient, registered_user: dict[str, Any]
+    client: AsyncClient,
+    app: Any,
+    registered_user: dict[str, Any],
+    email_inbox: MemoryEmailSender,
 ) -> None:
-    # Elevate to platform admin so global suspend is authorized.
+                                                                
     user_doc = await mongo_manager.database["users"].find_one({"email": registered_user["email"]})
     platform = await mongo_manager.database["business_accounts"].find_one({"type": "platform"})
     role = await mongo_manager.database["roles"].find_one(
@@ -773,30 +936,38 @@ async def test_suspend_requires_reason_blocks_sessions_and_audits(
         "/api/v1/businesses/current/switch", json={"business_id": str(platform["_id"])}
     )
 
-    missing = await client.post(
-        "/api/v1/users/suspend",
-        json={"user_id": registered_user["user"]["id"], "reason": ""},
-    )
-    assert missing.status_code == 422
-    suspended = await client.post(
+    own = await client.post(
         "/api/v1/platform/users/suspend",
-        json={"user_id": registered_user["user"]["id"], "reason": "Policy violation"},
+        json={"user_id": registered_user["user"]["id"], "reason": "Oops"},
     )
-    assert suspended.status_code == 200, suspended.text
-    me = await client.get("/api/v1/auth/me")
-    assert me.status_code == 403
-    refresh = await client.post("/api/v1/auth/refresh")
-    assert refresh.status_code in {401, 403}
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": registered_user["email"], "password": registered_user["password"]},
-    )
-    assert login.status_code == 403
+    assert own.status_code == 403
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as target:
+        target_reg = await _register(target, email_inbox, business_name="Target Co")
+        target_id = target_reg["user"]["id"]
+        missing = await client.post(
+            "/api/v1/users/suspend",
+            json={"user_id": target_id, "reason": ""},
+        )
+        assert missing.status_code == 422
+        suspended = await client.post(
+            "/api/v1/platform/users/suspend",
+            json={"user_id": target_id, "reason": "Policy violation"},
+        )
+        assert suspended.status_code == 200, suspended.text
+        me = await target.get("/api/v1/auth/me")
+        assert me.status_code == 403
+        refresh = await target.post("/api/v1/auth/refresh")
+        assert refresh.status_code in {401, 403}
+        login = await target.post(
+            "/api/v1/auth/login",
+            json={"email": target_reg["email"], "password": target_reg["password"]},
+        )
+        assert login.status_code == 403
     logs = await mongo_manager.database["audit_logs"].find({"action": "USER_SUSPENDED"}).to_list(10)
     assert logs
     assert logs[-1]["metadata"]["reason"] == "Policy violation"
     assert "password" not in logs[-1]["metadata"]
-
 
 @pytest.mark.asyncio
 async def test_platform_staff_through_platform_business(
@@ -844,7 +1015,6 @@ async def test_platform_staff_through_platform_business(
     back = await client.get("/api/v1/auth/me")
     assert permission_code("settings", "manage") not in set(back.json()["data"]["permissions"])
 
-
 @pytest.mark.asyncio
 async def test_audit_registration_has_actor_and_no_secrets(
     client: AsyncClient, registered_user: dict[str, Any]
@@ -861,13 +1031,13 @@ async def test_audit_registration_has_actor_and_no_secrets(
     assert "SecurePass123!" not in blob
     assert registered_user["verification_token"] not in blob
 
-
 @pytest.mark.asyncio
 async def test_invitation_cannot_demote_last_business_admin(
     client: AsyncClient,
     registered_user: dict[str, Any],
     email_inbox: MemoryEmailSender,
 ) -> None:
+    await _verify(client, registered_user["verification_token"])
     roles = (await client.get("/api/v1/roles")).json()["data"]
     viewer = next(item for item in roles if item["name"] == "Viewer")
     invited = await client.post(
@@ -878,13 +1048,12 @@ async def test_invitation_cannot_demote_last_business_admin(
             "permissions": viewer["permissions"],
         },
     )
-    assert invited.status_code == 200
-    token = email_inbox.last_token(to=registered_user["email"], template="invitation")
-    assert token
-    accepted = await client.post("/api/v1/invitations/accept", json={"token": token})
-    assert accepted.status_code == 409, accepted.text
-    assert accepted.json()["error"]["code"] == "LAST_ADMIN_PROTECTED"
-
+                                                                                               
+    assert invited.status_code == 409, invited.text
+    assert invited.json()["error"]["details"]["reason"] == "already_member"
+    assert email_inbox.last_token(to=registered_user["email"], template="invitation") is None
+    members = (await client.get("/api/v1/members")).json()["data"]
+    assert members[0]["role_name"] == "Business Admin"
 
 @pytest.mark.asyncio
 async def test_invitation_reaccept_after_membership_removed(
@@ -893,6 +1062,7 @@ async def test_invitation_reaccept_after_membership_removed(
     registered_user: dict[str, Any],
     email_inbox: MemoryEmailSender,
 ) -> None:
+    await _verify(client, registered_user["verification_token"])
     roles = (await client.get("/api/v1/roles")).json()["data"]
     viewer = next(item for item in roles if item["name"] == "Viewer")
     invitee_email = f"rejoin_{os.urandom(3).hex()}@example.com"
@@ -909,7 +1079,8 @@ async def test_invitation_reaccept_after_membership_removed(
     assert token
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as other:
-        await _register(other, email_inbox, email=invitee_email, business_name=None)
+        invitee = await _register(other, email_inbox, email=invitee_email, business_name=None)
+        await _verify(other, invitee["verification_token"])
         accepted = await other.post("/api/v1/invitations/accept", json={"token": token})
         assert accepted.status_code == 200, accepted.text
         membership_id = accepted.json()["data"]["membership_id"]
@@ -937,7 +1108,6 @@ async def test_invitation_reaccept_after_membership_removed(
         reaccepted = await other.post("/api/v1/invitations/accept", json={"token": token2})
         assert reaccepted.status_code == 200, reaccepted.text
 
-
 @pytest.mark.asyncio
 async def test_nested_member_get_requires_users_read(
     client: AsyncClient,
@@ -945,7 +1115,8 @@ async def test_nested_member_get_requires_users_read(
     registered_user: dict[str, Any],
     email_inbox: MemoryEmailSender,
 ) -> None:
-    # Viewer includes users.read — use a custom role without it.
+    await _verify(client, registered_user["verification_token"])
+                                                                
     custom = await client.post(
         "/api/v1/roles",
         json={"name": f"Limited {os.urandom(2).hex()}", "permissions": ["roles.read"]},
@@ -964,7 +1135,8 @@ async def test_nested_member_get_requires_users_read(
     )
     token = email_inbox.last_token(to=email, template="invitation")
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as other:
-        await _register(other, email_inbox, email=email, business_name=None)
+        invitee = await _register(other, email_inbox, email=email, business_name=None)
+        await _verify(other, invitee["verification_token"])
         await other.post("/api/v1/invitations/accept", json={"token": token})
         await other.post(
             "/api/v1/businesses/current/switch",
@@ -975,6 +1147,80 @@ async def test_nested_member_get_requires_users_read(
         )
         assert denied.status_code == 403
 
+@pytest.mark.asyncio
+async def test_member_manager_cannot_act_on_broader_access(
+    client: AsyncClient,
+    app: Any,
+    registered_user: dict[str, Any],
+    email_inbox: MemoryEmailSender,
+) -> None:
+    await _verify(client, registered_user["verification_token"])
+    hr_codes = ["users.read", "users.update", "users.remove", "roles.read", "roles.manage"]
+    hr = await client.post(
+        "/api/v1/roles", json={"name": f"HR {os.urandom(2).hex()}", "permissions": hr_codes}
+    )
+    assert hr.status_code == 200, hr.text
+    senior = await client.post(
+        "/api/v1/roles",
+        json={"name": f"Senior {os.urandom(2).hex()}", "permissions": ["users.read", "businesses.read"]},
+    )
+    assert senior.status_code == 200, senior.text
+    roles = (await client.get("/api/v1/roles")).json()["data"]
+    viewer = next(item for item in roles if item["name"] == "Viewer")
+    owner_membership = (await client.get("/api/v1/members")).json()["data"][0]
+    business_id = registered_user["business"]["id"]
+
+    email = f"hr_{os.urandom(3).hex()}@example.com"
+    invited = await client.post(
+        "/api/v1/invitations",
+        json={"email": email, "role_id": hr.json()["data"]["id"], "permissions": hr_codes},
+    )
+    assert invited.status_code == 200, invited.text
+    token = email_inbox.last_token(to=email, template="invitation")
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as other:
+        member = await _register(other, email_inbox, email=email, business_name=None)
+        await _verify(other, member["verification_token"])
+        accepted = await other.post("/api/v1/invitations/accept", json={"token": token})
+        assert accepted.status_code == 200, accepted.text
+        await other.post("/api/v1/businesses/current/switch", json={"business_id": business_id})
+
+        demote = await other.patch(
+            f"/api/v1/members/{owner_membership['id']}", json={"role_id": viewer["id"]}
+        )
+        assert demote.status_code == 403, demote.text
+        assert demote.json()["error"]["code"] == "PRIVILEGE_ESCALATION"
+        suspend = await other.post(
+            f"/api/v1/members/{owner_membership['id']}/suspend", json={"reason": "test"}
+        )
+        assert suspend.status_code == 403, suspend.text
+        remove = await other.delete(f"/api/v1/members/{owner_membership['id']}")
+        assert remove.status_code == 403, remove.text
+        strip = await other.patch(
+            f"/api/v1/roles/{senior.json()['data']['id']}", json={"permissions": ["users.read"]}
+        )
+        assert strip.status_code == 403, strip.text
+
+    still_admin = (await client.get("/api/v1/members")).json()["data"]
+    owner_after = next(item for item in still_admin if item["id"] == owner_membership["id"])
+    assert owner_after["status"] == MembershipStatus.ACTIVE
+
+@pytest.mark.asyncio
+async def test_role_with_open_invitation_cannot_be_deleted(
+    client: AsyncClient, registered_user: dict[str, Any]
+) -> None:
+    await _verify(client, registered_user["verification_token"])
+    role = await client.post(
+        "/api/v1/roles",
+        json={"name": f"Temp {os.urandom(2).hex()}", "permissions": ["users.read"]},
+    )
+    role_id = role.json()["data"]["id"]
+    invited = await client.post(
+        "/api/v1/invitations",
+        json={"email": f"t_{os.urandom(3).hex()}@example.com", "role_id": role_id, "permissions": ["users.read"]},
+    )
+    assert invited.status_code == 200, invited.text
+    blocked = await client.delete(f"/api/v1/roles/{role_id}")
+    assert blocked.status_code == 409, blocked.text
 
 @pytest.mark.asyncio
 async def test_platform_users_pagination_meta(
@@ -1009,7 +1255,6 @@ async def test_platform_users_pagination_meta(
     assert body["meta"]["total"] >= 1
     assert len(body["data"]) <= 1
 
-
 async def _elevate_platform_admin(client: AsyncClient, email: str) -> str:
     user_doc = await mongo_manager.database["users"].find_one({"email": email})
     platform = await mongo_manager.database["business_accounts"].find_one({"type": "platform"})
@@ -1032,7 +1277,6 @@ async def _elevate_platform_admin(client: AsyncClient, email: str) -> str:
         "/api/v1/businesses/current/switch", json={"business_id": str(platform["_id"])}
     )
     return str(platform["_id"])
-
 
 @pytest.mark.asyncio
 async def test_platform_can_provision_user_buyer_and_supplier(
@@ -1103,12 +1347,10 @@ async def test_platform_can_provision_user_buyer_and_supplier(
     )
     assert login.status_code == 200, login.text
 
-
 @pytest.mark.asyncio
 async def test_platform_full_control_on_trading_company_roles(
     client: AsyncClient, registered_user: dict[str, Any]
 ) -> None:
-    """Platform Admin can list/edit Business Admin and create custom roles on tenants."""
     await _elevate_platform_admin(client, registered_user["email"])
     suffix = os.urandom(3).hex()
     buyer_res = await client.post(
@@ -1132,8 +1374,8 @@ async def test_platform_full_control_on_trading_company_roles(
     admin = next(item for item in roles if item["name"] == "Business Admin")
     assert "users.read" in admin["permissions"]
 
-    # Trading company Business Admin cannot be edited via company routes by platform
-    # session (wrong tenant) — but platform oversight unlocks it.
+                                                                                    
+                                                                 
     updated = await client.patch(
         f"/api/v1/platform/businesses/{business_id}/roles/{admin['id']}",
         json={"permissions": ["users.read", "roles.read", "businesses.read"]},
@@ -1145,7 +1387,7 @@ async def test_platform_full_control_on_trading_company_roles(
         "businesses.read",
     }
 
-    # Platform-only codes must not land on trading roles.
+                                                         
     blocked = await client.patch(
         f"/api/v1/platform/businesses/{business_id}/roles/{admin['id']}",
         json={"permissions": ["users.read", "settings.manage"]},

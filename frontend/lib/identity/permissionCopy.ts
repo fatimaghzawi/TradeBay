@@ -1,6 +1,5 @@
 import type { Permission } from "@/lib/api/identityApi";
 
-/** Business-facing module titles for permission resources. */
 export const MODULE_LABELS: Record<string, string> = {
   users: "Team",
   roles: "Roles",
@@ -79,7 +78,6 @@ export function groupPermissionsByModule(
   );
 }
 
-/** High-level access chips for invite / role summary. */
 export function accessModulesFromCodes(codes: string[]): {
   label: string;
   allowed: boolean;

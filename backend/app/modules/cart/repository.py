@@ -1,4 +1,3 @@
-"""Cart repositories."""
 
 from __future__ import annotations
 
@@ -21,7 +20,6 @@ class CartRepository(BaseRepository):
             {"buyer_business_id": parse_object_id(buyer_business_id)},
             session=session,
         )
-
 
 class CartItemRepository(BaseRepository):
     collection_name = CollectionName.CART_ITEMS

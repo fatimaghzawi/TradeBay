@@ -2,11 +2,11 @@
 
 import { BusinessStepper } from "@/components/business/BusinessStepper";
 import { clearBusinessDraft } from "@/lib/business";
+import { BackLink } from "@/components/ui/BackLink";
 import { ROUTES } from "@/lib/constants";
 import Link from "next/link";
 import { useEffect } from "react";
 
-/** Complete — centered celebration sheet unique to verification success. */
 export default function BusinessVerificationCompletePage() {
   useEffect(() => {
     clearBusinessDraft();
@@ -16,13 +16,13 @@ export default function BusinessVerificationCompletePage() {
     <div className="relative space-y-5">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 -top-8 mx-auto h-40 max-w-lg rounded-full bg-[#e8f6ef]/80 blur-3xl"
+        className="pointer-events-none absolute inset-x-0 -top-8 mx-auto h-40 max-w-lg rounded-full bg-success-soft/80 blur-3xl"
       />
       <div className="relative flex justify-end">
         <BusinessStepper active={3} variant="supplier" />
       </div>
 
-      <div className="relative mx-auto max-w-lg overflow-hidden rounded-[1.75rem] border border-[#e2ebe6] bg-white px-6 py-12 text-center shadow-[0_20px_50px_rgba(21,36,29,0.07)] sm:px-10">
+      <div className="relative mx-auto max-w-lg overflow-hidden rounded-[1.75rem] border border-border bg-card px-6 py-12 text-center shadow-[0_20px_50px_rgba(21,36,29,0.07)] sm:px-10">
         <svg
           aria-hidden
           className="pointer-events-none absolute -right-8 -top-6 h-32 w-32 text-[#cfe3d6]"
@@ -50,29 +50,26 @@ export default function BusinessVerificationCompletePage() {
           </svg>
         </div>
 
-        <p className="mt-5 text-[0.7rem] font-bold uppercase tracking-[0.16em] text-[#e86f2a]">
+        <p className="mt-5 text-[0.7rem] font-bold uppercase tracking-[0.16em] text-accent-text">
           Company identity
         </p>
-        <h1 className="mt-2 font-[family-name:var(--font-instrument)] text-3xl tracking-tight text-[#0c1612]">
+        <h1 className="mt-2 font-[family-name:var(--font-instrument)] text-3xl tracking-tight text-foreground">
           Your company is taking shape
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-[#5a6a62]">
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           Documents are with TradeBay for review. Selling stays locked until
           approval — usually within 1–2 business days. Meanwhile you can build
           your team and define access.
         </p>
         <Link
           href={ROUTES.members}
-          className="mt-8 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#e86f2a] text-sm font-bold text-white transition hover:bg-[#d46220]"
+          className="mt-8 inline-flex h-12 w-full items-center justify-center rounded-xl bg-accent text-sm font-bold text-accent-foreground transition hover:bg-accent/90"
         >
           Build your team →
         </Link>
-        <Link
-          href={ROUTES.businesses}
-          className="mt-3 inline-flex text-sm font-semibold text-[#0d3b2a] hover:underline"
-        >
-          Back to company identity
-        </Link>
+        <div className="mt-3 flex justify-center">
+          <BackLink href={ROUTES.businesses}>Back to company identity</BackLink>
+        </div>
       </div>
     </div>
   );

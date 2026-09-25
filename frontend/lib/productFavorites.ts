@@ -1,10 +1,10 @@
-/** Local product favorites for guests and signed-in users. */
+
 
 export type SavedProduct = {
   id: string;
   name: string;
   image?: string | null;
-  /** Optional deep link when id is not a catalog product (e.g. landing demos). */
+  
   href?: string | null;
   savedAt: string;
 };
@@ -35,7 +35,7 @@ function writeAll(items: SavedProduct[]) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     window.dispatchEvent(new Event(PRODUCT_FAV_EVENT));
   } catch {
-    /* ignore */
+    
   }
 }
 

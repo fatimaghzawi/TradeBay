@@ -1,9 +1,7 @@
-"""Buyer shopping cart — add marketplace products, then checkout to an RFQ."""
 
 from __future__ import annotations
 
 __all__ = ["router"]
-
 
 def __getattr__(name: str):
     if name == "router":

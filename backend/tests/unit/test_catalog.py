@@ -1,4 +1,3 @@
-"""Unit tests for catalog pricing and category helpers."""
 
 from __future__ import annotations
 
@@ -9,13 +8,11 @@ def test_slugify_basic() -> None:
     assert _slugify("USB-C Charger!") == "usb-c-charger"
     assert _slugify("  Keyboards  ") == "keyboards"
 
-
 def test_price_ranges_overlap_logic() -> None:
     assert _ranges_overlap(50, 99, 80, 120) is True
     assert _ranges_overlap(50, 99, 100, 200) is False
     assert _ranges_overlap(500, None, 400, 600) is True
     assert _ranges_overlap(500, None, 100, 499) is False
-
 
 def test_resolve_unit_price_picks_correct_tier() -> None:
     service = CatalogService()
@@ -47,13 +44,11 @@ def test_resolve_unit_price_picks_correct_tier() -> None:
     assert service.resolve_unit_price(tiers, 800)["id"] == "3"
     assert service.resolve_unit_price(tiers, 10) is None
 
-
 def test_serialize_product_includes_featured_flag() -> None:
     from datetime import datetime, timezone
 
-    from bson import ObjectId
-
     from app.modules.catalog.service import serialize_product
+    from bson import ObjectId
 
     oid = ObjectId()
     now = datetime.now(timezone.utc)

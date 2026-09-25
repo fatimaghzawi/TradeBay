@@ -1,4 +1,3 @@
-"""Unit coverage for revoke → listings offline helper."""
 
 from __future__ import annotations
 
@@ -12,7 +11,6 @@ def test_buyer_visible_statuses_exclude_inactive() -> None:
     assert ProductStatus.ACTIVE in BUYER_VISIBLE_PRODUCT_STATUSES
     assert ProductStatus.INACTIVE not in BUYER_VISIBLE_PRODUCT_STATUSES
     assert ProductStatus.DRAFT not in BUYER_VISIBLE_PRODUCT_STATUSES
-
 
 def test_verification_transition_allows_revoke_from_verified() -> None:
     from app.modules.identity.constants import VERIFICATION_TRANSITIONS

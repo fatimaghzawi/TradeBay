@@ -15,18 +15,14 @@ type Props = {
   stats?: DirectoryMastStat[];
   actions?: ReactNode;
   meta?: ReactNode;
-  /** Giant marketplace opening vs slightly smaller app-page opening */
+  
   size?: "display" | "page";
   mark?: string;
 };
 
-/**
- * Signature page opening used across TradeBay buyer/supplier/admin surfaces.
- * Titles stand alone — no supporting lede/meta under the signature.
- */
 export function DirectoryMast({
   title,
-  lede: _lede,
+  lede,
   searchId,
   searchValue,
   searchPlaceholder = "Search…",
@@ -79,6 +75,8 @@ export function DirectoryMast({
             opacity="0.55"
           />
         </svg>
+
+        {lede ? <div className="tb-sign__lede">{lede}</div> : null}
       </div>
 
       {showSearch ? (

@@ -17,6 +17,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function ConversationThreadPage() {
   const params = useParams<{ id: string | string[] }>();
@@ -80,7 +81,7 @@ export default function ConversationThreadPage() {
       });
       lastCreatedRef.current = page.data.at(-1)?.created_at ?? lastCreatedRef.current;
     } catch {
-      /* keep the last good thread */
+      
     }
   }, [conversationId, hasPermission]);
 
@@ -149,9 +150,7 @@ export default function ConversationThreadPage() {
   return (
     <div className="tb-chat-room">
       <header className="tb-chat-room__head">
-        <Link href={ROUTES.conversations} className="tb-chat-back" aria-label="Back to inbox">
-          ←
-        </Link>
+        <BackLink href={ROUTES.conversations} aria-label="Back to inbox"></BackLink>
         <div className="tb-chat-room__pair" aria-hidden>
           <ChatAvatar name={business?.name || "You"} logoUrl={myLogo} size="sm" />
           <span className="tb-chat-room__link" />

@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClass } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/LoadingState";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -12,7 +13,7 @@ type AppStateFrameProps = {
   title: string;
   body?: ReactNode;
   actions?: ReactNode;
-  /** Compact = inline section; page = full viewport moment */
+  
   size?: "page" | "section";
   className?: string;
   children?: ReactNode;
@@ -32,10 +33,6 @@ const TONE_GLYPH: Record<AppStateTone, string> = {
   empty: "◇",
 };
 
-/**
- * Shared chrome for loading / error / not-found / empty moments.
- * Keeps TradeBay page openings consistent across the shell.
- */
 export function AppStateFrame({
   tone,
   title,
@@ -76,7 +73,11 @@ export function AppStateFrame({
         )}
       </div>
 
-      <h1 className="tb-app-state__title">{title}</h1>
+      {size === "page" ? (
+        <h1 className="tb-app-state__title">{title}</h1>
+      ) : (
+        <h2 className="tb-app-state__title">{title}</h2>
+      )}
 
       <svg className="tb-app-state__ink" viewBox="0 0 280 22" aria-hidden>
         <path
@@ -106,10 +107,7 @@ export function AppStateAction({
   children: ReactNode;
   tone?: "primary" | "soft";
 }) {
-  const className = cn(
-    "tb-app-state__btn",
-    tone === "soft" && "tb-app-state__btn--soft",
-  );
+  const className = buttonClass({ variant: tone === "soft" ? "outline" : "primary" });
   if (href) {
     return (
       <Link href={href} className={className}>

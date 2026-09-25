@@ -1,4 +1,3 @@
-"""Business Planner API — user-scoped discovery, plans, assistant, RFQ preview."""
 
 from __future__ import annotations
 
@@ -21,13 +20,11 @@ from app.shared.schemas.response import paginated, success
 planner_router = APIRouter(prefix="/business-planner", tags=["Business Planner"])
 plans_router = APIRouter(prefix="/business-plans", tags=["Business Planner"])
 
-# Back-compat for api_router optional import of `router`
+                                                        
 router = planner_router
-
 
 def get_business_planner_service() -> BusinessPlannerService:
     return BusinessPlannerService()
-
 
 @planner_router.post("/sessions", summary="Start a business planner discovery session")
 async def create_session(
@@ -36,7 +33,6 @@ async def create_session(
 ) -> dict[str, Any]:
     return success(await service.create_session(user_id=owner_id))
 
-
 @planner_router.get("/sessions/{session_id}", summary="Get a planner discovery session")
 async def get_session(
     session_id: str,
@@ -44,7 +40,6 @@ async def get_session(
     service: Annotated[BusinessPlannerService, Depends(get_business_planner_service)],
 ) -> dict[str, Any]:
     return success(await service.get_session(user_id=owner_id, session_id=session_id))
-
 
 @planner_router.post("/sessions/{session_id}/answers", summary="Submit discovery step answers")
 async def submit_answers(
@@ -62,7 +57,6 @@ async def submit_answers(
         )
     )
 
-
 @planner_router.post(
     "/sessions/{session_id}/next-questions",
     summary="Get adaptive AI follow-up questions",
@@ -74,7 +68,6 @@ async def next_questions(
 ) -> dict[str, Any]:
     return success(await service.next_questions(user_id=owner_id, session_id=session_id))
 
-
 @planner_router.post(
     "/sessions/{session_id}/generate",
     summary="Analyze marketplace and generate a structured business plan",
@@ -85,7 +78,6 @@ async def generate_plan(
     service: Annotated[BusinessPlannerService, Depends(get_business_planner_service)],
 ) -> dict[str, Any]:
     return success(await service.generate_from_session(user_id=owner_id, session_id=session_id))
-
 
 @plans_router.get("", summary="List my business plans")
 async def list_plans(
@@ -100,7 +92,6 @@ async def list_plans(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @plans_router.get("/{plan_id}", summary="Get business plan dashboard payload")
 async def get_plan(
     plan_id: str,
@@ -108,7 +99,6 @@ async def get_plan(
     service: Annotated[BusinessPlannerService, Depends(get_business_planner_service)],
 ) -> dict[str, Any]:
     return success(await service.get_plan(user_id=owner_id, plan_id=plan_id))
-
 
 @plans_router.patch("/{plan_id}", summary="Update plan title, milestones, or preferences")
 async def patch_plan(
@@ -127,7 +117,6 @@ async def patch_plan(
         )
     )
 
-
 @plans_router.post("/{plan_id}/regenerate", summary="Regenerate a new plan version")
 async def regenerate_plan(
     plan_id: str,
@@ -144,7 +133,6 @@ async def regenerate_plan(
         )
     )
 
-
 @plans_router.post("/{plan_id}/assistant", summary="Plan-aware AI assistant")
 async def plan_assistant(
     plan_id: str,
@@ -156,7 +144,6 @@ async def plan_assistant(
         await service.assistant(user_id=owner_id, plan_id=plan_id, message=body.message)
     )
 
-
 @plans_router.post("/{plan_id}/sourcing-draft", summary="Create AI Sourcing draft from plan")
 async def sourcing_draft(
     plan_id: str,
@@ -165,7 +152,6 @@ async def sourcing_draft(
 ) -> dict[str, Any]:
     return success(await service.create_sourcing_draft(user_id=auth.user_id, plan_id=plan_id))
 
-
 @plans_router.post("/{plan_id}/rfq-preview", summary="Prepare RFQ draft payload (no publish)")
 async def rfq_preview(
     plan_id: str,
@@ -173,7 +159,6 @@ async def rfq_preview(
     service: Annotated[BusinessPlannerService, Depends(get_business_planner_service)],
 ) -> dict[str, Any]:
     return success(await service.rfq_preview(user_id=auth.user_id, plan_id=plan_id))
-
 
 @plans_router.post("/{plan_id}/convert-to-rfq", summary="Create draft RFQ from business plan")
 async def convert_plan_to_rfq(

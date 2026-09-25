@@ -1,7 +1,3 @@
-"""Identity repositories — persistence only (no business rules).
-
-Each class maps to one ``CollectionName``. Services call these; routers do not.
-"""
 
 from __future__ import annotations
 
@@ -36,7 +32,6 @@ class UserRepository(BaseRepository):
             {"$set": {"avatar_url": url, "updated_at": updated_at}},
         )
 
-
 class BusinessRepository(BaseRepository):
     collection_name = CollectionName.BUSINESS_ACCOUNTS
 
@@ -48,7 +43,6 @@ class BusinessRepository(BaseRepository):
         if not domain:
             return None
         return await self.find_one({"email_domain": domain})
-
 
 class MembershipRepository(BaseRepository):
     collection_name = CollectionName.BUSINESS_MEMBERSHIPS
@@ -98,7 +92,6 @@ class MembershipRepository(BaseRepository):
         *,
         session: MongoSession = None,
     ) -> dict[str, Any] | None:
-        """Any membership row for (user, business), regardless of status."""
         return await self.find_one(
             {
                 "user_id": parse_object_id(str(user_id)),
@@ -107,10 +100,8 @@ class MembershipRepository(BaseRepository):
             session=session,
         )
 
-
 class RoleRepository(BaseRepository):
     collection_name = CollectionName.ROLES
-
 
 class PermissionRepository(BaseRepository):
     collection_name = CollectionName.PERMISSIONS
@@ -126,7 +117,6 @@ class PermissionRepository(BaseRepository):
             limit=max(len(permission_ids), 1),
         )
         return {f"{row['resource']}.{row['action']}" for row in rows}
-
 
 class RolePermissionRepository(BaseRepository):
     collection_name = CollectionName.ROLE_PERMISSIONS
@@ -157,7 +147,6 @@ class RolePermissionRepository(BaseRepository):
                 session=session,
             )
 
-
 class InvitationRepository(BaseRepository):
     collection_name = CollectionName.INVITATIONS
 
@@ -171,12 +160,34 @@ class InvitationRepository(BaseRepository):
             sort=[("created_at", -1)],
         )
 
-
 class AuthTokenRepository(BaseRepository):
     collection_name = CollectionName.AUTH_TOKENS
 
-    async def get_by_hash(self, token_hash: str) -> dict[str, Any] | None:
-        return await self.find_one({"token_hash": token_hash})
+    async def claim_attempt(
+        self, token_id: ObjectId, *, max_attempts: int
+    ) -> dict[str, Any] | None:
+        from pymongo import ReturnDocument
+
+        return await self.collection.find_one_and_update(
+            {
+                "_id": token_id,
+                "used_at": None,
+                "invalidated_at": None,
+                "attempts": {"$lt": max_attempts},
+            },
+            {"$inc": {"attempts": 1}},
+            return_document=ReturnDocument.AFTER,
+        )
+
+    async def mark_used_if_open(
+        self, token_id: ObjectId, at: Any, *, session: MongoSession = None
+    ) -> bool:
+        result = await self.collection.update_one(
+            {"_id": token_id, "used_at": None, "invalidated_at": None},
+            {"$set": {"used_at": at}},
+            session=session,
+        )
+        return result.modified_count == 1
 
     async def get_latest_open(
         self, user_id: str | ObjectId, purpose: str
@@ -210,7 +221,6 @@ class AuthTokenRepository(BaseRepository):
             session=session,
         )
 
-
 class SessionRepository(BaseRepository):
     collection_name = CollectionName.SESSIONS
 
@@ -233,7 +243,6 @@ class SessionRepository(BaseRepository):
         *,
         session: MongoSession = None,
     ) -> dict[str, Any] | None:
-        """Compare-and-swap revoke — returns None if already revoked (refresh race)."""
         oid = session_id if isinstance(session_id, ObjectId) else parse_object_id(str(session_id))
         from pymongo import ReturnDocument
 
@@ -265,9 +274,22 @@ class SessionRepository(BaseRepository):
         )
         return int(result.modified_count)
 
-    async def list_active_for_user(self, user_id: str | ObjectId) -> list[dict[str, Any]]:
+    async def revoke_family(self, family_id: ObjectId, revoked_at: Any) -> int:
+        result = await self.collection.update_many(
+            {"family_id": family_id, "revoked_at": None},
+            {"$set": {"revoked_at": revoked_at}},
+        )
+        return int(result.modified_count)
+
+    async def list_active_for_user(
+        self, user_id: str | ObjectId, *, now: Any
+    ) -> list[dict[str, Any]]:
         return await self.find_many(
-            {"user_id": parse_object_id(str(user_id)), "revoked_at": None},
+            {
+                "user_id": parse_object_id(str(user_id)),
+                "revoked_at": None,
+                "expires_at": {"$gt": now},
+            },
             limit=100,
             sort=[("last_used_at", -1), ("created_at", -1)],
         )
@@ -279,7 +301,6 @@ class SessionRepository(BaseRepository):
         *,
         session: MongoSession = None,
     ) -> int:
-        """Drop stale active-business pointers after membership removal."""
         result = await self.collection.update_many(
             {
                 "user_id": parse_object_id(str(user_id)),
@@ -290,7 +311,6 @@ class SessionRepository(BaseRepository):
             session=session,
         )
         return int(result.modified_count)
-
 
 class SupplierProfileRepository(BaseRepository):
     collection_name = CollectionName.SUPPLIER_PROFILES

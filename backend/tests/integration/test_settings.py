@@ -1,20 +1,17 @@
-"""System Settings integration — admin RBAC, updates, numbering, immutability."""
 
 from __future__ import annotations
 
 from decimal import Decimal
 
 import pytest
-from bson import ObjectId
 from app.core.exceptions import ForbiddenError
 from app.db.collections import CollectionName
 from app.db.mongodb import mongo_manager
-from app.modules.settings.constants import SINGLETON_KEY
+from app.modules.platform_money.service import create_commission_and_payable_for_order
 from app.modules.settings.numbering import allocate_document_number
 from app.modules.settings.service import SettingsService
-from app.modules.platform_money.service import create_commission_and_payable_for_order
 from app.shared.types.money import to_decimal128
-from app.shared.utils.datetime import utc_now
+from bson import ObjectId
 
 
 @pytest.mark.asyncio
@@ -33,7 +30,7 @@ async def test_settings_admin_update_and_history(app: object) -> None:
 
     old_rate = all_settings["platform"]["commission_rate"]
 
-    # Snapshot commission on an order before rate change
+                                                        
     order_id = ObjectId()
     supplier_id = ObjectId()
     await create_commission_and_payable_for_order(
@@ -59,14 +56,14 @@ async def test_settings_admin_update_and_history(app: object) -> None:
     assert updated["commission_rate"] == "0.06"
     assert updated["platform_name"] == "TradeBay Admin"
 
-    # Historical commission unchanged
+                                     
     commission = await mongo_manager.collection(CollectionName.COMMISSION_RECORDS).find_one(
         {"order_id": order_id}
     )
     assert commission is not None
     assert commission["rate"] == frozen_rate
 
-    # Tax rate change creates new active row; old invoices would keep their snapshot
+                                                                                    
     tax_before = await mongo_manager.collection(CollectionName.TAX_SETTINGS).find_one(
         {"is_active": True}
     )
@@ -96,19 +93,18 @@ async def test_settings_admin_update_and_history(app: object) -> None:
     )
     assert biz["business_name"] == "TradeBay SAL"
 
-    # Atomic numbering uniqueness
+                                 
     n1 = await allocate_document_number(kind="invoice", prefix="TB-TEST")
     n2 = await allocate_document_number(kind="invoice", prefix="TB-TEST")
     assert n1 != n2
     assert n1.startswith("TB-TEST-")
 
-    # Restore commission rate so other tests aren't polluted if shared DB
+                                                                         
     await svc.update_platform(
         user_id=user_id,
         business=platform,
         payload={"commission_rate": old_rate or "0.05"},
     )
-
 
 @pytest.mark.asyncio
 async def test_settings_rejects_secret_like_provider(app: object) -> None:

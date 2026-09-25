@@ -1,4 +1,3 @@
-"""Commercial PDF documents for quotations and purchase orders (reportlab)."""
 
 from __future__ import annotations
 
@@ -18,19 +17,16 @@ RULE = colors.HexColor("#d7e0da")
 ACCENT = colors.HexColor("#0d3b2a")
 PAPER_LINE = colors.HexColor("#e6eee9")
 
-
 def _money(value: Any) -> str:
     if value is None:
         return "—"
     return str(value)
-
 
 def _text(value: Any, fallback: str = "—") -> str:
     if value is None:
         return fallback
     text = str(value).strip()
     return text or fallback
-
 
 def _format_address(addr: Any) -> str | None:
     if not isinstance(addr, dict):
@@ -46,7 +42,6 @@ def _format_address(addr: Any) -> str | None:
     line = ", ".join(str(p).strip() for p in parts if p)
     return line or None
 
-
 def _format_date(value: Any) -> str:
     if not value:
         return "—"
@@ -57,7 +52,6 @@ def _format_date(value: Any) -> str:
         return datetime.fromisoformat(raw.replace("Z", "+00:00")).strftime("%b %d, %Y")
     except ValueError:
         return raw[:10] if len(raw) >= 10 else raw
-
 
 def _party_block(
     *,
@@ -144,7 +138,6 @@ def _party_block(
         )
     return bits
 
-
 def _build_pdf(title: str, subtitle: str, meta: list[tuple[str, str]], rows: list[list[str]], totals: list[tuple[str, str]]) -> bytes:
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.6 * cm, rightMargin=1.6 * cm, topMargin=1.6 * cm, bottomMargin=1.6 * cm)
@@ -212,9 +205,7 @@ def _build_pdf(title: str, subtitle: str, meta: list[tuple[str, str]], rows: lis
     doc.build(story)
     return buf.getvalue()
 
-
 def render_purchase_order_pdf(order: dict[str, Any]) -> bytes:
-    """Mirror the quiet on-page purchase order document."""
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -595,7 +586,6 @@ def render_purchase_order_pdf(order: dict[str, Any]) -> bytes:
     ]
     doc.build(story)
     return buf.getvalue()
-
 
 def render_quotation_pdf(quote: dict[str, Any]) -> bytes:
     rows = [["Product", "Qty", "Unit price", "Line total", "Lead days"]]

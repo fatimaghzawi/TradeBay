@@ -1,4 +1,4 @@
-/** Build a print-ready business plan document and trigger Save as PDF. */
+
 
 import type { BusinessPlan } from "@/lib/api/businessPlannerApi";
 import { formatPlanMoney, sourceBadge } from "@/lib/businessPlanner";

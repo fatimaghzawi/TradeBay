@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClass } from "@/components/ui/Button";
 import { BusyText } from "@/components/ui/LoadingState";
 import { cn } from "@/lib/utils";
 import {
@@ -51,7 +52,7 @@ export function AuthField({
       </label>
       <div className="relative">
         {icon ? (
-          <span className="pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2 text-[#8a9690]">
+          <span className="pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2 text-subtle-foreground">
             <FieldIcon name={icon} />
           </span>
         ) : null}
@@ -71,18 +72,18 @@ export function AuthField({
         {isPassword ? (
           <button
             type="button"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a9690] transition hover:text-[#0d3b2a]"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle-foreground transition hover:text-heading"
             aria-label={show ? "Hide password" : "Show password"}
             onClick={() => setShow((v) => !v)}
           >
             {show ? <EyeOffIcon /> : <EyeIcon />}
           </button>
         ) : showOk ? (
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#157347]">
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-success">
             <CheckIcon />
           </span>
         ) : trailing ? (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a9690]">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle-foreground">
             {trailing}
           </span>
         ) : null}
@@ -130,7 +131,7 @@ export function AuthSelect({
         {requiredMark || props.required ? <span className="tb-req">*</span> : null}
       </label>
       <div className="relative">
-        <span className="pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2 text-[#8a9690]">
+        <span className="pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2 text-subtle-foreground">
           <FieldIcon name={icon} />
         </span>
         <select
@@ -146,7 +147,7 @@ export function AuthSelect({
             </option>
           ))}
         </select>
-        <span className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2 text-[#8a9690]">
+        <span className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2 text-subtle-foreground">
           <ChevronIcon />
         </span>
       </div>
@@ -177,14 +178,12 @@ export function AuthSubmitButton({
       type="submit"
       disabled={pending || disabled}
       aria-busy={pending || undefined}
-      className={cn(
-        "inline-flex w-full items-center justify-center gap-2 rounded-[0.5rem] font-[family-name:var(--font-outfit)] text-sm font-semibold text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-        size === "sm" ? "h-10" : "h-11",
-        tone === "orange"
-          ? "bg-[#e86f2a] hover:bg-[#d96220] focus-visible:ring-[#e86f2a]"
-          : "bg-[#0d3b2a] hover:bg-[#124a36] focus-visible:ring-[#0d3b2a]",
+      className={buttonClass({
+        variant: tone === "orange" ? "accent" : "primary",
+        size: size === "sm" ? "md" : "lg",
+        block: true,
         className,
-      )}
+      })}
       {...props}
     >
       <BusyText busy={pending}>{children}</BusyText>
@@ -205,7 +204,7 @@ export function AuthCheckbox({
   id: string;
 }) {
   return (
-    <label htmlFor={id} className="flex cursor-pointer items-start gap-2.5 text-sm text-[var(--tb-ink-soft)]">
+    <label htmlFor={id} className="flex cursor-pointer items-start gap-2.5 text-sm text-ink-soft">
       <span className="relative mt-0.5 inline-flex h-[1.1rem] w-[1.1rem] shrink-0">
         <input
           id={id}
@@ -214,7 +213,7 @@ export function AuthCheckbox({
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
         />
-        <span className="absolute inset-0 rounded-[4px] border border-[var(--tb-field-line)] bg-[var(--tb-field-bg)] transition peer-checked:border-[var(--tb-form-orange)] peer-checked:bg-[var(--tb-form-orange)] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--tb-form-orange)]/25" />
+        <span className="absolute inset-0 rounded-[4px] border border-input bg-[var(--tb-field-bg)] transition peer-checked:border-[var(--tb-form-orange)] peer-checked:bg-[var(--tb-form-orange)] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--tb-form-orange)]/25" />
         <svg
           className="pointer-events-none absolute inset-0 m-auto hidden h-3 w-3 text-white peer-checked:block"
           viewBox="0 0 12 12"

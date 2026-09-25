@@ -5,17 +5,17 @@ import { OtpInput } from "@/components/auth/OtpInput";
 import { useToast } from "@/components/ui/Toast";
 import { ApiError } from "@/lib/api/client";
 import { authApi } from "@/lib/api/authApi";
+import { BackLink } from "@/components/ui/BackLink";
 import { ROUTES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const CODE_LEN = 6;
-/** Matches backend EMAIL_VERIFY_TTL_MINUTES */
+
 const OTP_WINDOW_SECONDS = 15 * 60;
 const RESEND_COOLDOWN_SECONDS = 45;
-/** Matches backend AUTH_TOKEN_MAX_ATTEMPTS */
+
 const MAX_ATTEMPTS = 5;
 
 function formatClock(total: number) {
@@ -144,7 +144,7 @@ export function VerifyEmailForm() {
           (err.message.toLowerCase().includes("expired") ||
             err.code === "INVALID_CREDENTIALS")
         ) {
-          // Only lock the UI for true expiry / exhausted challenge — not a single typo.
+          
           const msg = err.message.toLowerCase();
           if (msg.includes("expired") || msg.includes("too many")) {
             setExpired(true);
@@ -217,7 +217,7 @@ export function VerifyEmailForm() {
         </h1>
         <p className="auth-lede mt-2">
           We&apos;ve sent a verification code to{" "}
-          <span className="font-semibold text-[#0d3b2a]">
+          <span className="font-semibold text-heading">
             {emailHint || "your email"}
           </span>
           . Enter the code below to verify your email.
@@ -228,8 +228,8 @@ export function VerifyEmailForm() {
         className={cn(
           "flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm",
           expired || locked
-            ? "bg-[#fef3f2] text-[#b42318] ring-1 ring-[#fecdca]"
-            : "bg-[#eef6f2] text-[#0d3b2a] ring-1 ring-[#d4e0da]",
+            ? "bg-destructive-soft text-destructive ring-1 ring-destructive/30"
+            : "bg-secondary-soft text-heading ring-1 ring-border",
         )}
         role="status"
       >
@@ -248,21 +248,21 @@ export function VerifyEmailForm() {
         {locked || expired ? (
           <span className="text-xs font-semibold">Resend required</span>
         ) : (
-          <span className="text-xs font-medium text-[#5a6a62]">
+          <span className="text-xs font-medium text-muted-foreground">
             {attemptsLeft} of {MAX_ATTEMPTS} attempts left
           </span>
         )}
       </div>
 
       {resentFlash ? (
-        <p className="rounded-xl bg-[#eef6f2] px-3.5 py-2.5 text-sm text-[#0d3b2a] ring-1 ring-[#d4e0da]">
+        <p className="rounded-xl bg-secondary-soft px-3.5 py-2.5 text-sm text-heading ring-1 ring-border">
           A new code was sent{emailHint ? ` to ${emailHint}` : ""}. Check your
           inbox. You have {MAX_ATTEMPTS} attempts again.
         </p>
       ) : null}
 
       {error ? (
-        <p className="rounded-xl bg-[#fef3f2] px-3.5 py-2.5 text-sm text-[#b42318] ring-1 ring-[#fecdca]">
+        <p role="alert" className="tb-alert tb-alert--error">
           {error}
         </p>
       ) : null}
@@ -281,7 +281,7 @@ export function VerifyEmailForm() {
         error={Boolean(error) || expired || locked}
       />
 
-      <p className="text-sm text-[#5a6a62]">
+      <p className="text-sm text-muted-foreground">
         Didn&apos;t receive the code?{" "}
         <button
           type="button"
@@ -290,8 +290,8 @@ export function VerifyEmailForm() {
           className={cn(
             "font-semibold underline-offset-2",
             canResend && emailHint
-              ? "text-[#0d3b2a] hover:underline"
-              : "cursor-not-allowed text-[#5a6a62]",
+              ? "text-heading hover:underline"
+              : "cursor-not-allowed text-muted-foreground",
           )}
         >
           {resending
@@ -303,7 +303,7 @@ export function VerifyEmailForm() {
       </p>
 
       {!emailHint ? (
-        <p className="text-xs text-[#5a6a62]">
+        <p className="text-xs text-muted-foreground">
           After registering you&apos;ll land here with your email. You can also
           resend once we know which address to use.
         </p>
@@ -322,19 +322,14 @@ export function VerifyEmailForm() {
           type="button"
           onClick={() => void handleResend()}
           disabled={!canResend || !emailHint}
-          className="inline-flex h-11 w-full items-center justify-center rounded-[0.7rem] border border-[#d4e0da] bg-white text-sm font-semibold text-[#0d3b2a] transition hover:bg-[#eef6f2] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-11 w-full items-center justify-center rounded-[0.7rem] border border-input bg-card text-sm font-semibold text-heading transition hover:bg-secondary-soft disabled:cursor-not-allowed disabled:opacity-50"
         >
           {resending ? "Sending new code…" : "Send a new code"}
         </button>
       ) : null}
 
-      <p className="text-center text-sm">
-        <Link
-          href={ROUTES.login}
-          className="font-semibold text-[#0d3b2a] hover:underline"
-        >
-          Back to sign in
-        </Link>
+      <p className="flex justify-center">
+        <BackLink href={ROUTES.login}>Back to sign in</BackLink>
       </p>
     </form>
   );

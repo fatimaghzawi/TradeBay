@@ -1,16 +1,3 @@
-"""Wipe the TradeBay database and seed a coherent Lebanese B2B demo.
-
-All trading companies, users, SKUs, RFQs, orders, and chats are SYNTHETIC.
-Public Lebanese firms researched for category inspiration are documented in
-`app/db/demo/SOURCES.md` and are never inserted as TradeBay members.
-
-Creates:
-  platform admin → synthetic suppliers/buyers → categories → products →
-  prices → inventory → marketplace activity (RFQ → quote → PO → invoice).
-
-Usage (from backend/):
-  python _reset_demo_seed.py
-"""
 
 from __future__ import annotations
 
@@ -21,8 +8,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from app.db.demo.catalog import FEATURED_LANDING_SKUS, PRODUCTS_BY_SUPPLIER, SUBCATEGORIES
 from bson import ObjectId
-
 
 def _load_dotenv() -> None:
     for path in (
@@ -38,12 +25,11 @@ def _load_dotenv() -> None:
             key, _, value = stripped.partition("=")
             os.environ.setdefault(key.strip(), value.strip().strip("'").strip('"'))
 
-
 DEMO_PASSWORD = "TradeBay123!"
 ASSET_PREFIX = "/images/assets"
 LOGO_PREFIX = "/images/logos"
 
-# Business logos used as user profile images (company mark, not personal photo).
+                                                                                
 LOGOS = {
     "tradebay": f"{LOGO_PREFIX}/tradebay.svg",
     "levant": f"{LOGO_PREFIX}/cedrus-foods.png",
@@ -62,13 +48,11 @@ LOGOS = {
     "jbeil": f"{LOGO_PREFIX}/nahr-energy.png",
 }
 
-
 def _slugify(value: str) -> str:
     text = value.strip().lower()
     text = re.sub(r"[^a-z0-9]+", "-", text)
     text = re.sub(r"-{2,}", "-", text).strip("-")
     return text[:140] or "item"
-
 
 SUPPLIER_DOMAINS: dict[str, str] = {
     "levant": "cedrusfoods.com",
@@ -92,17 +76,13 @@ def _resolve_unit(unit: str) -> str:
         return "carton"
     return "unit"
 
-
 def _asset_url(rel: str) -> str:
     if rel.startswith("/"):
         return rel
     return f"{ASSET_PREFIX}/{rel}"
 
-
 def _gallery(primary: str, cat_key: str = "", sku: str = "", count: int = 1) -> list[str]:
-    """One photo per SKU — the file that actually shows this product."""
     return [primary]
-
 
 def _product_description(
     name: str,
@@ -116,10 +96,9 @@ def _product_description(
     return (
         f"{name} supplied wholesale by {business_name}. "
         f"Origin: {origin}. Minimum order {moq} {unit}. "
-        f"Typical lead time {lead} {day_label}. "
-        "Demo catalog listing — not an official company price."
+        f"Typical lead time {lead} {day_label} across Lebanon. "
+        "Volume pricing applies from four times the minimum order."
     )
-
 
 def _addr(
     street: str,
@@ -139,8 +118,7 @@ def _addr(
         "country": country,
     }
 
-
-# ── Catalog blueprint (synced to public/images/assets) ─────────────────────
+                                                                             
 
 CATEGORIES: list[dict[str, Any]] = [
     {
@@ -305,103 +283,29 @@ CATEGORIES: list[dict[str, Any]] = [
     },
 ]
 
-# Each product: (sku, name, unit, origin, moq, lead, base_price, stock, image_rel, category_key)
-# image_rel is under /images/assets/
-FEATURED_LANDING_SKUS = {
-    "LEV-OIL-1L",
-    "ZFI-HONEY",
-    "BKT-MON-24",
-    "CDR-BLOCK-20",
-    "TYR-FISH-ICE",
-    "MSP-TEA-HERB",
-}
-
-PRODUCTS_BY_SUPPLIER: dict[str, list[tuple[Any, ...]]] = {
-    # Names and photos are 1:1 with the asset file. One image per SKU.
-    "levant": [
-        ("LEV-OIL-1L", "Extra Virgin Olive Oil 1L", "carton", "Lebanon", 12, 3, "18.50", "480", "food/foodd1.png", "food"),
-        ("LEV-BREAD-MIX", "Bakery Bread Assortment", "carton", "Lebanon", 8, 2, "16.40", "140", "food/food1.png", "food"),
-        ("LEV-PASTRY-MIX", "Pastry and Cake Assortment", "carton", "Lebanon", 8, 3, "19.80", "110", "food/food2.png", "food"),
-        ("LEV-PANTRY-JAR", "Dry Goods Jars Assortment", "carton", "Lebanon", 10, 4, "14.50", "160", "food/food3.png", "pantry"),
-        ("LEV-PASTA-5", "Durum Pasta Assortment", "carton", "Italy", 10, 5, "12.60", "300", "food/food4.png", "pantry"),
-        ("LEV-MILK-PLANT", "Plant Milk and Nut Mix", "carton", "Lebanon", 8, 3, "15.20", "120", "food/food5.png", "dairy"),
-        ("LEV-CHOC-MIX", "Assorted Chocolate", "carton", "Belgium", 6, 6, "22.00", "90", "food/food6.png", "food"),
-    ],
-    "bekaa": [
-        ("BKT-CAM-DSLR", "Digital Camera Kit", "piece", "Japan", 2, 12, "640.00", "18", "elect/elect0.png", "elect"),
-        ("BKT-LAPTOP-I5", "Business Laptop 14in", "piece", "China", 2, 14, "520.00", "28", "elect/elect1.png", "elect"),
-        ("BKT-PHONE-5G", "5G Smartphone", "piece", "China", 4, 10, "280.00", "40", "elect/elect2.png", "elect"),
-        ("BKT-EARBUDS", "True Wireless Earbuds", "piece", "China", 12, 6, "42.00", "160", "elect/elect3.png", "elect"),
-        ("BKT-WATCH", "Smart Watch", "piece", "China", 8, 7, "89.00", "70", "elect/elect4.png", "elect"),
-        ("BKT-HEADSET", "Wireless Over-Ear Headphones", "piece", "China", 8, 6, "58.00", "90", "elect/elect5.png", "elect"),
-        ("BKT-TABLET-10", "Tablet 11in with Stylus", "piece", "China", 4, 11, "165.00", "36", "elect/elect6.png", "elect"),
-        ("BKT-MON-24", "27in Office Monitor", "piece", "China", 4, 10, "145.00", "45", "elect/elect7.png", "elect"),
-        ("BKT-CONSOLE", "Portable Game Console", "piece", "China", 4, 12, "210.00", "24", "elect/elect8.png", "elect"),
-        ("BKT-ACTION", "Action Camera", "piece", "China", 6, 8, "96.00", "50", "elect/elect9.png", "elect"),
-        ("BKT-PRINT-INK", "Color Inkjet Printer", "piece", "Vietnam", 2, 12, "89.00", "22", "elect/elect10.png", "elect"),
-        ("BKT-ROUTER", "Dual-Band Wi-Fi Router", "piece", "China", 6, 8, "54.00", "60", "elect/elect11.png", "elect"),
-        ("BKT-KB-RGB", "Keyboard and Mouse Set", "box", "China", 10, 5, "38.00", "120", "elect/elect12.png", "elect"),
-    ],
-    "cedar": [
-        ("CDR-BLOCK-20", "Clay Bricks and Concrete Blocks", "piece", "Lebanon", 200, 3, "0.85", "8000", "const/const1.png", "const"),
-        ("CDR-REBAR-12", "Steel Rebar Bundle", "unit", "Turkey", 10, 5, "48.00", "180", "const/const2.png", "const"),
-        ("CDR-TIMBER", "Structural Timber Beams", "piece", "Russia", 20, 6, "24.00", "220", "const/const3.png", "const"),
-        ("CDR-PAINT-20", "Paint Buckets and Roller Kit", "piece", "Lebanon", 8, 4, "34.00", "110", "const/const4.png", "const"),
-        ("CDR-DRILL-18", "Cordless Drill Kit", "piece", "China", 4, 8, "89.00", "40", "const/const5.png", "industrial"),
-        ("CDR-TOOLS", "Site Hand Tool Set", "box", "China", 8, 5, "28.00", "95", "const/const6.png", "industrial"),
-        ("CDR-PPE", "Safety Helmet and PPE Kit", "box", "China", 12, 4, "18.50", "160", "const/const7.png", "const"),
-        ("CDR-LADDER", "Aluminium Step Ladder", "piece", "China", 6, 7, "42.00", "55", "const/const10.png", "industrial"),
-        ("CDR-SAW-CIRC", "Circular Saw", "piece", "China", 4, 8, "72.00", "35", "const/const11.png", "industrial"),
-        ("CDR-PAVER", "Concrete Paving Bricks", "piece", "Lebanon", 150, 3, "0.95", "5000", "const/const12.png", "const"),
-    ],
-    "south": [
-        ("TYR-FISH-ICE", "Chilled Whole Fish on Ice", "kg", "Lebanon", 10, 1, "14.50", "80", "food/food8.png", "meat"),
-        ("TYR-CHICKEN", "Fresh Whole Chicken", "piece", "Lebanon", 8, 1, "9.80", "70", "food/food9.png", "meat"),
-        ("TYR-BEEF-STK", "Fresh Beef Steaks", "kg", "Lebanon", 6, 1, "18.40", "45", "food/food10.png", "meat"),
-    ],
-    "pack": [
-        ("SPK-TAPE", "Packing Tape Dispenser", "piece", "Lebanon", 24, 4, "4.80", "400", "office/office3.png", "packaging"),
-        ("SPK-STORE", "Airtight Food Storage Set", "box", "Lebanon", 10, 5, "16.50", "180", "home/home2.png", "packaging"),
-    ],
-    "zahle": [
-        ("ZFI-HONEY", "Bekaa Wildflower Honey", "carton", "Lebanon", 8, 3, "21.00", "90", "food/foodd2.png", "food"),
-    ],
-    "tripoli": [
-        ("SAF-MOP", "Plastic Spin Mop and Bucket", "piece", "Lebanon", 12, 5, "14.80", "160", "home/home7.png", "cleaning"),
-    ],
-    "keserwan": [
-        ("PHR-COTTON", "Cotton Pads and Swabs", "box", "Lebanon", 16, 5, "6.40", "280", "care/care4.png", "pharma"),
-        ("PHR-SUN", "Sunscreen Lotion Pair", "box", "EU", 12, 6, "11.20", "190", "care/care6.png", "pharma"),
-    ],
-    "saida": [
-        ("MSP-TEA-HERB", "Mountain Herbal Tea", "carton", "Lebanon", 12, 2, "9.60", "220", "food/food7.png", "beverages"),
-    ],
-    "baalbek": [
-        ("SRC-DINNER", "Ceramic Dinnerware Set", "box", "Lebanon", 8, 8, "28.00", "90", "home/home5.png", "home"),
-        ("SRC-GLASS", "Glass Pitcher and Tumbler Set", "box", "Lebanon", 10, 6, "16.80", "110", "home/homw6.png", "home"),
-        ("SRC-CLOCK", "Wall Clock", "piece", "Lebanon", 8, 7, "18.40", "70", "home/home12.png", "home"),
-    ],
-    "achrafieh": [
-        ("LTX-CUSHION", "Cushion and Throw Set", "box", "Turkey", 8, 9, "24.00", "80", "home/home9.png", "textiles"),
-        ("LTX-CURTAIN", "Blackout Curtain Pair", "piece", "Turkey", 6, 10, "32.00", "60", "home/home10.png", "textiles"),
-        ("LTX-RUG", "Woven Area Rug", "piece", "Turkey", 4, 12, "78.00", "40", "home/home11.png", "textiles"),
-    ],
-    "jbeil": [
-        ("NHR-CABLE", "Electrical Cable and Socket Kit", "box", "Turkey", 8, 7, "36.00", "90", "const/const8.png", "elect"),
-        ("NHR-LIGHT", "LED Work Lights and Floodlight", "box", "China", 6, 8, "42.00", "70", "const/const9.png", "elect"),
-        ("NHR-BULB", "LED Bulb E27", "piece", "China", 24, 5, "3.80", "400", "elect/elect13.png", "elect"),
-    ],
-}
-
+for _key, _parent, _name, _desc, _image, _order in SUBCATEGORIES:
+    CATEGORIES.append(
+        {
+            "key": _key,
+            "parent": _parent,
+            "name": _name,
+            "slug": _slugify(_name),
+            "description": _desc,
+            "image": f"{ASSET_PREFIX}/{_image}",
+            "order": _order,
+        }
+    )
 
 async def main() -> None:
     _load_dotenv()
-    # Give Atlas more room for drop + bulk seed.
+                                                
     os.environ["MONGODB_SEED_MODE"] = "1"
 
+    from datetime import timedelta
+
     from app.core.config import get_settings, reset_settings_cache
-    from app.db.demo.kyc import write_cover, write_logo, write_verification_pack
     from app.core.security import hash_password
+    from app.db.demo.kyc import write_cover, write_logo, write_verification_pack
     from app.db.mongodb import mongo_manager
     from app.db.seed import seed_trading_roles
     from app.modules.catalog.constants import (
@@ -422,12 +326,13 @@ async def main() -> None:
     from app.modules.identity.permissions import TRADING_SYSTEM_ROLES
     from app.shared.types.money import to_decimal128
     from app.shared.utils.datetime import utc_now
-    from datetime import timedelta
     from motor.motor_asyncio import AsyncIOMotorClient
 
     reset_settings_cache()
     settings = get_settings()
     db_name = settings.mongodb_database
+    if settings.is_production or settings.app_env == "production":
+        raise SystemExit("Refusing to wipe a production database.")
     if "test" in db_name.lower():
         raise SystemExit(f"Refusing to wipe test database: {db_name}")
 
@@ -456,14 +361,12 @@ async def main() -> None:
 
     print("Reconnecting (indexes + platform seed)…")
     reset_settings_cache()
-    # Temporarily widen Motor timeouts used by mongo_manager
-    original_connect = mongo_manager.connect
-
     async def connect_slow(settings_arg=None):
         from app.core.config import get_settings as gs
+        from app.core.logging import get_logger
         from app.db.indexes import ensure_indexes
         from app.db.seed import seed_startup
-        from app.core.logging import get_logger
+        from pymongo.errors import DuplicateKeyError
 
         log = get_logger(__name__)
         cfg = settings_arg or gs()
@@ -488,13 +391,22 @@ async def main() -> None:
         await ensure_indexes(mongo_manager.database)
         mongo_manager._indexes_ready = True
         log.info("mongodb_indexes_ensured")
-        await seed_startup()
+        try:
+            await seed_startup()
+        except DuplicateKeyError:
+                                                                                
+                                                                          
+            await asyncio.sleep(5)
+            await seed_startup()
         log.info("mongodb_seed_ensured")
 
     mongo_manager.connect = connect_slow  # type: ignore[method-assign]
     await mongo_manager.connect()
     db = mongo_manager.database
     now = utc_now()
+    founded = now - timedelta(days=200)
+    catalog_listed = now - timedelta(days=150)
+    verification_plan: list[dict[str, Any]] = []
     password_hash = hash_password(DEMO_PASSWORD)
 
     platform = await db["business_accounts"].find_one({"type": BusinessAccountType.PLATFORM})
@@ -546,7 +458,7 @@ async def main() -> None:
             "email_verified_at": now,
             "is_demo_seed": True,
             "data_source": "synthetic_demo",
-            "created_at": now,
+            "created_at": founded,
             "updated_at": now,
         }
         await db["users"].insert_one(user)
@@ -572,29 +484,13 @@ async def main() -> None:
         industry_categories: list[str] | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any], dict[str, dict[str, Any]]]:
         verification = verification.lower()
+                                                                                   
+                                                                                  
         if account_type == BusinessAccountType.BUYER:
             status = BusinessAccountStatus.VERIFIED
-        elif verification == "verified":
-            status = BusinessAccountStatus.VERIFIED
-        elif verification == "rejected":
-            status = BusinessAccountStatus.REJECTED
-        elif verification == "revoked":
-            status = BusinessAccountStatus.SUSPENDED
         else:
             status = BusinessAccountStatus.PENDING
-        if account_type == BusinessAccountType.SUPPLIER:
-            if verification == "verified":
-                profile_status = SupplierVerificationStatus.VERIFIED
-            elif verification == "pending":
-                profile_status = SupplierVerificationStatus.PENDING
-            elif verification == "rejected":
-                profile_status = SupplierVerificationStatus.REJECTED
-            elif verification == "revoked":
-                profile_status = SupplierVerificationStatus.REVOKED
-            else:
-                profile_status = SupplierVerificationStatus.UNVERIFIED
-        else:
-            profile_status = SupplierVerificationStatus.UNVERIFIED
+        profile_status = SupplierVerificationStatus.UNVERIFIED
         business = {
             "_id": ObjectId(),
             "name": name,
@@ -613,7 +509,7 @@ async def main() -> None:
             "industry_categories": industry_categories or [],
             "is_demo_seed": True,
             "data_source": "synthetic_demo",
-            "created_at": now,
+            "created_at": founded,
             "updated_at": now,
         }
         await db["business_accounts"].insert_one(business)
@@ -632,8 +528,8 @@ async def main() -> None:
                 "business_account_id": business["_id"],
                 "role_id": admin_role["_id"],
                 "status": MembershipStatus.ACTIVE,
-                "joined_at": now,
-                "created_at": now,
+                "joined_at": founded,
+                "created_at": founded,
                 "updated_at": now,
             }
         )
@@ -643,38 +539,49 @@ async def main() -> None:
             "rejected",
             "revoked",
         }
-        documents = (
-            write_verification_pack(
+        if wants_docs:
+            documents = write_verification_pack(
                 business_id=str(business["_id"]),
                 company_name=name,
                 legal_name=legal_name,
                 tax_number=tax_number,
                 registration_number=str(business["registration_number"]),
                 address=address,
-                verified=verification in {"verified", "revoked"},
+                verified=False,
             )
-            if wants_docs
-            else []
-        )
+            verification_plan.append(
+                {
+                    "business": business,
+                    "owner": owner,
+                    "decision": verification,
+                    "reason": rejection_reason,
+                    "documents": [
+                        {
+                            "document_type": str(d["document_type"]),
+                            "url": str(d["url"]),
+                            "file_name": str(d["file_name"]),
+                        }
+                        for d in documents
+                    ],
+                }
+            )
         profile = {
             "_id": ObjectId(),
             "business_account_id": business["_id"],
             "verification_status": profile_status,
-            "documents": documents,
+            "documents": [],
             "service_areas": service_areas or [],
             "rating_summary": {
                 "average_rating": 0.0,
                 "review_count": 0,
                 "last_reviewed_at": None,
             },
-            "verified_at": now if verification in {"verified", "revoked"} else None,
-            "verified_by": platform_admin_role["_id"]
-            if verification in {"verified", "revoked"}
-            else None,
-            "rejection_reason": rejection_reason,
+            "verified_at": None,
+            "verified_by": None,
+            "rejection_reason": None,
             "is_demo_seed": True,
             "data_source": "synthetic_demo",
-            "created_at": now,
+            "created_at": founded,
             "updated_at": now,
         }
         await db["supplier_profiles"].insert_one(profile)
@@ -687,7 +594,6 @@ async def main() -> None:
         logo_url: str | None,
         members: list[tuple[str, str, str, str, str, int]],
     ) -> None:
-        """members: role, first, last, local_part, phone, joined_days_ago"""
         for role_name, first, last, local, phone, days in members:
             user = await create_user(
                 f"{local}@{domain}",
@@ -756,7 +662,7 @@ async def main() -> None:
 
     from app.core.security import generate_refresh_token, hash_token
 
-    # ── Platform staff ─────────────────────────────────────────────────────
+                                                                             
     await db["business_accounts"].update_one(
         {"_id": platform["_id"]},
         {
@@ -819,7 +725,7 @@ async def main() -> None:
             }
         )
 
-    # ── Company owners ─────────────────────────────────────────────────────
+                                                                             
     karim = await create_user(
         "karim@cedrusfoods.com",
         "Karim",
@@ -856,7 +762,7 @@ async def main() -> None:
         avatar_url=LOGOS["harbor"],
     )
 
-    # ── Businesses ─────────────────────────────────────────────────────────
+                                                                             
     levant, levant_profile, levant_roles = await create_business(
         name="Cedrus Foods",
         account_type=BusinessAccountType.SUPPLIER,
@@ -1392,9 +1298,9 @@ async def main() -> None:
 
     demo_admin = await create_user(
         "admin@demo.tradebay.com",
-        "Demo",
-        "Admin",
-        phone="+96171100002",
+        "Nadim",
+        "Karam",
+        phone="+96171100003",
         avatar_url=LOGOS["tradebay"],
     )
     await db["business_memberships"].insert_one(
@@ -1411,23 +1317,23 @@ async def main() -> None:
     )
     supplier1 = await create_user(
         "supplier1@demo.tradebay.com",
-        "Demo",
-        "Supplier",
+        "Jad",
+        "Nassar",
         phone="+96176120006",
         avatar_url=logo_pack,
     )
     await add_member(supplier1, pack, pack_roles, "Sales Representative", joined_days_ago=2)
     buyer1 = await create_user(
         "buyer1@demo.tradebay.com",
-        "Demo",
-        "Buyer",
+        "Mira",
+        "Hayek",
         phone="+96171150005",
         avatar_url=LOGOS["harbor"],
     )
     await add_member(buyer1, harbor, harbor_roles, "Viewer", joined_days_ago=2)
 
-    # ── Full teams (every trading system role + extras) ────────────────────
-    # Cedrus Foods
+                                                                             
+                  
     nora = await create_user(
         "nora@cedrusfoods.com", "Nora", "Khoury", phone="+96171110002", avatar_url=LOGOS["levant"]
     )
@@ -1443,7 +1349,7 @@ async def main() -> None:
     ziad_removed = await create_user(
         "ziad.ex@cedrusfoods.com",
         "Ziad",
-        "ExMember",
+        "Fakhoury",
         phone="+96171110006",
         avatar_url=LOGOS["levant"],
     )
@@ -1460,7 +1366,7 @@ async def main() -> None:
         joined_days_ago=100,
     )
 
-    # LebTech Solutions
+                       
     lina = await create_user(
         "lina@lebtechsolutions.com", "Lina", "Abi", phone="+96171120002", avatar_url=LOGOS["bekaa"]
     )
@@ -1489,7 +1395,7 @@ async def main() -> None:
     )
     await add_member(nour_bekaa, bekaa, bekaa_roles, "Viewer", joined_days_ago=12)
 
-    # Beirut Build
+                  
     fadi = await create_user(
         "fadi@beirutbuild.com", "Fadi", "Shami", phone="+96171130002", avatar_url=LOGOS["cedar"]
     )
@@ -1507,7 +1413,7 @@ async def main() -> None:
     await add_member(walid, cedar, cedar_roles, "Finance", joined_days_ago=25)
     await add_member(rania_cedar, cedar, cedar_roles, "Viewer", joined_days_ago=14)
 
-    # Beirut Mart
+                 
     nader = await create_user(
         "nader@beirutmart.com", "Nader", "Chami", phone="+96171140002", avatar_url=LOGOS["beirut"]
     )
@@ -1525,7 +1431,7 @@ async def main() -> None:
     await add_member(mark, beirut_mart, beirut_roles, "Viewer", joined_days_ago=15)
     await add_member(rana_mart, beirut_mart, beirut_roles, "Sales Representative", joined_days_ago=22)
 
-    # Harbor Hospitality
+                        
     hiba = await create_user(
         "procurement@harborhospitality.lb",
         "Hiba",
@@ -1648,7 +1554,7 @@ async def main() -> None:
         ("Viewer", "Joanna", "Salameh", "joanna.salameh", "+96176340005", 5),
     ])
 
-    # ── Invitations (pending / accepted / revoked / expired) ───────────────
+                                                                             
     _, invite_token = await invite(
         business=beirut_mart,
         roles=beirut_roles,
@@ -1697,7 +1603,7 @@ async def main() -> None:
         days_ago=28,
     )
 
-    # Custom role on Levant (beyond system roles)
+                                                 
     custom_role_id = ObjectId()
     await db["roles"].insert_one(
         {
@@ -1710,7 +1616,7 @@ async def main() -> None:
             "updated_at": now - timedelta(days=14),
         }
     )
-    # Grant a few inventory/product read+manage style permissions if present
+                                                                            
     perm_rows = await db["permissions"].find(
         {"resource": {"$in": ["inventory", "products", "categories"]}}
     ).to_list(length=50)
@@ -1752,8 +1658,16 @@ async def main() -> None:
     invite_count = await db["invitations"].count_documents({})
     print(f"Seeded memberships: {member_count}, invitations: {invite_count}")
 
+                                                                            
+    from app.db.demo.verification import run_verification_reviews
 
-    # ── Categories ─────────────────────────────────────────────────────────
+    await run_verification_reviews(
+        plan=verification_plan,
+        reviewer_user_id=str(platform_admin["_id"]),
+        founded=founded,
+    )
+
+                                                                             
     cat_ids: dict[str, ObjectId] = {}
     for spec in CATEGORIES:
         parent_id = cat_ids[spec["parent"]] if spec.get("parent") else None
@@ -1766,8 +1680,8 @@ async def main() -> None:
             "is_active": True,
             "display_order": spec["order"],
             "image_url": spec["image"],
-            "created_at": now,
-            "updated_at": now,
+            "created_at": founded,
+            "updated_at": founded,
         }
         await db["categories"].insert_one(doc)
         cat_ids[spec["key"]] = doc["_id"]
@@ -1807,10 +1721,12 @@ async def main() -> None:
     inventory_docs: list[dict[str, Any]] = []
     tx_docs: list[dict[str, Any]] = []
 
+    seen_images: set[str] = set()
     for supplier_key, rows in PRODUCTS_BY_SUPPLIER.items():
-        business, profile = supplier_map[supplier_key]
+        business, _ = supplier_map[supplier_key]
+        profile = await db["supplier_profiles"].find_one({"business_account_id": business["_id"]})
         creator = creator_map[supplier_key]
-        for (
+        for index, (
             sku,
             name,
             unit,
@@ -1821,7 +1737,14 @@ async def main() -> None:
             stock,
             image_rel,
             cat_key,
-        ) in rows:
+        ) in enumerate(rows):
+                                                                             
+            listed = (
+                now - timedelta(days=4 + (index * 5) % 26, hours=index)
+                if image_rel in seen_images
+                else catalog_listed + timedelta(days=index)
+            )
+            seen_images.add(str(image_rel))
             product_id = ObjectId()
             inventory_id = ObjectId()
             stock_dec = Decimal(stock)
@@ -1856,8 +1779,8 @@ async def main() -> None:
                     "is_featured": bool(sellable and sku in FEATURED_LANDING_SKUS),
                     "is_demo_seed": True,
                     "data_source": "synthetic_demo",
-                    "created_at": now,
-                    "updated_at": now,
+                    "created_at": listed,
+                    "updated_at": listed,
                 }
             )
             price_docs.extend(
@@ -1870,8 +1793,8 @@ async def main() -> None:
                         "unit_price": to_decimal128(price_dec),
                         "currency": "USD",
                         "is_active": True,
-                        "created_at": now,
-                        "updated_at": now,
+                        "created_at": listed,
+                        "updated_at": listed,
                     },
                     {
                         "_id": ObjectId(),
@@ -1883,8 +1806,8 @@ async def main() -> None:
                         ),
                         "currency": "USD",
                         "is_active": True,
-                        "created_at": now,
-                        "updated_at": now,
+                        "created_at": listed,
+                        "updated_at": listed,
                     },
                 ]
             )
@@ -1896,7 +1819,7 @@ async def main() -> None:
                     "alt_text": name,
                     "is_primary": True,
                     "display_order": 0,
-                    "created_at": now,
+                    "created_at": listed,
                 }
             )
             inventory_docs.append(
@@ -1905,7 +1828,7 @@ async def main() -> None:
                     "product_id": product_id,
                     "available_quantity": to_decimal128(stock_dec),
                     "reserved_quantity": to_decimal128(Decimal("0")),
-                    "updated_at": now,
+                    "updated_at": listed,
                 }
             )
             tx_docs.append(
@@ -1921,9 +1844,9 @@ async def main() -> None:
                     "previous_reserved": to_decimal128(Decimal("0")),
                     "new_available": to_decimal128(stock_dec),
                     "new_reserved": to_decimal128(Decimal("0")),
-                    "reason": "Demo opening stock",
+                    "reason": "Opening stock count",
                     "created_by": creator,
-                    "created_at": now,
+                    "created_at": listed,
                 }
             )
 
@@ -1937,7 +1860,7 @@ async def main() -> None:
     product_count = len(product_docs)
     image_count = len(image_docs)
 
-    # Sample audit events so Audit Trail is not empty
+                                                     
     await db["audit_logs"].insert_many(
         [
             {
@@ -2013,7 +1936,7 @@ async def main() -> None:
                 "resource_id": None,
                 "metadata": {
                     "actor_name": "Karim Haddad",
-                    "member_name": "Ziad ExMember",
+                    "member_name": "Ziad Fakhoury",
                     "member_email": ziad_removed["email"],
                     "role_name": "Sales Representative",
                 },
@@ -2087,8 +2010,9 @@ async def main() -> None:
                 "pack": (pack, samer),
                 "zahle": (zahle_farm, youssef),
                 "keserwan": (keserwan, karine),
-                "saida": (saida, ziad_saida),
+                "tripoli": (tripoli_paper, rana),
             },
+            platform=(platform, platform_admin),
         )
     except Exception:
         import traceback
@@ -2096,33 +2020,46 @@ async def main() -> None:
         traceback.print_exc()
         raise
 
-    print("\n=== Demo seed complete ===")
-    print(f"Password for all users: {DEMO_PASSWORD}")
-    print("\nLogins:")
-    print("  Platform admin     admin@demo.tradebay.com")
-    print("  Platform admin     admin@tradebay.com")
-    print("  Platform operator  ops@tradebay.com")
-    print("  Demo supplier      supplier1@demo.tradebay.com")
-    print("  Demo buyer         buyer1@demo.tradebay.com")
-    print("  Cedrus Foods       karim@cedrusfoods.com")
-    print("  LebTech Solutions  rami@lebtechsolutions.com")
-    print("  Beirut Build       maya@beirutbuild.com")
-    print("  Beirut Pack        samer@beirutpack.com")
-    print("  Beirut Mart admin  sara@beirutmart.com")
-    print("  Harbor admin       omar@harborhospitality.lb")
-    print("  Cafe buyer         lara@cedarcafe.com")
-    print("  Grocery buyer      nabil@nabatiehgrocery.com")
-    print(f"\nPending invite token (jad@beirutmart.com): {invite_token}")
-    print("All companies are synthetic demo records (is_demo_seed=true).")
-    print("Public source notes: backend/app/db/demo/SOURCES.md")
-    print("Activity counts:", activity)
-    print("Images served from frontend: /images/assets/…")
+    print("\nActivity:")
+    for key, value in activity.items():
+        print(f"  {key:<20} {value}")
 
-    # Silence unused
-    _ = (TRADING_SYSTEM_ROLES, bekaa_roles, harbor_roles, cedar_profile)
+    from app.db.demo.integrity import verify_seed
+
+    print("\nVerifying data integrity…")
+    problems, summary = await verify_seed(db)
+    for key, value in summary.items():
+        print(f"  {key:<28} {value}")
+    if problems:
+        print(f"\nIntegrity check FAILED ({len(problems)} problems):")
+        for problem in problems[:80]:
+            print(f"  - {problem}")
+        await mongo_manager.disconnect()
+        raise SystemExit(1)
+    print("Integrity check passed.")
+
+    print("\n=== Demo seed complete ===")
+    print(f"Password for demo users: {DEMO_PASSWORD}")
+    print("admin@tradebay.com uses PLATFORM_ADMIN_PASSWORD")
+    print("\nLogins:")
+    print("  Platform admin     admin@tradebay.com")
+    print("  Platform admin     admin@demo.tradebay.com")
+    print("  Platform operator  ops@tradebay.com")
+    print("  Supplier           karim@cedrusfoods.com      (Cedrus Foods)")
+    print("  Supplier           rami@lebtechsolutions.com  (LebTech Solutions)")
+    print("  Supplier           maya@beirutbuild.com       (Beirut Build)")
+    print("  Supplier           samer@beirutpack.com       (Beirut Pack)")
+    print("  Supplier (pending) ziad@mountainspices.com    (Mountain Spices)")
+    print("  Buyer              sara@beirutmart.com        (Beirut Mart Retail)")
+    print("  Buyer              omar@harborhospitality.lb  (Harbor Hospitality)")
+    print("  Buyer              lara@cedarcafe.com         (Cedar Cafe)")
+    print("  Buyer              nabil@nabatiehgrocery.com  (Nabatieh Grocery)")
+    print("Pending invitation: jad@beirutmart.com (token is only in the email outbox, never printed)")
+    print("Images are committed static files under frontend/public/images/.")
+
+    _ = (TRADING_SYSTEM_ROLES, bekaa_roles, harbor_roles, cedar_profile, invite_token)
 
     await mongo_manager.disconnect()
-
 
 if __name__ == "__main__":
     asyncio.run(main())

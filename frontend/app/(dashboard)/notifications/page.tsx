@@ -2,11 +2,11 @@
 
 import {
   InventoryEmpty,
-  InventoryLinkBtn,
   InventoryPageHeader,
   InventoryPanel,
   InventorySkeleton,
 } from "@/components/catalog/InventoryUi";
+import { BackLink } from "@/components/ui/BackLink";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { ApiError } from "@/lib/api/client";
 import { notificationsApi, type AppNotification } from "@/lib/api/notificationsApi";
@@ -88,12 +88,12 @@ export default function NotificationsPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="tb-inv-btn is-ghost"
+              className="tb-btn tb-btn--outline"
               onClick={() => setUnreadOnly((v) => !v)}
             >
               {unreadOnly ? "Show all" : "Unread only"}
             </button>
-            <button type="button" className="tb-inv-btn is-soft" onClick={() => void markAll()}>
+            <button type="button" className="tb-btn tb-btn--secondary" onClick={() => void markAll()}>
               Mark all read
             </button>
           </div>
@@ -119,9 +119,7 @@ export default function NotificationsPage() {
                 : "Nothing here yet."
             }
             action={
-              <InventoryLinkBtn href={ROUTES.dashboard} tone="soft">
-                Back to dashboard
-              </InventoryLinkBtn>
+              <BackLink href={ROUTES.dashboard}>Back to dashboard</BackLink>
             }
           />
         ) : (
@@ -135,7 +133,7 @@ export default function NotificationsPage() {
                     if (!n.is_read) void markOne(n.id);
                   }}
                 >
-                  <strong className={!n.is_read ? "text-[#0d3b2a]" : undefined}>{n.title}</strong>
+                  <strong className={!n.is_read ? "text-heading" : undefined}>{n.title}</strong>
                   {n.message ? <span className="tb-inv-entity-sub">{n.message}</span> : null}
                   <span className="tb-inv-entity-sub">
                     {n.created_at
@@ -147,7 +145,7 @@ export default function NotificationsPage() {
                 {!n.is_read ? (
                   <button
                     type="button"
-                    className="text-xs font-bold text-[#1a6b4f] hover:underline"
+                    className="text-xs font-bold text-link hover:underline"
                     onClick={() => void markOne(n.id)}
                   >
                     Mark read

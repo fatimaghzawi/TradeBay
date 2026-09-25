@@ -70,7 +70,7 @@ export function PasswordResetSuccess() {
 
       <Link
         href={ROUTES.login}
-        className={`mt-8 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#e86f2a] text-sm font-semibold text-white transition hover:bg-[#d46220] ${burst ? "verify-copy-in verify-copy-delay-2" : "opacity-0"}`}
+        className={`mt-8 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-semibold text-white transition hover:bg-accent/90 ${burst ? "verify-copy-in verify-copy-delay-2" : "opacity-0"}`}
       >
         Continue to sign in
         <span aria-hidden>→</span>
@@ -85,7 +85,7 @@ function LockVerifiedMark() {
       className="relative flex h-[11.5rem] w-[11.5rem] items-center justify-center"
       aria-hidden
     >
-      <span className="verify-glow absolute inset-[18%] rounded-full bg-[#e86f2a]/15 blur-2xl" />
+      <span className="verify-glow absolute inset-[18%] rounded-full bg-accent/15 blur-2xl" />
 
       <svg
         className="verify-petals absolute inset-0 h-full w-full"
@@ -130,7 +130,7 @@ function LockVerifiedMark() {
         <path d="M94 24 78 30" stroke="#c45b2a" strokeWidth="2.5" strokeLinecap="round" className="verify-ray verify-ray-5" />
       </svg>
 
-      {/* Lock body */}
+      {}
       <svg
         className="verify-envelope relative z-[1] h-[5.5rem] w-[5rem] drop-shadow-[0_14px_28px_rgba(13,59,42,0.18)]"
         viewBox="0 0 80 88"
@@ -161,7 +161,7 @@ function LockVerifiedMark() {
         />
       </svg>
 
-      <span className="verify-badge absolute left-1/2 top-[46%] z-[2] flex h-[3.6rem] w-[3.6rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#0d3b2a] text-white shadow-[0_10px_24px_-6px_rgba(13,59,42,0.55)] ring-[5px] ring-[#e8ebe6]">
+      <span className="verify-badge absolute left-1/2 top-[46%] z-[2] flex h-[3.6rem] w-[3.6rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_10px_24px_-6px_rgba(13,59,42,0.55)] ring-[5px] ring-border">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
           <path
             d="M5 12.5 9.5 17 19 7.5"

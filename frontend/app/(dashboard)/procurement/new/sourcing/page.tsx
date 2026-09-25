@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import { LoadingEntity } from "@/components/ui/LoadingState";
 
-/** Legacy sourcing URL — same catalog RFQ form, query params preserved. */
 function RedirectToCatalogRfq() {
   const router = useRouter();
   const search = useSearchParams();

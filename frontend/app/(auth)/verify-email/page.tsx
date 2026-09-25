@@ -3,7 +3,6 @@ import { VerifyEmailForm } from "@/components/auth/VerifyEmailForm";
 import { Suspense } from "react";
 import { LoadingEntity } from "@/components/ui/LoadingState";
 
-/** Verify — coast scene: sunrise gradient stage. */
 export default function VerifyEmailPage() {
   return (
     <AuthShell scene="coast">

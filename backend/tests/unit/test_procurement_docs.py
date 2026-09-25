@@ -1,4 +1,3 @@
-"""Unit tests for tracking webhook mapping and commercial PDF smoke."""
 
 from __future__ import annotations
 
@@ -21,15 +20,12 @@ def test_carrier_webhook_maps_status() -> None:
     assert update.status == "in_transit"
     assert update.source == "carrier_webhook"
 
-
 def test_carrier_webhook_rejects_unknown() -> None:
     assert CarrierWebhookProvider().parse_webhook({"foo": "bar"}) is None
-
 
 def test_get_tracking_provider_default_manual() -> None:
     assert get_tracking_provider().name == "manual"
     assert get_tracking_provider("carrier_webhook").name == "carrier_webhook"
-
 
 def test_po_pdf_renders_bytes() -> None:
     pdf = render_purchase_order_pdf(
@@ -68,8 +64,6 @@ def test_po_pdf_renders_bytes() -> None:
     )
     assert pdf.startswith(b"%PDF")
     assert b"PURCHASE ORDER" in pdf or b"Purchase" in pdf or len(pdf) > 500
-
-
 
 def test_quotation_pdf_renders_bytes() -> None:
     pdf = render_quotation_pdf(

@@ -1,4 +1,3 @@
-"""API dependency re-exports and shared helpers."""
 
 from typing import Any
 
@@ -25,7 +24,6 @@ __all__ = [
     "require_seller",
     "require_verified_email",
 ]
-
 
 async def get_db() -> AsyncIOMotorDatabase[Any]:
     return mongo_manager.database

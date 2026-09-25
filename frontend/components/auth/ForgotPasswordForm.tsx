@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/api/client";
 import { authApi } from "@/lib/api/authApi";
 import { forgotPasswordSchema } from "@/lib/validation/auth";
 import { useLiveFields } from "@/lib/validation/live";
+import { BackLink } from "@/components/ui/BackLink";
 import { ROUTES } from "@/lib/constants";
 import Link from "next/link";
 import { useState } from "react";
@@ -56,16 +57,16 @@ export function ForgotPasswordForm() {
       </div>
 
       {sent ? (
-        <div className="rounded-xl bg-[#eef6f2] px-3.5 py-3 text-sm text-[#0d3b2a] ring-1 ring-[#d4e0da]">
-          <p className="font-semibold text-[#1a6b4f]">Check your inbox</p>
-          <p className="mt-1 text-[#4a5f55]">
+        <div className="rounded-xl bg-secondary-soft px-3.5 py-3 text-sm text-heading ring-1 ring-border">
+          <p className="font-semibold text-link">Check your inbox</p>
+          <p className="mt-1 text-muted-foreground">
             If an account exists for{" "}
-            <span className="font-semibold text-[#0d3b2a]">{email}</span>, a 6-digit reset code
+            <span className="font-semibold text-heading">{email}</span>, a 6-digit reset code
             has been sent. Enter it on the next screen to set your new password.
           </p>
           <Link
             href={`${ROUTES.resetPassword}?email=${encodeURIComponent(email)}`}
-            className="mt-3 inline-flex font-semibold text-[#1a6b4f] underline-offset-2 hover:underline"
+            className="mt-3 inline-flex font-semibold text-link underline-offset-2 hover:underline"
           >
             Enter reset code →
           </Link>
@@ -73,7 +74,7 @@ export function ForgotPasswordForm() {
       ) : null}
 
       {error ? (
-        <p className="rounded-xl bg-[#fef3f2] px-3.5 py-2.5 text-sm text-[#b42318] ring-1 ring-[#fecdca]">
+        <p role="alert" className="tb-alert tb-alert--error">
           {error}
         </p>
       ) : null}
@@ -98,13 +99,8 @@ export function ForgotPasswordForm() {
         </>
       ) : null}
 
-      <p className="text-center text-sm">
-        <Link
-          href={ROUTES.login}
-          className="font-semibold text-[#0d3b2a] hover:underline"
-        >
-          Back to sign in
-        </Link>
+      <p className="flex justify-center">
+        <BackLink href={ROUTES.login}>Back to sign in</BackLink>
       </p>
     </form>
   );

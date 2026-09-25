@@ -16,9 +16,9 @@ type ModulePermissionPickerProps = {
   onChange: (codes: string[]) => void;
   grantable: Set<string> | string[];
   readOnly?: boolean;
-  /** Optional: copy permissions from another role. */
+  
   templates?: { id: string; name: string; permissions: string[] }[];
-  /** Dense chip grid — default true for manageable scrolling. */
+  
   compact?: boolean;
 };
 
@@ -118,7 +118,7 @@ export function ModulePermissionPicker({
 
   if (grouped.length === 0) {
     return (
-      <p className="rounded-xl bg-[var(--tb-interactive)] px-3.5 py-3 text-sm text-[var(--tb-muted-fg)]">
+      <p className="rounded-xl bg-interactive px-3.5 py-3 text-sm text-muted-foreground">
         No permissions available to assign.
       </p>
     );
@@ -167,7 +167,7 @@ export function ModulePermissionPicker({
       </div>
 
       {filteredGrouped.length === 0 ? (
-        <p className="rounded-xl bg-[var(--tb-interactive)] px-3.5 py-3 text-sm text-[var(--tb-muted-fg)]">
+        <p className="rounded-xl bg-interactive px-3.5 py-3 text-sm text-muted-foreground">
           No permissions match your search.
         </p>
       ) : (

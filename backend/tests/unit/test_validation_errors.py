@@ -1,4 +1,3 @@
-"""Validation error envelope must stay JSON-serializable for ORJSONResponse."""
 
 import asyncio
 

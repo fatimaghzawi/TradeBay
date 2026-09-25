@@ -32,13 +32,13 @@ export type NavItem = {
   label: string;
   href: string;
   icon: NavIconKey;
-  /** If set, item is hidden unless the user holds one of these permissions. */
+  
   permissions?: string[];
-  /** Visual grouping in the sidebar. Does not change routing. */
+  
   group?: string;
-  /** Nested items — used for Company / Inventory spaces. */
+  
   children?: NavItem[];
-  /** Short description in dropdown panels. */
+  
   hint?: string;
 };
 
@@ -51,10 +51,6 @@ export type WorkspaceNav = {
   searchPlaceholder: string;
 };
 
-/**
- * Company Identity story navigation.
- * Groups mirror: Company → Team → Access → Security.
- */
 export const COMPANY_SPACE_NAV: NavItem[] = [
   {
     key: "overview",
@@ -129,11 +125,6 @@ export const COMPANY_SPACE_NAV: NavItem[] = [
 
 export const COMPANY_NAV_GROUPS = ["Company", "Team", "Access", "Security"] as const;
 
-/**
- * Inventory / Catalog space — same grouping pattern as Company.
- * Groups: Catalog → Stock → Pricing
- */
-/** Buyer marketplace: browse & order only — no stock ops or catalog management. */
 export const BUYER_INVENTORY_NAV: NavItem[] = [
   {
     key: "inv-overview",
@@ -173,7 +164,6 @@ export const BUYER_INVENTORY_NAV: NavItem[] = [
   },
 ];
 
-/** Supplier catalog ops: manage listings, stock, movements, and tiers. */
 export const SUPPLIER_INVENTORY_NAV: NavItem[] = [
   {
     key: "inv-overview",
@@ -222,17 +212,12 @@ export const SUPPLIER_INVENTORY_NAV: NavItem[] = [
   },
 ];
 
-/** @deprecated Prefer BUYER_INVENTORY_NAV / SUPPLIER_INVENTORY_NAV */
 export const INVENTORY_SPACE_NAV = SUPPLIER_INVENTORY_NAV;
 
 export const BUYER_INVENTORY_NAV_GROUPS = ["Marketplace"] as const;
 export const SUPPLIER_INVENTORY_NAV_GROUPS = ["Catalog", "Stock"] as const;
 export const INVENTORY_NAV_GROUPS = SUPPLIER_INVENTORY_NAV_GROUPS;
 
-/**
- * Commerce space — procurement → finance.
- * Mirrors Company / Inventory sidebar grouping.
- */
 export const BUYER_COMMERCE_NAV: NavItem[] = [
   {
     key: "com-hub",
@@ -263,12 +248,12 @@ export const BUYER_COMMERCE_NAV: NavItem[] = [
   },
   {
     key: "com-orders",
-    label: "Purchase orders",
+    label: "Orders",
     href: ROUTES.orders,
     icon: "orders",
     permissions: ["orders.read"],
     group: "Fulfilment",
-    hint: "Coming soon — RFQs & quotations are available now",
+    hint: "Checkouts and supplier orders",
   },
   {
     key: "com-tracking",
@@ -277,7 +262,7 @@ export const BUYER_COMMERCE_NAV: NavItem[] = [
     icon: "truck",
     permissions: ["orders.read", "shipments.read"],
     group: "Fulfilment",
-    hint: "Coming soon — fulfilment tracking",
+    hint: "Where each supplier order is",
   },
   {
     key: "com-finance",
@@ -286,7 +271,7 @@ export const BUYER_COMMERCE_NAV: NavItem[] = [
     icon: "finance",
     permissions: ["invoices.read"],
     group: "Money",
-    hint: "Coming soon — invoices & payments",
+    hint: "Invoices, payments and balance",
   },
 ];
 
@@ -311,12 +296,12 @@ export const SUPPLIER_COMMERCE_NAV: NavItem[] = [
   },
   {
     key: "com-orders",
-    label: "Purchase orders",
+    label: "Orders",
     href: ROUTES.orders,
     icon: "orders",
     permissions: ["orders.read"],
     group: "Fulfilment",
-    hint: "Coming soon — RFQs & quotations are available now",
+    hint: "Checkouts and supplier orders",
   },
   {
     key: "com-tracking",
@@ -325,7 +310,7 @@ export const SUPPLIER_COMMERCE_NAV: NavItem[] = [
     icon: "truck",
     permissions: ["orders.read", "shipments.read"],
     group: "Fulfilment",
-    hint: "Coming soon — fulfilment tracking",
+    hint: "Where each supplier order is",
   },
   {
     key: "com-finance",
@@ -334,7 +319,7 @@ export const SUPPLIER_COMMERCE_NAV: NavItem[] = [
     icon: "finance",
     permissions: ["invoices.read"],
     group: "Money",
-    hint: "Coming soon — invoices & payments",
+    hint: "Invoices, payments and balance",
   },
 ];
 
@@ -496,19 +481,53 @@ export const PLATFORM_NAV: WorkspaceNav = {
       hint: "All supplier listings",
     },
     {
-      key: "settlements",
-      label: "Transactions",
-      href: ROUTES.admin.settlements,
-      icon: "settlements",
-      permissions: ["settlements.read", "settlements.approve", "payables.read"],
-    },
-    {
       key: "finance",
-      label: "Analytics",
+      label: "Overview",
       href: ROUTES.admin.finance,
       icon: "finance",
       permissions: ["settlements.read", "payables.read", "commissions.read"],
-      hint: "Coming soon — platform finance",
+      group: "Finance",
+      hint: "Where the platform's money is",
+    },
+    {
+      key: "finance-payments",
+      label: "Buyer payments",
+      href: `${ROUTES.admin.finance}?section=payments`,
+      icon: "finance",
+      permissions: ["settlements.read", "payables.read"],
+      group: "Finance",
+    },
+    {
+      key: "finance-balances",
+      label: "Supplier balances",
+      href: `${ROUTES.admin.finance}?section=balances`,
+      icon: "finance",
+      permissions: ["payables.read", "settlements.read"],
+      group: "Finance",
+    },
+    {
+      key: "settlements",
+      label: "Supplier payouts",
+      href: ROUTES.admin.settlements,
+      icon: "settlements",
+      permissions: ["settlements.read", "settlements.approve", "payables.read"],
+      group: "Finance",
+    },
+    {
+      key: "finance-earnings",
+      label: "Platform earnings",
+      href: `${ROUTES.admin.finance}?section=earnings`,
+      icon: "finance",
+      permissions: ["commissions.read", "settlements.read"],
+      group: "Finance",
+    },
+    {
+      key: "finance-activity",
+      label: "Financial activity",
+      href: `${ROUTES.admin.finance}?section=activity`,
+      icon: "audit",
+      permissions: ["settlements.read"],
+      group: "Finance",
     },
     {
       key: "audit",
@@ -542,27 +561,30 @@ export function isNavActive(pathname: string, href: string, search = "") {
   if (query) {
     return pathname === path && search.includes(query);
   }
-  // Company overview is the bare /businesses route — not profile/documents tabs.
+  
   if (path === ROUTES.businesses) {
     return (
       pathname === path &&
       (!search.includes("tab=") || search.includes("tab=overview"))
     );
   }
-  // Inventory overview is only the bare /inventory route.
+  
   if (path === ROUTES.inventory) {
     return pathname === path;
   }
-  // Bare /admin/businesses without a type query is not an Identity tab target.
+  
   if (path === ROUTES.admin.businesses && !query) {
     return pathname === path && !search.includes("type=");
   }
-  // Procurement hub is only the bare /procurement route (not /new or workspaces).
+  
   if (path === ROUTES.procurement) {
     return pathname === path;
   }
   if (path === "/dashboard" || path === "/admin") {
     return pathname === path;
+  }
+  if (path === ROUTES.admin.finance && !query) {
+    return pathname === path && (!search.includes("section=") || search.includes("section=overview"));
   }
   return pathname === path || pathname.startsWith(`${path}/`);
 }
@@ -588,7 +610,7 @@ export function isInventorySpacePath(pathname: string) {
   if (pathname === ROUTES.catalog || pathname.startsWith(`${ROUTES.catalog}/`)) {
     return true;
   }
-  // Buyer supplier directory lives under Marketplace chrome (same sidebar as products).
+  
   if (
     pathname === ROUTES.suppliersDirectory ||
     pathname.startsWith(`${ROUTES.suppliersDirectory}/`)
@@ -602,6 +624,7 @@ export function isCommerceSpacePath(pathname: string) {
   const prefixes = [
     ROUTES.procurement,
     ROUTES.orders,
+    ROUTES.checkout,
     ROUTES.tracking,
     ROUTES.quotations,
     ROUTES.finance,
@@ -645,7 +668,6 @@ export function getWorkspaceNav(kind: WorkspaceKind): WorkspaceNav {
   return BUYER_NAV;
 }
 
-/** Trading Business Admin stays locked for company admins; platform staff get fullControl. */
 export function canEditRolePermissions(
   role: {
     name: string;

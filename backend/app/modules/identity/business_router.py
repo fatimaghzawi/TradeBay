@@ -1,4 +1,3 @@
-"""Business account API routes."""
 
 from __future__ import annotations
 
@@ -8,8 +7,12 @@ from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 
 from app.core.config import Settings, get_settings
 from app.core.constants import ACCESS_COOKIE_NAME
-from app.core.exceptions import BadRequestError
-from app.modules.identity.constants import REQUIRED_SUPPLIER_DOCUMENT_TYPES
+from app.core.exceptions import BadRequestError, ForbiddenError
+from app.modules.identity.constants import (
+    REQUIRED_SUPPLIER_DOCUMENT_TYPES,
+    BusinessAccountType,
+    SupplierVerificationStatus,
+)
 from app.modules.identity.dependencies import (
     AuthContext,
     get_auth_service,
@@ -20,7 +23,9 @@ from app.modules.identity.dependencies import (
     require_verification_document_access,
     require_verified_email,
 )
+from app.modules.identity.exceptions import VerifiedBusinessLockedError
 from app.modules.identity.http import client_ip
+from app.modules.identity.repository import SupplierProfileRepository
 from app.modules.identity.schemas import (
     CreateBusinessRequest,
     SubmitSupplierVerificationRequest,
@@ -32,7 +37,6 @@ from app.shared.schemas.response import paginated, success
 
 businesses_router = APIRouter(prefix="/businesses", tags=["Businesses"])
 companies_router = APIRouter(prefix="/companies", tags=["Companies"])
-
 
 async def _switch_business_response(
     *,
@@ -59,7 +63,6 @@ async def _switch_business_response(
     response.set_cookie(ACCESS_COOKIE_NAME, result["access_token"], **cookie)
     return success({"business": result["business"]})
 
-
 @businesses_router.get("", summary="List businesses for current user")
 async def list_businesses(
     auth: Annotated[AuthContext, Depends(get_current_user)],
@@ -67,7 +70,6 @@ async def list_businesses(
 ) -> dict[str, Any]:
     items = await service.list_for_user(auth.user_id)
     return paginated(items, page=1, page_size=len(items) or 20, total=len(items))
-
 
 @businesses_router.post("", summary="Create a business account for current user")
 async def create_business(
@@ -90,7 +92,6 @@ async def create_business(
     )
     return success(business)
 
-
 @businesses_router.get("/current", summary="Get active business from session")
 async def current_business(
     auth: Annotated[AuthContext, Depends(get_current_user)],
@@ -100,7 +101,6 @@ async def current_business(
         return success(None)
     payload = await service.get_for_user(user_id=auth.user_id, business_id=auth.business_id)
     return success(payload)
-
 
 @businesses_router.post("/switch", summary="Switch the session's active business")
 async def switch_business_brd(
@@ -114,7 +114,6 @@ async def switch_business_brd(
         body=body, response=response, auth=auth, service=service, settings=settings
     )
 
-
 @businesses_router.post("/current/switch", summary="Switch active business (legacy)", include_in_schema=False)
 async def switch_business_legacy(
     body: SwitchBusinessRequest,
@@ -127,7 +126,6 @@ async def switch_business_legacy(
         body=body, response=response, auth=auth, service=service, settings=settings
     )
 
-
 @companies_router.get("/{business_id}", summary="Public trading company profile")
 async def get_public_company(
     business_id: str,
@@ -138,7 +136,6 @@ async def get_public_company(
     payload = await service.get_public_company(business_id)
     return success(payload)
 
-
 @businesses_router.get("/{business_id}", summary="Get a business the user belongs to")
 async def get_business(
     business_id: str,
@@ -147,7 +144,6 @@ async def get_business(
 ) -> dict[str, Any]:
     payload = await service.get_for_user(user_id=auth.user_id, business_id=business_id)
     return success(payload)
-
 
 @businesses_router.patch("/{business_id}", summary="Update business identity fields")
 async def update_business(
@@ -177,7 +173,6 @@ async def update_business(
     )
     return success(result)
 
-
 @businesses_router.post(
     "/{business_id}/media/{kind}",
     summary="Upload business logo or cover image",
@@ -202,7 +197,6 @@ async def upload_business_media(
     )
     return success(result)
 
-
 @businesses_router.post(
     "/{business_id}/verification/documents/{document_type}",
     summary="Upload one supplier verification document",
@@ -217,11 +211,22 @@ async def upload_supplier_verification_document(
 
     if document_type not in REQUIRED_SUPPLIER_DOCUMENT_TYPES:
         raise BadRequestError("Unknown verification document type")
+    if auth.business is None or auth.business.get("type") != BusinessAccountType.SUPPLIER:
+        raise ForbiddenError("Only supplier companies upload verification documents.")
+    profile = await SupplierProfileRepository().get_by_business(business_id)
+    if profile and profile.get("verification_status") == SupplierVerificationStatus.VERIFIED:
+        raise VerifiedBusinessLockedError()
+    submitted_urls = {
+        str(row.get("url"))
+        for row in (profile or {}).get("documents") or []
+        if isinstance(row, dict) and row.get("url")
+    }
     original_name = file.filename
     url = await save_verification_document(
         business_id=business_id,
         document_type=document_type,
         upload=file,
+        keep_urls=submitted_urls,
     )
     return success(
         {
@@ -230,7 +235,6 @@ async def upload_supplier_verification_document(
             "url": url,
         }
     )
-
 
 @businesses_router.get(
     "/{business_id}/verification/documents/{document_type}/files/{filename}",
@@ -244,7 +248,6 @@ async def download_supplier_verification_document(
 ):
     from fastapi.responses import FileResponse
 
-    from app.modules.identity.repository import SupplierProfileRepository
     from app.modules.identity.storage import (
         media_type_for_verification_file,
         resolve_verification_path,
@@ -272,7 +275,6 @@ async def download_supplier_verification_document(
         content_disposition_type="inline",
     )
 
-
 @businesses_router.post(
     "/{business_id}/verification/submit",
     summary="Submit supplier documents for platform review",
@@ -291,7 +293,6 @@ async def submit_supplier_verification(
         ip_address=client_ip(request),
     )
     return success(result)
-
 
 @businesses_router.delete(
     "/{business_id}/verification/documents/{document_type}",

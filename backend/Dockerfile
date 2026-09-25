@@ -34,5 +34,9 @@ USER appuser
 ENV PORT=8000 \
     UPLOAD_ROOT=/home/appuser/uploads
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS "http://127.0.0.1:${PORT:-8000}/health" || exit 1
 # Render injects $PORT — bind to it so the platform health check succeeds.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
+# Only Render's proxy can reach the container, so its X-Forwarded-For is trusted;
+# without this every request appears to come from the proxy IP.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 --proxy-headers --forwarded-allow-ips='*' --timeout-graceful-shutdown 30"]

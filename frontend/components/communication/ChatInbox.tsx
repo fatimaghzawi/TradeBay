@@ -87,7 +87,7 @@ export function ChatEmptyStage() {
       </div>
       <h2>Pick a conversation</h2>
       <p>Select a thread to read and reply.</p>
-      <Link href={ROUTES.procurement} className="tb-inv-btn tb-inv-btn-soft">
+      <Link href={ROUTES.procurement} className="tb-btn tb-btn--secondary">
         Open procurement
       </Link>
     </div>

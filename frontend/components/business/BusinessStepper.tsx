@@ -36,7 +36,7 @@ export function BusinessStepper({
                 aria-hidden
                 className={cn(
                   "hidden h-px w-6 sm:block sm:w-10",
-                  done || current ? "bg-[#e86f2a]" : "bg-[#dce5e0]",
+                  done || current ? "bg-accent" : "bg-muted",
                 )}
               />
             ) : null}
@@ -44,9 +44,9 @@ export function BusinessStepper({
               <span
                 className={cn(
                   "flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold",
-                  done && "bg-[#1a6b4f] text-white",
-                  current && "bg-[#e86f2a] text-white",
-                  !done && !current && "bg-[#eef3f0] text-[#6a726c]",
+                  done && "bg-primary text-primary-foreground",
+                  current && "bg-accent text-accent-foreground",
+                  !done && !current && "bg-muted text-muted-foreground",
                 )}
               >
                 {done ? "✓" : step.id}
@@ -55,10 +55,10 @@ export function BusinessStepper({
                 className={cn(
                   "text-xs font-semibold sm:text-sm",
                   current
-                    ? "text-[#e86f2a]"
+                    ? "text-accent-text"
                     : done
-                      ? "text-[#1a6b4f]"
-                      : "text-[#8a9690]",
+                      ? "text-link"
+                      : "text-subtle-foreground",
                 )}
               >
                 {step.label}

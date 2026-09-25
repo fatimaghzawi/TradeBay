@@ -1,11 +1,3 @@
-"""Upsert demo products (one primary image each) for all 12 suppliers.
-
-Does not drop the database or rewrite companies. Existing SKUs are updated in
-place; mismatched leftover demo SKUs are deactivated.
-
-Usage:
-  python frontend/scripts/_upsert_demo_catalog.py
-"""
 from __future__ import annotations
 
 import os
@@ -39,7 +31,6 @@ RETIRE_PREFIXES = {
     "keserwan": "KFC-",
 }
 
-
 def _env() -> None:
     for path in (REPO / ".env", BACKEND / ".env"):
         if not path.is_file():
@@ -51,10 +42,8 @@ def _env() -> None:
             key, _, value = stripped.partition("=")
             os.environ.setdefault(key.strip(), value.strip().strip("'").strip('"'))
 
-
 def _money(value: Decimal) -> Decimal128:
     return Decimal128(str(value))
-
 
 def _price_docs(product_id: ObjectId, moq: int, price_dec: Decimal, now: datetime) -> list[dict]:
     return [
@@ -82,7 +71,6 @@ def _price_docs(product_id: ObjectId, moq: int, price_dec: Decimal, now: datetim
         },
     ]
 
-
 def _image_docs(product_id: ObjectId, name: str, image_rel: str, cat_key: str, sku: str, now: datetime) -> list[dict]:
     return [
         {
@@ -95,7 +83,6 @@ def _image_docs(product_id: ObjectId, name: str, image_rel: str, cat_key: str, s
             "created_at": now,
         }
     ]
-
 
 def main() -> None:
     _env()
@@ -293,7 +280,6 @@ def main() -> None:
     print(f"Deactivated:  {deactivated}")
     print(f"Database:     {db_name}")
     client.close()
-
 
 if __name__ == "__main__":
     main()

@@ -7,6 +7,7 @@ import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Logo } from "@/components/layout/Logo";
 import { NavIcon } from "@/components/layout/NavIcon";
 import { useShell } from "@/components/layout/ShellContext";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { ROUTES } from "@/lib/constants";
 import type { NavItem, NavIconKey, WorkspaceNav } from "@/lib/navigation";
@@ -252,7 +253,7 @@ function CompanySpaceBar({
     <div className="tb-company-space" ref={rootRef}>
       <div className="mx-auto flex max-w-[92rem] items-center gap-3 px-4 sm:px-6 lg:px-8">
         <div className="hidden shrink-0 items-center gap-2 sm:flex">
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--tb-accent)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--tb-accent)_20%,transparent)]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_0_3px_color-mix(in_srgb,var(--tb-accent)_20%,transparent)]" />
           <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-[var(--tb-secondary)]">
             Company identity
           </p>
@@ -381,6 +382,7 @@ export function AppNavbar({
           <CartButton />
           <ChatBell />
           <NotificationBell />
+          <ThemeToggle />
           <div className="tb-nav-who">
             {business && business.type !== "platform" ? (
               <Link
@@ -414,7 +416,7 @@ export function AppNavbar({
             aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
             aria-expanded={mobileNavOpen}
             onClick={toggleMobileNav}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--tb-border)] bg-[var(--tb-surface)] text-[var(--tb-ink)] lg:hidden"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border-strong bg-card text-foreground lg:hidden"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
               {mobileNavOpen ? (
@@ -485,18 +487,18 @@ export function AppNavbar({
                         href={item.href}
                         onClick={close}
                         className={cn(
-                          "border-b border-[var(--tb-line)] py-3 font-[family-name:var(--font-outfit)] text-sm font-semibold text-[var(--tb-ink)]",
+                          "border-b border-border py-3 font-[family-name:var(--font-outfit)] text-sm font-semibold text-foreground",
                           item.key === "ai-sourcing" && "tb-navbar-bay-mobile",
                         )}
                       >
                         {item.key === "ai-sourcing" ? (
-                          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--tb-accent)] text-xs text-white">
+                          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs text-white">
                             ✦
                           </span>
                         ) : null}
                         {item.label}
                         {item.key === "ai-sourcing" && item.hint ? (
-                          <span className="mt-1 block text-xs font-medium text-[var(--tb-muted-fg)]">
+                          <span className="mt-1 block text-xs font-medium text-muted-foreground">
                             {item.hint}
                           </span>
                         ) : null}

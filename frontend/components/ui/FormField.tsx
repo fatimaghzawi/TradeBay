@@ -100,7 +100,6 @@ type NumberInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "in
   maxDecimals?: number;
 };
 
-/** Text input that only accepts digits (and one decimal for prices). */
 export function NumberInput({
   kind = "decimal",
   maxDecimals = 2,

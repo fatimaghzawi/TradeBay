@@ -1,26 +1,24 @@
-"""Customer Finance integration — invoice → payment → credit → refund → ledger balance."""
 
 from __future__ import annotations
 
 from decimal import Decimal
 
 import pytest
-from bson import ObjectId
+from app.core.exceptions import ForbiddenError
 from app.db.collections import CollectionName
 from app.db.mongodb import mongo_manager
 from app.modules.finance.service import FinanceService, issue_invoice_for_confirmed_order
 from app.modules.identity.constants import BusinessAccountType
 from app.shared.types.money import to_decimal128
 from app.shared.utils.datetime import utc_now
+from bson import ObjectId
 
 
 def _buyer_biz(oid: ObjectId) -> dict:
     return {"_id": oid, "type": BusinessAccountType.BUYER}
 
-
 def _supplier_biz(oid: ObjectId) -> dict:
     return {"_id": oid, "type": BusinessAccountType.SUPPLIER}
-
 
 @pytest.mark.asyncio
 async def test_finance_lifecycle_invoice_payment_credit_refund(app: object) -> None:
@@ -70,6 +68,8 @@ async def test_finance_lifecycle_invoice_payment_credit_refund(app: object) -> N
             "subtotal": to_decimal128(Decimal("2000.00")),
             "discount_total": to_decimal128(Decimal("0")),
             "charge_total": to_decimal128(Decimal("0")),
+                                                                                         
+            "tax_rate_snapshot": to_decimal128(Decimal("0")),
             "tax_total": to_decimal128(Decimal("0")),
             "total": to_decimal128(Decimal("2000.00")),
         },
@@ -78,14 +78,14 @@ async def test_finance_lifecycle_invoice_payment_credit_refund(app: object) -> N
     )
     assert invoice is not None
     invoice_id = str(invoice["_id"])
-    # Historical unit price preserved on lines
+                                              
     assert Decimal(str(invoice["lines"][0]["unit_price"].to_decimal())) == Decimal("20.00")
 
     svc = FinanceService()
     buyer = _buyer_biz(buyer_id)
     supplier = _supplier_biz(supplier_id)
 
-    # Pending payment does not reduce outstanding
+                                                 
     pending = await svc.record_payment(
         user_id=user_id,
         business=buyer,
@@ -97,15 +97,24 @@ async def test_finance_lifecycle_invoice_payment_credit_refund(app: object) -> N
     inv_view = await svc.get_invoice(business=buyer, invoice_id=invoice_id)
     assert inv_view["outstanding"] == "2000.00"
 
-    await svc.complete_payment(user_id=user_id, business=buyer, payment_id=pending["payment_id"])
+                                                                                     
+    with pytest.raises(ForbiddenError):
+        await svc.complete_payment(user_id=user_id, business=buyer, payment_id=pending["payment_id"])
+    self_reported = await svc.record_payment(
+        user_id=user_id, business=buyer, invoice_id=invoice_id, amount="1.00", complete=True
+    )
+    assert self_reported["status"] == "pending"
+
+    platform = {"_id": ObjectId(), "type": BusinessAccountType.PLATFORM}
+    await svc.complete_payment(user_id=user_id, business=platform, payment_id=pending["payment_id"])
     inv_view = await svc.get_invoice(business=buyer, invoice_id=invoice_id)
     assert inv_view["outstanding"] == "1500.00"
     assert inv_view["status"] == "partially_paid"
 
-    # Second payment settles remaining before credit
+                                                                                  
     pay2 = await svc.record_payment(
         user_id=user_id,
-        business=buyer,
+        business=platform,
         invoice_id=invoice_id,
         amount="1500.00",
         complete=True,
@@ -114,9 +123,9 @@ async def test_finance_lifecycle_invoice_payment_credit_refund(app: object) -> N
     inv_view = await svc.get_invoice(business=buyer, invoice_id=invoice_id)
     assert inv_view["outstanding"] == "0.00"
     assert inv_view["status"] == "paid"
-    assert inv_view["total"] == "2000.00"  # immutable total
+    assert inv_view["total"] == "2000.00"                   
 
-    # Credit note reduces obligation / creates customer credit — total unchanged
+                                                                                
     cn = await svc.create_credit_note(
         user_id=user_id,
         business=supplier,
@@ -131,7 +140,7 @@ async def test_finance_lifecycle_invoice_payment_credit_refund(app: object) -> N
     assert inv_view["amount_credited"] == "300.00"
     assert inv_view["customer_credit"] == "300.00"
 
-    # Over-credit rejected
+                          
     with pytest.raises(Exception):
         await svc.create_credit_note(
             user_id=user_id,
@@ -142,7 +151,7 @@ async def test_finance_lifecycle_invoice_payment_credit_refund(app: object) -> N
             apply=True,
         )
 
-    # Refund against payment (cash returned)
+                                            
     refund = await svc.create_refund(
         user_id=user_id,
         business=supplier,
@@ -154,7 +163,7 @@ async def test_finance_lifecycle_invoice_payment_credit_refund(app: object) -> N
     )
     assert refund["status"] == "processed"
 
-    # Over-refund prevented
+                           
     with pytest.raises(Exception):
         await svc.create_refund(
             user_id=user_id,
@@ -165,7 +174,7 @@ async def test_finance_lifecycle_invoice_payment_credit_refund(app: object) -> N
         )
 
     bal = await svc.ar_balance(business=buyer)
-    # Invoice 2000 − payments 2000 − credit 300 + refund 300 = 0
+                                                                
     assert bal["outstanding"] == "0.00"
 
     txs, total = await svc.list_transactions(business=buyer, page_size=20)
@@ -176,7 +185,7 @@ async def test_finance_lifecycle_invoice_payment_credit_refund(app: object) -> N
     assert "credit_applied" in types
     assert "refund_processed" in types
 
-    # Buyer isolation
+                     
     other = _buyer_biz(ObjectId())
     with pytest.raises(Exception):
         await svc.get_invoice(business=other, invoice_id=invoice_id)

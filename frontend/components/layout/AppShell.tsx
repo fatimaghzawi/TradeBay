@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {useSidebar ? (
           <Suspense
             fallback={
-              <div className="hidden w-[var(--tb-sidebar-width)] shrink-0 border-r border-[var(--tb-border)] bg-[var(--tb-surface)] lg:block" />
+              <div className="hidden w-[var(--tb-sidebar-width)] shrink-0 border-r border-border-strong bg-card lg:block" />
             }
           >
             <AppSidebar key={business?.id ?? "no-business"} nav={nav} />
@@ -72,7 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : (
           <Suspense
             fallback={
-              <div className="h-[var(--tb-topbar-height)] border-b border-[var(--tb-border)] bg-[var(--tb-surface)]" />
+              <div className="h-[var(--tb-topbar-height)] border-b border-border-strong bg-card" />
             }
           >
             <AppNavbar
@@ -136,7 +136,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </div>
-      <ShoppingTraysHost />
+      {kind === "platform" ? null : <ShoppingTraysHost />}
     </ShellProvider>
   );
 }

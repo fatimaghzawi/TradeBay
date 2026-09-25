@@ -33,13 +33,13 @@ type ToastContextValue = {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const TONE_SHELL: Record<ToastTone, string> = {
-  default: "border-[var(--tb-line)] bg-[var(--tb-surface)] text-[var(--tb-ink)]",
+  default: "border-border bg-card text-foreground",
   success:
-    "border-[color-mix(in_srgb,var(--tb-success)_28%,transparent)] bg-[var(--tb-surface)] text-[var(--tb-ink)]",
+    "border-[color-mix(in_srgb,var(--tb-success)_28%,transparent)] bg-card text-foreground",
   error:
-    "border-[color-mix(in_srgb,var(--tb-danger)_28%,transparent)] bg-[var(--tb-surface)] text-[var(--tb-ink)]",
+    "border-[color-mix(in_srgb,var(--tb-danger)_28%,transparent)] bg-card text-foreground",
   warning:
-    "border-[color-mix(in_srgb,var(--tb-warning)_28%,transparent)] bg-[var(--tb-surface)] text-[var(--tb-ink)]",
+    "border-[color-mix(in_srgb,var(--tb-warning)_28%,transparent)] bg-card text-foreground",
 };
 
 const TONE_DOT: Record<ToastTone, string> = {
@@ -89,7 +89,7 @@ function ToastViewport({
                 {toast.title}
               </p>
               {toast.description ? (
-                <p className="mt-0.5 truncate text-[12px] leading-snug text-[var(--tb-muted-fg)]">
+                <p className="mt-0.5 truncate text-[12px] leading-snug text-muted-foreground">
                   {toast.description}
                 </p>
               ) : null}
@@ -97,7 +97,7 @@ function ToastViewport({
             <button
               type="button"
               aria-label="Dismiss"
-              className="-mr-0.5 -mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[15px] leading-none text-[var(--tb-muted-fg)] transition hover:bg-[var(--tb-hover)] hover:text-[var(--tb-ink)]"
+              className="-mr-0.5 -mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[15px] leading-none text-muted-foreground transition hover:bg-[var(--tb-hover)] hover:text-foreground"
               onClick={() => dismiss(toast.id)}
             >
               ×

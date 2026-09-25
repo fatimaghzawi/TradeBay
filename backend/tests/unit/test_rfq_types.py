@@ -1,4 +1,3 @@
-"""Unit tests for Product vs Sourcing RFQ invariants."""
 
 from __future__ import annotations
 
@@ -8,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.modules.catalog.constants import ProductStatus
-from app.modules.identity.constants import BusinessAccountStatus, BusinessAccountType
+from app.modules.identity.constants import BusinessAccountType
 from app.modules.procurement.constants import RFQType, RFQVisibility
 from app.modules.procurement.exceptions import (
     ProductRFQValidationError,
@@ -21,10 +20,8 @@ from bson import ObjectId
 def _buyer() -> dict[str, Any]:
     return {"_id": ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), "type": BusinessAccountType.BUYER}
 
-
 def _supplier_id() -> ObjectId:
     return ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")
-
 
 @pytest.mark.asyncio
 async def test_create_product_rfq_rejects_missing_product() -> None:
@@ -37,7 +34,6 @@ async def test_create_product_rfq_rejects_missing_product() -> None:
                 business=_buyer(),
                 payload={"product_id": "dddddddddddddddddddddddd", "quantity": "10"},
             )
-
 
 @pytest.mark.asyncio
 async def test_create_product_rfq_rejects_inactive_product() -> None:
@@ -56,7 +52,6 @@ async def test_create_product_rfq_rejects_inactive_product() -> None:
                 business=_buyer(),
                 payload={"product_id": "dddddddddddddddddddddddd", "quantity": "10"},
             )
-
 
 @pytest.mark.asyncio
 async def test_create_product_rfq_rejects_self_supply() -> None:
@@ -77,7 +72,6 @@ async def test_create_product_rfq_rejects_self_supply() -> None:
                 payload={"product_id": "dddddddddddddddddddddddd", "quantity": "10"},
             )
 
-
 @pytest.mark.asyncio
 async def test_create_product_rfq_rejects_supplier_override() -> None:
     service = ProcurementService()
@@ -93,7 +87,7 @@ async def test_create_product_rfq_rejects_supplier_override() -> None:
     }
     with patch("app.modules.procurement.service.mongo_manager") as mongo:
         mongo.collection.return_value.find_one = AsyncMock(return_value=product)
-        with pytest.raises(ProductRFQValidationError, match="cannot be overridden"):
+        with pytest.raises(ProductRFQValidationError, match="can't be changed"):
             await service.create_product_rfq(
                 user_id="cccccccccccccccccccccccc",
                 business=_buyer(),
@@ -104,11 +98,10 @@ async def test_create_product_rfq_rejects_supplier_override() -> None:
                 },
             )
 
-
 @pytest.mark.asyncio
 async def test_create_sourcing_rfq_rejects_locked_supplier() -> None:
     service = ProcurementService()
-    with pytest.raises(SourcingRFQValidationError, match="cannot lock"):
+    with pytest.raises(SourcingRFQValidationError, match="can't be tied"):
         await service.create_sourcing_rfq(
             user_id="cccccccccccccccccccccccc",
             business=_buyer(),
@@ -120,7 +113,6 @@ async def test_create_sourcing_rfq_rejects_locked_supplier() -> None:
             },
         )
 
-
 @pytest.mark.asyncio
 async def test_create_sourcing_rfq_requires_requirement_text() -> None:
     service = ProcurementService()
@@ -130,7 +122,6 @@ async def test_create_sourcing_rfq_requires_requirement_text() -> None:
             business=_buyer(),
             payload={"title": "Cups", "quantity": "100"},
         )
-
 
 @pytest.mark.asyncio
 async def test_upsert_quotation_blocks_wrong_supplier_on_product_rfq() -> None:
@@ -163,11 +154,9 @@ async def test_upsert_quotation_blocks_wrong_supplier_on_product_rfq() -> None:
             submit=True,
         )
 
-
 def test_rfq_type_constants() -> None:
     assert RFQType.PRODUCT == "product"
     assert RFQType.SOURCING == "sourcing"
-
 
 def test_rfq_is_unsent_until_suppliers_are_invited() -> None:
     from app.modules.procurement.service import rfq_is_unsent
@@ -176,7 +165,6 @@ def test_rfq_is_unsent_until_suppliers_are_invited() -> None:
     assert rfq_is_unsent({"status": "published", "supplier_invites": []}) is True
     assert rfq_is_unsent({"status": "published", "supplier_invites": [{"status": "invited"}]}) is False
     assert rfq_is_unsent({"status": "cancelled", "supplier_invites": []}) is False
-
 
 def test_freeze_catalog_price_ignores_later_buyer_override() -> None:
     from app.modules.procurement.service import freeze_catalog_price
@@ -188,7 +176,6 @@ def test_freeze_catalog_price_ignores_later_buyer_override() -> None:
     )
     assert frozen == Decimal("12.50")
 
-
 def test_freeze_catalog_price_uses_lookup_on_first_snapshot() -> None:
     from app.modules.procurement.service import freeze_catalog_price
 
@@ -198,7 +185,6 @@ def test_freeze_catalog_price_uses_lookup_on_first_snapshot() -> None:
         client=Decimal("1.00"),
     )
     assert frozen == Decimal("18.00")
-
 
 def test_group_catalog_items_by_supplier() -> None:
     from app.modules.procurement.service import group_catalog_items_by_supplier
@@ -216,7 +202,6 @@ def test_group_catalog_items_by_supplier() -> None:
     assert [row["product_name"] for row in groups["s1"]] == ["A", "B"]
     assert [row["product_name"] for row in groups["s2"]] == ["C"]
     assert [row["product_name"] for row in groups[""]] == ["Open spec"]
-
 
 def test_supplier_requests_map_invite_and_quote_stages() -> None:
     rows = ProcurementService()._supplier_requests(
@@ -238,7 +223,6 @@ def test_supplier_requests_map_invite_and_quote_stages() -> None:
     assert rows[0]["stage"] == "quoted"
     assert rows[0]["products"][0]["product_name"] == "Cups"
 
-
 def test_quotation_cannot_be_edited_after_submit() -> None:
     from app.modules.procurement.service import quotation_cannot_be_edited
 
@@ -251,12 +235,44 @@ def test_quotation_cannot_be_edited_after_submit() -> None:
     )
     assert quotation_cannot_be_edited("submitted", allow_revision=True) is None
     assert quotation_cannot_be_edited("accepted") == (
-        "Cannot modify an accepted or rejected quotation"
+        "This quotation was accepted, so it can no longer be changed."
     )
     assert quotation_cannot_be_edited("rejected") == (
-        "Cannot modify an accepted or rejected quotation"
+        "The buyer declined this quotation, so it can no longer be changed."
     )
     assert quotation_cannot_be_edited("rejected", allow_revision=True) is None
     assert quotation_cannot_be_edited("accepted", allow_revision=True) == (
-        "Cannot modify an accepted or rejected quotation"
+        "This quotation was accepted, so it can no longer be changed."
     )
+    assert quotation_cannot_be_edited("withdrawn") == (
+        "This quotation was withdrawn, so it can no longer be changed."
+    )
+
+def test_rfq_dates_must_be_future_and_ordered() -> None:
+    from datetime import timedelta
+
+    from app.modules.procurement.exceptions import ProcurementValidationError
+    from app.modules.procurement.service import assert_rfq_dates
+    from app.shared.utils.datetime import utc_now
+
+    now = utc_now()
+    assert_rfq_dates(None, None)
+    assert_rfq_dates(now + timedelta(days=10), now + timedelta(days=3))
+    with pytest.raises(ProcurementValidationError, match="quote deadline must be in the future"):
+        assert_rfq_dates(None, now - timedelta(hours=1))
+    with pytest.raises(ProcurementValidationError, match="can't be earlier"):
+        assert_rfq_dates(now + timedelta(days=2), now + timedelta(days=5))
+
+def test_deadline_and_validity_helpers() -> None:
+    from datetime import timedelta
+
+    from app.modules.procurement.service import quotation_expired, rfq_deadline_passed
+    from app.shared.utils.datetime import utc_now
+
+    now = utc_now()
+    assert rfq_deadline_passed({"response_deadline": now - timedelta(minutes=1)})
+    assert not rfq_deadline_passed({"response_deadline": now + timedelta(days=1)})
+    assert not rfq_deadline_passed({})
+    naive_past = (now - timedelta(days=1)).replace(tzinfo=None)
+    assert quotation_expired({"valid_until": naive_past})
+    assert not quotation_expired({"valid_until": None})

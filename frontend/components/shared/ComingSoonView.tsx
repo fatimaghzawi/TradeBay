@@ -18,7 +18,7 @@ export function ComingSoonView({
   actions,
 }: {
   kind: ComingSoonKind;
-  /** Optional page-specific title override */
+  
   title?: string;
   actions?: ReactNode;
 }) {

@@ -2,19 +2,16 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   verified: boolean;
-  /** Accessible label when verified is true/false */
+  
   label?: string;
   className?: string;
   size?: "sm" | "md";
-  /** Show the word “Verified” beside the icon. Buyer supplier names use the icon only. */
+  
   showLabel?: boolean;
-  /** When false, render nothing for unverified suppliers. Default true for admin. */
+  
   showWhenUnverified?: boolean;
 };
 
-/**
- * Compact verified mark — buyers see it only when the supplier is verified.
- */
 export function VerifiedBadge({
   verified,
   label,

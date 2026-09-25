@@ -1,4 +1,3 @@
-"""Cart API schemas."""
 
 from __future__ import annotations
 
@@ -9,7 +8,6 @@ class AddCartItemRequest(BaseModel):
     product_id: str = Field(min_length=24, max_length=24)
     quantity: int = Field(default=1, ge=1, le=1_000_000)
     suggested_unit_price: str | None = Field(default=None, max_length=40)
-
 
 class UpdateCartItemRequest(BaseModel):
     quantity: int | None = Field(default=None, ge=1, le=1_000_000)
@@ -22,13 +20,11 @@ class UpdateCartItemRequest(BaseModel):
             return None
         return value
 
-
 class CheckoutCartRequest(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     notes: str | None = Field(default=None, max_length=2000)
-    # When false (default), create a draft RFQ so the buyer can set prices before sending.
+                                                                                          
     publish: bool = False
-
 
 class PlaceCartOrderRequest(BaseModel):
     notes: str | None = Field(default=None, max_length=2000)

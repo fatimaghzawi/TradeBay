@@ -72,6 +72,7 @@ function AISourcingExperienceInner() {
   const [description, setDescription] = useState("");
   const [requestId, setRequestId] = useState<string | null>(null);
   const [requirements, setRequirements] = useState<ProcurementRequirements | null>(null);
+  const [clarification, setClarification] = useState<string | null>(null);
   const [recs, setRecs] = useState<RecommendationsResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +87,7 @@ function AISourcingExperienceInner() {
     setStep("describe");
   }, [promptFromQuery]);
 
-  // From Ask the Bay / deep links: auto-run analyze once the prompt is filled.
+  
   const autoStarted = useRef(false);
   useEffect(() => {
     if (!promptFromQuery || autoStarted.current || resuming) return;
@@ -102,6 +103,7 @@ function AISourcingExperienceInner() {
       .then((result) => {
         setRequestId(result.sourcing_request_id);
         setRequirements(result.requirements);
+        setClarification(result.clarification ?? null);
         setStep("confirm");
       })
       .catch((err) => {
@@ -174,6 +176,7 @@ function AISourcingExperienceInner() {
       const result = await aiSourcingApi.analyze(description.trim());
       setRequestId(result.sourcing_request_id);
       setRequirements(result.requirements);
+      setClarification(result.clarification ?? null);
       setStep("confirm");
     } catch (err) {
       setError(
@@ -203,7 +206,7 @@ function AISourcingExperienceInner() {
     }
   }
 
-  /** Refresh once if results are missing image URLs (stale client state). */
+  
   useEffect(() => {
     if (step !== "results" || !requestId || !recs?.products.length) return;
     if (imageRefreshFor.current === requestId) return;
@@ -229,7 +232,7 @@ function AISourcingExperienceInner() {
         }));
       })
       .catch(() => {
-        /* keep existing cards */
+        
       });
     return () => {
       cancelled = true;
@@ -331,7 +334,10 @@ function AISourcingExperienceInner() {
             <div className="tb-src-sheet-top">
               <div>
                 <h2>Edit your requirements</h2>
-                <p>Review your brief, then search.</p>
+                <p>
+                  {clarification ??
+                    "Review your brief, then search. I'll only match verified listings that are on TradeBay today."}
+                </p>
               </div>
             </div>
 
@@ -432,11 +438,7 @@ function ResultsView({
   const hasMatches = recs.products.length > 0 || recs.suppliers.length > 0;
   const strongFits = recs.products.filter((p) => p.relevance_label === "highly_relevant").length;
   const verifiedSuppliers = recs.suppliers.filter((s) => s.verified).length;
-  const similarHeavy =
-    hasMatches &&
-    (recs.suggestions.some((s) => /similar/i.test(s)) ||
-      recs.products.filter((p) => p.relevance_label === "partial").length >=
-        Math.ceil(recs.products.length * 0.6));
+  const similarHeavy = hasMatches && Boolean(recs.loose_match);
   const topCatch = [...recs.products].sort(
     (a, b) => (b.match_score ?? 0) - (a.match_score ?? 0),
   )[0];
@@ -492,8 +494,10 @@ function ResultsView({
 
       {!hasMatches ? (
         <div className="tb-src-empty-bay">
-          <p className="tb-src-empty-bay-title">No verified listings available yet</p>
-          <p>Once suppliers publish matching products, they’ll appear here. Meanwhile try:</p>
+          <p className="tb-src-empty-bay-title">
+            {recs.message ?? "No verified listings available yet"}
+          </p>
+          <p>Try one of these, or edit the details you already shared:</p>
           <ul>
             {(recs.suggestions.length
               ? recs.suggestions

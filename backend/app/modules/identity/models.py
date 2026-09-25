@@ -1,9 +1,3 @@
-"""Identity document shapes (MongoDB-oriented).
-
-ERD §4. A person (`users`) logs in; a company (`business_accounts`) trades. The two
-are connected only through `business_memberships`, so one person can act for several
-companies under a different role in each.
-"""
 
 from __future__ import annotations
 
@@ -15,7 +9,6 @@ from app.shared.types.address import AddressEmbedded
 from app.shared.types.document import MongoDocument, MongoEmbedded
 from app.shared.types.ids import DocumentId, OptionalDocumentId
 
-# Retained for callers that imported the old local base.
 MongoModel = MongoEmbedded
 
 __all__ = [
@@ -36,7 +29,6 @@ __all__ = [
     "UserDocument",
 ]
 
-
 class UserDocument(MongoDocument):
     email: EmailStr
     password_hash: str
@@ -49,7 +41,6 @@ class UserDocument(MongoDocument):
     email_verified_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
-
 
 class BusinessAccountDocument(MongoDocument):
     name: str
@@ -67,9 +58,7 @@ class BusinessAccountDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class MembershipDocument(MongoDocument):
-    """Unique on (user_id, business_account_id) — one membership per person per company."""
 
     user_id: DocumentId
     business_account_id: DocumentId
@@ -79,9 +68,7 @@ class MembershipDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class RoleDocument(MongoDocument):
-    """Roles belong to one business. System roles are seeded per company and cannot be deleted."""
 
     business_account_id: DocumentId
     name: str
@@ -92,23 +79,18 @@ class RoleDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class PermissionDocument(MongoDocument):
-    """Global atomic grant, unique on (resource, action). Never assigned to a user directly."""
 
     resource: str
     action: str
     description: str | None = None
-
 
 class RolePermissionDocument(MongoDocument):
     role_id: DocumentId
     permission_id: DocumentId
     created_at: datetime
 
-
 class InvitationDocument(MongoDocument):
-    """Company invite: delivery_email gets the link; invited_email is the login identity."""
 
     business_account_id: DocumentId
     invited_email: EmailStr
@@ -121,7 +103,6 @@ class InvitationDocument(MongoDocument):
     accepted_at: datetime | None = None
     created_at: datetime
 
-
 class SessionDocument(MongoDocument):
     user_id: DocumentId
     active_business_account_id: OptionalDocumentId = None
@@ -133,13 +114,7 @@ class SessionDocument(MongoDocument):
     user_agent: str | None = None
     created_at: datetime
 
-
 class AuthTokenDocument(MongoDocument):
-    """Hashed one-time challenge for email verification or password reset.
-
-    ERD also shows password_reset_token_hash on users; Identity stores challenges
-    here so EMAIL_VERIFICATION and PASSWORD_RESET cannot be confused.
-    """
 
     user_id: DocumentId
     purpose: str
@@ -149,7 +124,6 @@ class AuthTokenDocument(MongoDocument):
     invalidated_at: datetime | None = None
     attempts: int = 0
     created_at: datetime
-
 
 class AuditLogDocument(MongoDocument):
     business_account_id: OptionalDocumentId = None
@@ -161,9 +135,7 @@ class AuditLogDocument(MongoDocument):
     ip_address: str | None = None
     created_at: datetime
 
-
 class SupplierDocumentEmbedded(MongoEmbedded):
-    """Verification paperwork. Replaces a separate `verification_cases` collection."""
 
     document_type: str
     url: str
@@ -171,17 +143,13 @@ class SupplierDocumentEmbedded(MongoEmbedded):
     uploaded_at: datetime | None = None
     verified_at: datetime | None = None
 
-
 class SupplierRatingSummaryEmbedded(MongoEmbedded):
-    """Cached rollup of published reviews. Recomputed from `reviews`, never authoritative."""
 
     average_rating: float = 0.0
     review_count: int = 0
     last_reviewed_at: datetime | None = None
 
-
 class SupplierProfileDocument(MongoDocument):
-    """One per trading company. Selling requires verification_status = verified."""
 
     business_account_id: DocumentId
     verification_status: str

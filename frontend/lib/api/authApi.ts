@@ -107,8 +107,8 @@ export const authApi = {
     apiClient.post<{ requested: boolean }>("/auth/email/resend"),
   resendVerificationEmail: (email: string) =>
     apiClient.post<{ requested: boolean }>("/auth/email/resend", { email }),
-  resetPassword: (token: string, password: string) =>
-    apiClient.post<{ reset: boolean }>("/auth/password/reset", { token, password }),
+  resetPassword: (email: string, token: string, password: string) =>
+    apiClient.post<{ reset: boolean }>("/auth/password/reset", { email, token, password }),
   changePassword: (current_password: string, new_password: string) =>
     apiClient.post<{ changed: boolean }>("/auth/password/change", {
       current_password,

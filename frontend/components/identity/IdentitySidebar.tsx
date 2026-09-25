@@ -51,11 +51,11 @@ export function IdentitySidebar() {
           <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.18em] text-[var(--tb-secondary)]">
             Company
           </p>
-          <p className="mt-1 font-[family-name:var(--font-outfit)] text-base font-semibold tracking-tight text-[var(--tb-ink)]">
+          <p className="mt-1 font-[family-name:var(--font-outfit)] text-base font-semibold tracking-tight text-foreground">
             {business?.name ?? "Company identity"}
           </p>
           {business?.email_domain ? (
-            <p className="mt-0.5 text-[0.72rem] font-semibold text-[var(--tb-muted-fg)]">
+            <p className="mt-0.5 text-[0.72rem] font-semibold text-muted-foreground">
               @{business.email_domain}
             </p>
           ) : null}

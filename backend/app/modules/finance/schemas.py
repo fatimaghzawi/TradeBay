@@ -1,4 +1,3 @@
-"""Finance request schemas — money as string/int only (no float)."""
 
 from __future__ import annotations
 
@@ -12,12 +11,11 @@ def _reject_float(v: Any) -> Any:
         raise ValueError("Money must be string or int — not float")
     return v
 
-
 class RecordPaymentRequest(BaseModel):
     amount: str
     payment_method: str | None = None
     reference: str | None = Field(default=None, max_length=120)
-    # Pending receipts do not affect AR until completed.
+                                                        
     complete: bool = True
 
     @field_validator("amount", mode="before")
@@ -25,11 +23,10 @@ class RecordPaymentRequest(BaseModel):
     def _no_float(cls, v: Any) -> Any:
         return _reject_float(v)
 
-
 class CreateCreditNoteRequest(BaseModel):
     amount: str
     reason: str = Field(min_length=1, max_length=500)
-    # When true, issues and applies in one step (posts ledger + reduces obligation).
+                                                                                    
     apply: bool = True
     lines: list[dict[str, Any]] | None = None
 
@@ -38,12 +35,11 @@ class CreateCreditNoteRequest(BaseModel):
     def _no_float(cls, v: Any) -> Any:
         return _reject_float(v)
 
-
 class CreateRefundRequest(BaseModel):
     amount: str
     reason: str | None = Field(default=None, max_length=500)
     credit_note_id: str | None = None
-    # When true, create as approved+processed (manual cash return).
+                                                                   
     process: bool = True
 
     @field_validator("amount", mode="before")

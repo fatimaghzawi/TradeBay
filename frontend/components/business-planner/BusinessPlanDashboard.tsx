@@ -4,13 +4,13 @@ import {
   InventoryBtn,
   InventoryEmpty,
   InventoryKpi,
-  InventoryLinkBtn,
   InventoryPageHeader,
   InventoryPanel,
   InventorySkeleton,
   InventoryTabs,
   StatusBadge,
 } from "@/components/catalog/InventoryUi";
+import { BackLink } from "@/components/ui/BackLink";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import {
   BUDGET_KEYS,
@@ -47,9 +47,7 @@ export function BusinessPlanDashboard({ planId }: Props) {
         <FeedbackBanner tone="error" title="Plan unavailable">
           {bp.error || "Plan not found"}
         </FeedbackBanner>
-        <InventoryLinkBtn href={ROUTES.businessPlanner} tone="soft">
-          Back to plans
-        </InventoryLinkBtn>
+        <BackLink href={ROUTES.businessPlanner}>Back to plans</BackLink>
       </div>
     );
   }
@@ -209,7 +207,7 @@ export function BusinessPlanDashboard({ planId }: Props) {
                 <li key={a.key}>
                   <button
                     type="button"
-                    className="tb-inv-btn tb-inv-btn-soft"
+                    className="tb-btn tb-btn--secondary"
                     onClick={() => bp.handleNextAction(a.key)}
                   >
                     {a.label}
@@ -217,7 +215,7 @@ export function BusinessPlanDashboard({ planId }: Props) {
                 </li>
               ))}
             <li>
-              <button type="button" className="tb-inv-btn tb-inv-btn-primary" onClick={onExport}>
+              <button type="button" className="tb-btn tb-btn--primary" onClick={onExport}>
                 Export plan PDF
               </button>
             </li>

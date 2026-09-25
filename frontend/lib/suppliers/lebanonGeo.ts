@@ -1,4 +1,4 @@
-/** Lebanon geography for the supplier map (WGS84). */
+
 
 export type LebanonMapPlace = {
   id: string;

@@ -1,13 +1,3 @@
-"""Auth and authorization FastAPI dependencies.
-
-Request path for protected APIs:
-
-1. ``get_current_user`` — JWT + session → ``AuthContext``
-2. ``require_permission(resource, action)`` — needs active business membership
-3. Handler / service uses ``auth.permissions`` for further subset checks
-
-Permission checks use ``resource.action`` codes — never ``if role == "admin"``.
-"""
 
 from __future__ import annotations
 
@@ -58,7 +48,6 @@ from app.modules.identity.service import AuthService, BusinessService
 
 @dataclass(slots=True)
 class AuthContext:
-    """Authenticated request context (user + optional active company)."""
 
     user: dict[str, Any]
     session: dict[str, Any]
@@ -66,6 +55,8 @@ class AuthContext:
     membership: dict[str, Any] | None = None
     role: dict[str, Any] | None = None
     permissions: set[str] = field(default_factory=set)
+                                                                                               
+    inactive_business: dict[str, Any] | None = None
 
     @property
     def user_id(self) -> str:
@@ -84,21 +75,16 @@ class AuthContext:
     def has_permission(self, resource: str, action: str) -> bool:
         return f"{resource}.{action}" in self.permissions
 
-
-# ── Service factories (FastAPI Depends) ──────────────────────────────────────
-
+                                                                               
 
 def get_auth_service() -> AuthService:
     return AuthService()
 
-
 def get_business_service() -> BusinessService:
     return BusinessService()
 
-
 def get_directory_service() -> DirectoryService:
     return DirectoryService()
-
 
 def _extract_access_token(
     authorization: str | None,
@@ -108,9 +94,7 @@ def _extract_access_token(
         return authorization.split(" ", 1)[1].strip()
     return access_cookie
 
-
-# ── Authentication ───────────────────────────────────────────────────────────
-
+                                                                               
 
 async def get_current_user(
     request: Request,
@@ -130,7 +114,7 @@ async def get_current_user(
     user_id = str(payload.get("sub", ""))
     session_id = str(payload.get("sid", ""))
     if not user_id or not session_id:
-        raise UnauthorizedError("Invalid access token claims")
+        raise UnauthorizedError()
 
     cached = get_cached_session_auth(session_id)
     if cached is not None and str(cached.get("user_id")) == user_id:
@@ -141,15 +125,12 @@ async def get_current_user(
             membership=cached.get("membership"),
             role=cached.get("role"),
             permissions=set(cached.get("permissions") or ()),
+            inactive_business=cached.get("inactive_business"),
         )
         if ctx.user.get("status") in {UserStatus.SUSPENDED, UserStatus.DEACTIVATED}:
             raise AccountInactiveError()
         if ctx.session.get("revoked_at") is not None:
-            raise UnauthorizedError("Session is not valid", code=ErrorCode.SESSION_REVOKED)
-        if ctx.business is not None and not is_business_operational(
-            str(ctx.business.get("status", ""))
-        ):
-            raise BusinessInactiveError()
+            raise UnauthorizedError(code=ErrorCode.SESSION_REVOKED)
         user_id_ctx.set(user_id)
         if ctx.business_id:
             business_id_ctx.set(ctx.business_id)
@@ -163,14 +144,16 @@ async def get_current_user(
         sessions.get_by_id(session_id),
     )
     if user is None:
-        raise UnauthorizedError("User not found")
-    # Prefer ACCOUNT_INACTIVE (403) over SESSION_REVOKED (401) after suspend,
-    # which revokes sessions before the next authenticated request.
+        raise UnauthorizedError()
+                                                                             
+                                                                   
     if user.get("status") in {UserStatus.SUSPENDED, UserStatus.DEACTIVATED}:
         raise AccountInactiveError()
 
     if session is None or session.get("revoked_at") is not None:
-        raise UnauthorizedError("Session is not valid", code=ErrorCode.SESSION_REVOKED)
+        raise UnauthorizedError(code=ErrorCode.SESSION_REVOKED)
+    if str(session.get("user_id")) != str(user["_id"]):
+        raise UnauthorizedError(code=ErrorCode.SESSION_REVOKED)
 
     ctx = AuthContext(user=user, session=session)
     user_id_ctx.set(user_id)
@@ -182,13 +165,14 @@ async def get_current_user(
             MembershipRepository().get_active_membership(user_id, business_id),
         )
         if business is not None and not is_business_operational(str(business.get("status", ""))):
-            raise BusinessInactiveError()
-        ctx.business = business
-        ctx.membership = membership
-        if membership:
-            role, codes = await _load_permissions_for_membership(membership)
-            ctx.role = role
-            ctx.permissions = codes
+            ctx.inactive_business = business
+        else:
+            ctx.business = business
+            ctx.membership = membership
+            if membership:
+                role, codes = await _load_permissions_for_membership(membership)
+                ctx.role = role
+                ctx.permissions = codes
         business_id_ctx.set(str(business_id))
 
     set_cached_session_auth(
@@ -201,11 +185,11 @@ async def get_current_user(
             "membership": ctx.membership,
             "role": ctx.role,
             "permissions": frozenset(ctx.permissions),
+            "inactive_business": ctx.inactive_business,
         },
     )
     request.state.auth = ctx
     return ctx
-
 
 async def get_optional_user(
     request: Request,
@@ -213,7 +197,6 @@ async def get_optional_user(
     authorization: Annotated[str | None, Header()] = None,
     access_cookie: Annotated[str | None, Cookie(alias=ACCESS_COOKIE_NAME)] = None,
 ) -> AuthContext | None:
-    """Return auth context when a valid session exists; otherwise None (guest)."""
     token = _extract_access_token(authorization, access_cookie)
     if not token:
         return None
@@ -231,44 +214,51 @@ async def get_optional_user(
     except BusinessInactiveError:
         raise
 
+SAFE_HTTP_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+def _require_active_business(auth: AuthContext) -> None:
+    if auth.inactive_business is not None:
+        raise BusinessInactiveError()
+    if auth.business is None or auth.membership is None:
+        raise BusinessContextRequiredError()
+
+def _require_verified_email_for_writes(request: Request, auth: AuthContext) -> None:
+    if request.method.upper() not in SAFE_HTTP_METHODS:
+        assert_email_verified(auth.user)
 
 async def get_current_business(auth: Annotated[AuthContext, Depends(get_current_user)]) -> dict[str, Any]:
-    if auth.business is None:
-        raise BusinessContextRequiredError()
+    _require_active_business(auth)
+    assert auth.business is not None
     return auth.business
-
 
 async def get_current_membership(
     auth: Annotated[AuthContext, Depends(get_current_user)],
 ) -> dict[str, Any]:
-    if auth.membership is None:
-        raise BusinessContextRequiredError()
+    _require_active_business(auth)
+    assert auth.membership is not None
     return auth.membership
 
-
 def assert_email_verified(user: dict[str, Any]) -> None:
-    """Reusable FR-AUTH-02 gate for commercial writes in this and future domains."""
     if not user.get("email_verified_at"):
         raise EmailUnverifiedError()
     if user.get("status") != UserStatus.ACTIVE:
         raise AccountInactiveError()
 
-
-# ── Authorization (permission codes) ─────────────────────────────────────────
-
+                                                                               
 
 def require_permission(resource: str, action: str) -> Callable[..., Any]:
-    """Require active business membership holding ``resource.action``."""
 
-    async def _dependency(auth: Annotated[AuthContext, Depends(get_current_user)]) -> AuthContext:
-        if auth.business is None or auth.membership is None:
-            raise BusinessContextRequiredError()
+    async def _dependency(
+        request: Request,
+        auth: Annotated[AuthContext, Depends(get_current_user)],
+    ) -> AuthContext:
+        _require_active_business(auth)
         if not auth.has_permission(resource, action):
             raise PermissionDeniedError(resource, action)
+        _require_verified_email_for_writes(request, auth)
         return auth
 
     return _dependency
-
 
 async def _load_permissions_for_membership(membership: dict[str, Any]) -> tuple[dict[str, Any] | None, set[str]]:
     role = await RoleRepository().get_by_id(membership["role_id"])
@@ -283,9 +273,7 @@ async def _load_permissions_for_membership(membership: dict[str, Any]) -> tuple[
         set_cached_role_permissions(role_key, codes)
     return role, codes
 
-
 def require_business_scope() -> Callable[..., Any]:
-    """Require an active membership in the path business_id (no specific permission)."""
 
     async def _dependency(
         business_id: str,
@@ -309,23 +297,23 @@ def require_business_scope() -> Callable[..., Any]:
 
     return _dependency
 
-
 def require_business_permission(resource: str, action: str) -> Callable[..., Any]:
-    """Authorize against membership in path business_id (not only the session active business)."""
 
     async def _dependency(
         business_id: str,
+        request: Request,
         auth: Annotated[AuthContext, Depends(get_current_user)],
     ) -> AuthContext:
-        return await resolve_business_permission(
+        scoped = await resolve_business_permission(
             business_id=business_id,
             auth=auth,
             resource=resource,
             action=action,
         )
+        _require_verified_email_for_writes(request, scoped)
+        return scoped
 
     return _dependency
-
 
 async def resolve_business_permission(
     *,
@@ -353,9 +341,7 @@ async def resolve_business_permission(
         raise PermissionDeniedError(resource, action)
     return scoped
 
-
 def require_verification_document_access() -> Callable[..., Any]:
-    """Supplier member (read) or platform staff (suppliers.read) may open KYC files."""
 
     async def _dependency(
         business_id: str,
@@ -388,7 +374,6 @@ def require_verification_document_access() -> Callable[..., Any]:
 
     return _dependency
 
-
 def require_verified_email() -> Callable[..., Any]:
     async def _dependency(auth: Annotated[AuthContext, Depends(get_current_user)]) -> AuthContext:
         assert_email_verified(auth.user)
@@ -396,13 +381,10 @@ def require_verified_email() -> Callable[..., Any]:
 
     return _dependency
 
-
 def require_commercial_write(resource: str, action: str) -> Callable[..., Any]:
-    """FR-AUTH-02 + FR-AUTH-04: verified email AND resource.action on the active membership."""
 
     async def _dependency(auth: Annotated[AuthContext, Depends(get_current_user)]) -> AuthContext:
-        if auth.business is None or auth.membership is None:
-            raise BusinessContextRequiredError()
+        _require_active_business(auth)
         if not auth.has_permission(resource, action):
             raise PermissionDeniedError(resource, action)
         assert_email_verified(auth.user)
@@ -410,13 +392,10 @@ def require_commercial_write(resource: str, action: str) -> Callable[..., Any]:
 
     return _dependency
 
-
 def require_seller(resource: str, action: str) -> Callable[..., Any]:
-    """Selling writes: permission + verified supplier profile for the active company."""
 
     async def _dependency(auth: Annotated[AuthContext, Depends(get_current_user)]) -> AuthContext:
-        if auth.business is None or auth.membership is None:
-            raise BusinessContextRequiredError()
+        _require_active_business(auth)
         if not auth.has_permission(resource, action):
             raise PermissionDeniedError(resource, action)
         assert_email_verified(auth.user)
@@ -428,7 +407,6 @@ def require_seller(resource: str, action: str) -> Callable[..., Any]:
         return auth
 
     return _dependency
-
 
 def get_refresh_token_from_cookie(
     refresh_cookie: Annotated[str | None, Cookie(alias=REFRESH_COOKIE_NAME)] = None,

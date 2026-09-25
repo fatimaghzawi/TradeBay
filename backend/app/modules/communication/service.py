@@ -1,4 +1,3 @@
-"""Communication service — BRD §8.7 general-purpose two-company poll messaging."""
 
 from __future__ import annotations
 
@@ -26,8 +25,7 @@ from app.shared.utils.objectid import parse_object_id
 
 class ConversationNotFoundError(NotFoundError):
     def __init__(self) -> None:
-        super().__init__("Conversation not found")
-
+        super().__init__("We couldn't find that conversation.")
 
 class CommunicationService:
     def _biz_id(self, business: dict[str, Any] | None) -> str:
@@ -124,7 +122,6 @@ class CommunicationService:
         user_id: str,
         business: dict[str, Any] | None,
     ) -> int:
-        """Sum unread messages across the active company's threads."""
         bid = parse_object_id(self._biz_id(business))
         convs = (
             await mongo_manager.collection(CollectionName.CONVERSATIONS)
@@ -177,7 +174,7 @@ class CommunicationService:
             part = await self.mark_read(
                 user_id=user_id, business=business, conversation_id=conversation_id
             )
-            # re-fetch participant after mark
+                                             
             part = await self._get_participant(conv["_id"], user_id) or part
         return await self._serialize_conversation(
             conv, viewer_business_id=self._biz_id(business), participant=part
@@ -196,15 +193,18 @@ class CommunicationService:
     ) -> dict[str, Any]:
         bid = self._biz_id(business)
         if bid == counterparty_business_id:
-            raise BadRequestError("Cannot open a conversation with your own company")
+            raise BadRequestError("You can't start a conversation with your own company.")
         if type_ not in {t.value for t in ConversationType}:
-            raise BadRequestError("Invalid conversation type")
+            raise BadRequestError("This kind of conversation isn't available.")
         if type_ not in CONTEXTLESS_CONVERSATION_TYPES and (not context_type or not context_id):
             raise BadRequestError("Start this conversation from an RFQ, quotation, or order")
 
         col = mongo_manager.collection(CollectionName.CONVERSATIONS)
         initiator = parse_object_id(bid)
         counterparty = parse_object_id(counterparty_business_id)
+        await self._assert_counterparty(counterparty)
+        if context_type and context_id:
+            await self._assert_context_parties(context_type, context_id, {bid, str(counterparty)})
 
         existing = await self._find_pair_conversation(initiator, counterparty)
         if existing:
@@ -259,6 +259,61 @@ class CommunicationService:
             role=ParticipantRole.OWNER,
         )
         return await self._serialize_conversation(doc, viewer_business_id=bid)
+
+    async def _assert_counterparty(self, counterparty: ObjectId) -> None:
+        other = await mongo_manager.collection(CollectionName.BUSINESS_ACCOUNTS).find_one(
+            {"_id": counterparty}, {"status": 1, "deleted_at": 1}
+        )
+        if other is None or other.get("deleted_at") or other.get("status") == "suspended":
+            raise NotFoundError("We couldn't find that company.")
+
+    async def _assert_context_parties(
+        self, context_type: str, context_id: str, parties: set[str]
+    ) -> None:
+        oid = parse_object_id(context_id)
+        db = mongo_manager
+        allowed: set[str] = set()
+        if context_type == "rfq":
+            rfq = await db.collection(CollectionName.RFQS).find_one({"_id": oid})
+            if rfq is not None:
+                allowed.add(str(rfq.get("buyer_business_id")))
+                sides = {str(rfq.get("supplier_business_id") or "")}
+                sides |= {
+                    str(i.get("supplier_business_id"))
+                    for i in rfq.get("supplier_invites") or []
+                }
+                async for q in db.collection(CollectionName.QUOTATIONS).find(
+                    {"rfq_id": oid}, {"supplier_id": 1}
+                ):
+                    sides.add(str(q.get("supplier_id")))
+                other = parties - allowed
+                if len(other) == 1 and other <= sides:
+                    allowed |= other
+        elif context_type in {"order", "negotiation", "dispute"}:
+            collection = {
+                "order": CollectionName.ORDERS,
+                "negotiation": CollectionName.NEGOTIATIONS,
+                "dispute": CollectionName.DISPUTES,
+            }[context_type]
+            doc = await db.collection(collection).find_one(
+                {"_id": oid}, {"buyer_business_id": 1, "supplier_business_id": 1}
+            )
+            if doc is not None:
+                allowed = {str(doc.get("buyer_business_id")), str(doc.get("supplier_business_id"))}
+        elif context_type == "quotation":
+            doc = await db.collection(CollectionName.QUOTATIONS).find_one(
+                {"_id": oid}, {"buyer_business_id": 1, "supplier_id": 1}
+            )
+            if doc is not None:
+                allowed = {str(doc.get("buyer_business_id")), str(doc.get("supplier_id"))}
+        elif context_type == "product":
+            doc = await db.collection(CollectionName.PRODUCTS).find_one(
+                {"_id": oid, "deleted_at": None}, {"business_account_id": 1}
+            )
+            if doc is not None and str(doc.get("business_account_id")) in parties:
+                allowed = set(parties)
+        if not parties <= allowed:
+            raise ForbiddenError("This conversation can only be linked to a deal both companies are part of.")
 
     async def _reuse_conversation(
         self,
@@ -316,7 +371,7 @@ class CommunicationService:
         col = mongo_manager.collection(CollectionName.MESSAGES)
         oid = parse_object_id(conversation_id)
         query: dict[str, Any] = {"conversation_id": oid}
-        # Soft-deleted still appear as tombstones for dispute evidence (FR-MSG-08).
+                                                                                   
         if after:
             try:
                 after_dt = datetime.fromisoformat(after.replace("Z", "+00:00"))
@@ -349,29 +404,29 @@ class CommunicationService:
             user_id=user_id, business=business, conversation_id=conversation_id
         )
         if conv.get("status") != ConversationStatus.ACTIVE:
-            raise BadRequestError("Conversation is closed")
+            raise BadRequestError("This conversation is closed, so new messages can't be sent.")
 
         if message_type not in {
             MessageType.TEXT,
             MessageType.ATTACHMENT,
             MessageType.REFERENCE,
         }:
-            raise BadRequestError("Invalid message type")
+            raise BadRequestError("This kind of message can't be sent here.")
         if message_type == MessageType.SYSTEM:
-            raise BadRequestError("System messages are platform-authored only")
+            raise BadRequestError("This kind of message can't be sent here.")
 
         text = (body or "").strip()
         if message_type == MessageType.TEXT and not text:
-            raise BadRequestError("Message body is required")
+            raise BadRequestError("Write a message before sending.")
         if len(text) > 8000:
-            raise BadRequestError("Message is too long")
+            raise BadRequestError("This message is too long. Keep it under 8,000 characters.")
 
         if message_type == MessageType.REFERENCE:
             if not reference_type or not reference_id:
                 raise BadRequestError("Attach a linked document to share it in this conversation")
             if reference_type not in {t.value for t in MessageReferenceType}:
-                raise BadRequestError("Unsupported reference type for link messages")
-            # FR-MSG-04 / BR-19: never restates commercial terms — body is optional caption only.
+                raise BadRequestError("That kind of document can't be shared here.")
+                                                                                                 
             text = text or None
         else:
             reference_type = None
@@ -427,8 +482,8 @@ class CommunicationService:
             role=ParticipantRole.MEMBER,
             last_read_at=now,
         )
-        # Chat unread lives on the Messages bell / conversation last_read — never
-        # fan out into the Activity notifications feed.
+                                                                                 
+                                                       
         return self._serialize_message(msg)
 
     async def edit_message(
@@ -445,9 +500,9 @@ class CommunicationService:
         )
         text = (body or "").strip()
         if not text:
-            raise BadRequestError("Message body is required")
+            raise BadRequestError("Write a message before saving.")
         if len(text) > 8000:
-            raise BadRequestError("Message is too long")
+            raise BadRequestError("This message is too long. Keep it under 8,000 characters.")
         now = utc_now()
         from pymongo import ReturnDocument
 
@@ -463,7 +518,7 @@ class CommunicationService:
             return_document=ReturnDocument.AFTER,
         )
         if updated is None:
-            raise NotFoundError("Message not found or not editable")
+            raise NotFoundError("You can only edit your own messages that haven't been removed.")
         return self._serialize_message(updated)
 
     async def soft_delete_message(
@@ -474,7 +529,6 @@ class CommunicationService:
         conversation_id: str,
         message_id: str,
     ) -> dict[str, Any]:
-        """FR-MSG-08: never hard-delete — blank body and set deleted_at."""
         await self._require_participant_access(
             user_id=user_id, business=business, conversation_id=conversation_id
         )
@@ -493,7 +547,7 @@ class CommunicationService:
             return_document=ReturnDocument.AFTER,
         )
         if updated is None:
-            raise NotFoundError("Message not found or already removed")
+            raise NotFoundError("This message was already removed or isn't yours to remove.")
         return self._serialize_message(updated)
 
     async def mark_read(
@@ -528,18 +582,26 @@ class CommunicationService:
         subject: str | None = None,
         type_: str | None = None,
     ) -> dict[str, Any] | None:
-        """FR-MSG-09: platform-authored timeline entry (no sender)."""
         if system_event not in {e.value for e in SystemEvent}:
             raise BadRequestError("Unrecognized system event")
         col = mongo_manager.collection(CollectionName.CONVERSATIONS)
         ctx_oid = parse_object_id(context_id)
-        conv = await col.find_one(
-            {
+        lookup: dict[str, Any] = {
+            "context_type": context_type,
+            "context_id": ctx_oid,
+            "status": {"$ne": ConversationStatus.ARCHIVED},
+        }
+        if initiator_business_id and counterparty_business_id:
+                                                                                  
+            lookup = {
+                **self._pair_query(
+                    parse_object_id(initiator_business_id),
+                    parse_object_id(counterparty_business_id),
+                ),
                 "context_type": context_type,
                 "context_id": ctx_oid,
-                "status": {"$ne": ConversationStatus.ARCHIVED},
             }
-        )
+        conv = await col.find_one(lookup)
         if conv is None and initiator_business_id and counterparty_business_id:
             conv = await self._find_pair_conversation(
                 parse_object_id(initiator_business_id),
@@ -632,7 +694,6 @@ class CommunicationService:
         business: dict[str, Any] | None,
         conversation_id: str,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """FR-MSG-05: active party membership + participant row (lazy-join for party users)."""
         bid = self._biz_id(business)
         conv = await mongo_manager.collection(CollectionName.CONVERSATIONS).find_one(
             {"_id": parse_object_id(conversation_id)}
@@ -712,12 +773,12 @@ class CommunicationService:
             str(conv.get("initiator_business_id")),
             str(conv.get("counterparty_business_id")),
         }:
-            raise ForbiddenError("Not a party to this conversation")
+            raise ForbiddenError("This conversation belongs to other companies.")
 
     async def _unread_count(
         self, conversation_id: ObjectId, last_read_at: datetime | None
     ) -> int:
-        # FR-MSG-06: derived from last_read_at — never a stored counter.
+                                                                        
         query: dict[str, Any] = {"conversation_id": conversation_id, "deleted_at": None}
         if last_read_at is not None:
             query["created_at"] = {"$gt": last_read_at}

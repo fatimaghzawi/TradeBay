@@ -1,4 +1,3 @@
-"""Tax helpers — resolve active VAT and compute tax with Decimal only."""
 
 from __future__ import annotations
 
@@ -9,8 +8,7 @@ from typing import Any
 from bson import Decimal128
 
 MONEY_QUANT = Decimal("0.01")
-MAX_TAX_RATE = Decimal("1")  # 100% absolute ceiling for sanity
-
+MAX_TAX_RATE = Decimal("1")                                    
 
 def as_decimal(value: Any) -> Decimal:
     if isinstance(value, Decimal128):
@@ -21,10 +19,8 @@ def as_decimal(value: Any) -> Decimal:
         return Decimal("0")
     return Decimal(str(value))
 
-
 def money(value: Any) -> Decimal:
     return as_decimal(value).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
-
 
 def compute_tax(
     *,
@@ -32,7 +28,6 @@ def compute_tax(
     discount: Any = "0",
     rate: Any,
 ) -> dict[str, Decimal]:
-    """taxable = subtotal − discount; tax = taxable × rate; total = taxable + tax."""
     sub = money(subtotal)
     disc = money(discount)
     if disc > sub:
@@ -51,7 +46,6 @@ def compute_tax(
         "tax_amount": tax_amount,
         "total": total,
     }
-
 
 def tax_is_effective(doc: dict[str, Any], *, at: datetime) -> bool:
     if not doc.get("is_active"):

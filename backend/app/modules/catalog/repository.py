@@ -1,4 +1,3 @@
-"""Catalog & inventory repositories — persistence only."""
 
 from __future__ import annotations
 
@@ -19,7 +18,6 @@ def _qty(value: Decimal | int | str) -> Decimal128:
         return to_decimal128(value)
     return to_decimal128(Decimal(value))
 
-
 class CategoryRepository(BaseRepository):
     collection_name = CollectionName.CATEGORIES
 
@@ -34,7 +32,6 @@ class CategoryRepository(BaseRepository):
         else:
             query = {"parent_category_id": parse_object_id(str(parent_id))}
         return await self.find_many(query, limit=500, sort=[("display_order", 1), ("name", 1)], session=session)
-
 
 class ProductRepository(BaseRepository):
     collection_name = CollectionName.PRODUCTS
@@ -53,7 +50,6 @@ class ProductRepository(BaseRepository):
             },
             session=session,
         )
-
 
 class ProductPriceRepository(BaseRepository):
     collection_name = CollectionName.PRODUCT_PRICES
@@ -83,7 +79,6 @@ class ProductPriceRepository(BaseRepository):
             session=session,
         )
 
-
 class ProductImageRepository(BaseRepository):
     collection_name = CollectionName.PRODUCT_IMAGES
 
@@ -99,7 +94,6 @@ class ProductImageRepository(BaseRepository):
             sort=[("display_order", 1), ("created_at", 1)],
             session=session,
         )
-
 
 class InventoryRepository(BaseRepository):
     collection_name = CollectionName.INVENTORIES
@@ -120,7 +114,6 @@ class InventoryRepository(BaseRepository):
         updated_at: Any,
         session: MongoSession = None,
     ) -> dict[str, Any] | None:
-        """Atomically move qty from available → reserved if enough stock exists."""
         qty = _qty(quantity)
         return await self.collection.find_one_and_update(
             {
@@ -165,7 +158,6 @@ class InventoryRepository(BaseRepository):
         updated_at: Any,
         session: MongoSession = None,
     ) -> dict[str, Any] | None:
-        """Consume reserved stock as sold (reserved ↓)."""
         qty = _qty(quantity)
         return await self.collection.find_one_and_update(
             {
@@ -199,7 +191,6 @@ class InventoryRepository(BaseRepository):
             session=session,
         )
 
-
 class InventoryTransactionRepository(AppendOnlyRepository):
     collection_name = CollectionName.INVENTORY_TRANSACTIONS
 
@@ -218,3 +209,39 @@ class InventoryTransactionRepository(AppendOnlyRepository):
             sort=[("created_at", -1)],
             session=session,
         )
+
+    async def held_quantity(
+        self,
+        inventory_id: ObjectId,
+        reference_filter: Any,
+        *,
+        session: MongoSession = None,
+    ) -> Decimal:
+        pipeline: list[dict[str, Any]] = [
+            {
+                "$match": {
+                    "inventory_id": inventory_id,
+                    "reference_id": reference_filter,
+                    "transaction_type": {"$in": ["reservation", "reservation_release", "sale"]},
+                }
+            },
+            {
+                "$group": {
+                    "_id": None,
+                    "held": {
+                        "$sum": {
+                            "$cond": [
+                                {"$eq": ["$transaction_type", "reservation"]},
+                                "$quantity",
+                                {"$multiply": ["$quantity", -1]},
+                            ]
+                        }
+                    },
+                }
+            },
+        ]
+        rows = await self.collection.aggregate(pipeline, session=session).to_list(length=1)
+        if not rows:
+            return Decimal("0")
+        held = rows[0].get("held")
+        return held.to_decimal() if isinstance(held, Decimal128) else Decimal(str(held or 0))

@@ -1,8 +1,5 @@
 import type { ReactNode } from "react";
 
-/**
- * Business onboarding aside — unique leaf-framed panel for create/verify only.
- */
 export function BusinessAsideCard({
   title,
   points,
@@ -15,21 +12,21 @@ export function BusinessAsideCard({
   illustration?: "warehouse" | "docs";
 }) {
   return (
-    <aside className="relative overflow-hidden rounded-[1.5rem] border border-[#e2ebe6] bg-[#fffdf9] p-5 shadow-[0_16px_40px_rgba(21,36,29,0.06)] lg:p-6">
+    <aside className="relative overflow-hidden rounded-[1.5rem] border border-border bg-muted p-5 shadow-[0_16px_40px_rgba(21,36,29,0.06)] lg:p-6">
       <LeafCorner className="pointer-events-none absolute -right-6 -top-8 h-36 w-36 text-[#cfe3d6]" />
       <LeafCorner className="pointer-events-none absolute -bottom-10 -left-8 h-40 w-40 rotate-180 text-[#f3d0b8]/80" />
 
       <div className="relative">
-        <div className="mb-4 flex h-32 items-end justify-center rounded-2xl bg-gradient-to-b from-[#f3f6f4] to-[#eaf3ee]">
+        <div className="mb-4 flex h-32 items-end justify-center rounded-2xl bg-gradient-to-b from-muted to-secondary-soft">
           {illustration === "docs" ? <DocsArt /> : <WarehouseArt />}
         </div>
-        <h2 className="font-[family-name:var(--font-instrument)] text-xl leading-snug tracking-tight text-[#0c1612]">
+        <h2 className="font-[family-name:var(--font-instrument)] text-xl leading-snug tracking-tight text-foreground">
           {title}
         </h2>
         <ul className="mt-4 space-y-2.5">
           {points.map((point) => (
-            <li key={point} className="flex gap-2.5 text-sm text-[#3f4f47]">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#e8f6ef] text-[0.65rem] font-bold text-[#1a6b4f]">
+            <li key={point} className="flex gap-2.5 text-sm text-ink-soft">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success-soft text-[0.65rem] font-bold text-link">
                 ✓
               </span>
               <span>{point}</span>

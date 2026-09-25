@@ -7,7 +7,6 @@ import Link from "next/link";
 
 const LOGO = "/images/TradeBay-logo-light.png";
 
-/** Official TradeBay logo. Dark mode adds a light chip via CSS so forest greens stay readable. */
 export function Logo({
   className,
   compact = false,
@@ -16,7 +15,7 @@ export function Logo({
   className?: string;
   compact?: boolean;
   href?: string;
-  /** @deprecated Kept for call-site compat; unused. */
+  
   invert?: boolean;
 }) {
   return (

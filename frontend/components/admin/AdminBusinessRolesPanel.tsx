@@ -75,14 +75,14 @@ export function AdminBusinessRolesPanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="tb-section-label">Roles & permissions</h2>
-          <p className="mt-1 text-sm text-[#5a6a62]">
+          <p className="mt-1 text-sm text-muted-foreground">
             Full control for {businessName}. Business Admin can be edited by platform staff.
           </p>
         </div>
         {canManage ? (
           <button
             type="button"
-            className="bg-[#0d3b2a] px-3.5 py-2 text-sm font-semibold text-white"
+            className="tb-btn tb-btn--primary tb-btn--sm"
             onClick={() => setCreateOpen(true)}
           >
             + Create role
@@ -106,7 +106,7 @@ export function AdminBusinessRolesPanel({
           <p>This company has no roles yet.</p>
         </div>
       ) : (
-        <ul className="mt-5 divide-y divide-[#e4ece7] border border-[#d4e0da]">
+        <ul className="mt-5 divide-y divide-border border border-input">
           {roles.map((role) => (
             <li
               key={role.id}
@@ -114,15 +114,15 @@ export function AdminBusinessRolesPanel({
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-[#0c1612]">{role.name}</p>
-                  <span className="rounded-full bg-[#e8f2ec] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#0d3b2a]">
+                  <p className="font-semibold text-foreground">{role.name}</p>
+                  <span className="rounded-full bg-secondary-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-heading">
                     {role.is_system_role ? "System" : "Custom"}
                   </span>
-                  <span className="text-xs text-[#6b7a72]">
+                  <span className="text-xs text-muted-foreground">
                     {role.permissions.length} permissions
                   </span>
                 </div>
-                <p className="mt-0.5 text-sm text-[#5a6a62]">
+                <p className="mt-0.5 text-sm text-muted-foreground">
                   {role.description || roleBlurb(role.name)}
                 </p>
               </div>
@@ -130,7 +130,7 @@ export function AdminBusinessRolesPanel({
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="border border-[#d4e0da] px-3 py-1.5 text-sm font-semibold text-[#0d3b2a]"
+                    className="border border-input px-3 py-1.5 text-sm font-semibold text-heading"
                     onClick={() => setEditRole(role)}
                   >
                     Edit permissions
@@ -138,7 +138,7 @@ export function AdminBusinessRolesPanel({
                   {!role.is_system_role ? (
                     <button
                       type="button"
-                      className="border border-[#f3c1bb] px-3 py-1.5 text-sm font-semibold text-[#b42318]"
+                      className="border border-destructive/30 px-3 py-1.5 text-sm font-semibold text-destructive"
                       disabled={busyId === role.id}
                       onClick={() => setDeleteRole(role)}
                     >

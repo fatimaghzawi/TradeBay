@@ -10,6 +10,7 @@ import { DirectoryMast } from "@/components/shared/DirectoryMast";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/useConfirm";
 import {
   platformUserName,
   statusTone,
@@ -31,13 +32,10 @@ type VerifiedFilter = "all" | "verified" | "unverified";
 type MembershipFilter = "all" | "with_company" | "orphan" | "platform_only";
 type SortKey = "newest" | "name" | "email" | "companies";
 
-/**
- * Platform users — full Identity account control.
- * Search, status/verification/membership filters, detail drawer, suspend/reactivate, CSV export.
- */
 function AdminUsersPageInner() {
   const { hasPermission, user: currentUser } = useAuth();
   const { success, error: toastError } = useToast();
+  const { confirm, dialog } = useConfirm();
   const searchParams = useSearchParams();
   const qFromUrl = searchParams.get("q") ?? "";
   const [users, setUsers] = useState<PlatformUser[]>([]);
@@ -116,7 +114,7 @@ function AdminUsersPageInner() {
         setStatSuspended(s.meta.total);
       })
       .catch(() => {
-        /* stats are best-effort */
+        
       });
   }, []);
 
@@ -192,6 +190,7 @@ function AdminUsersPageInner() {
 
   return (
     <AdminPage>
+      {dialog}
       <p className="tb-ov-crumb mb-3">
         <Link href={ROUTES.admin.home} className="hover:underline">
           Admin
@@ -253,7 +252,7 @@ function AdminUsersPageInner() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search name or email…"
-          className="h-9 w-full max-w-sm border-0 border-b border-[#b8c0b9] bg-transparent px-0 text-sm outline-none focus:border-[#e86f2a]"
+          className="h-9 w-full max-w-sm border-0 border-b border-input bg-transparent px-0 text-sm outline-none focus:border-ring"
         />
         {(
           [
@@ -275,7 +274,7 @@ function AdminUsersPageInner() {
           </button>
         ))}
         <select
-          className="h-9 rounded-lg border border-[#d4e0da] bg-white px-2 text-sm text-[#0d3b2a]"
+          className="h-9 rounded-lg border border-input bg-card px-2 text-sm text-heading"
           value={sortKey}
           onChange={(e) => setSortKey(e.target.value as SortKey)}
           aria-label="Sort"
@@ -286,7 +285,7 @@ function AdminUsersPageInner() {
           <option value="companies">Sort: companies</option>
         </select>
         <select
-          className="h-9 rounded-lg border border-[#d4e0da] bg-white px-2 text-sm text-[#0d3b2a]"
+          className="h-9 rounded-lg border border-input bg-card px-2 text-sm text-heading"
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
           aria-label="Page size"
@@ -300,10 +299,10 @@ function AdminUsersPageInner() {
       </div>
 
       <div className="tb-cc-filters mt-0 sm:grid-cols-3">
-          <label className="block text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Email verification
             <select
-              className="mt-1.5 h-10 w-full rounded-lg border border-[#d4e0da] bg-white px-3 text-sm font-medium text-[#0d3b2a]"
+              className="mt-1.5 h-10 w-full rounded-lg border border-input bg-card px-3 text-sm font-medium text-heading"
               value={verifiedFilter}
               onChange={(e) => setVerifiedFilter(e.target.value as VerifiedFilter)}
             >
@@ -312,10 +311,10 @@ function AdminUsersPageInner() {
               <option value="unverified">Unverified only</option>
             </select>
           </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Membership (this page)
             <select
-              className="mt-1.5 h-10 w-full rounded-lg border border-[#d4e0da] bg-white px-3 text-sm font-medium text-[#0d3b2a]"
+              className="mt-1.5 h-10 w-full rounded-lg border border-input bg-card px-3 text-sm font-medium text-heading"
               value={membershipFilter}
               onChange={(e) => setMembershipFilter(e.target.value as MembershipFilter)}
             >
@@ -325,13 +324,13 @@ function AdminUsersPageInner() {
               <option value="platform_only">Platform staff only</option>
             </select>
           </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-[#5a6a62]">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Company name contains
             <input
               value={companyNeedle}
               onChange={(e) => setCompanyNeedle(e.target.value)}
               placeholder="Filter memberships on this page…"
-              className="mt-1.5 h-10 w-full rounded-lg border border-[#d4e0da] bg-white px-3 text-sm text-[#0d3b2a] outline-none focus:border-[#e86f2a]"
+              className="mt-1.5 h-10 w-full rounded-lg border border-input bg-card px-3 text-sm text-heading outline-none focus:border-ring"
             />
           </label>
         </div>
@@ -358,7 +357,7 @@ function AdminUsersPageInner() {
                 >
                   <button
                     type="button"
-                    className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#0d3b2a] text-xs font-bold text-white"
+                    className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-primary-foreground"
                     onClick={() => setSelected(open ? null : user)}
                     aria-label={`Inspect ${name}`}
                   >
@@ -372,7 +371,7 @@ function AdminUsersPageInner() {
                   <div className="min-w-0">
                     <button
                       type="button"
-                      className="inline-flex items-center gap-2 text-left font-semibold text-[#0d3b2a] hover:underline"
+                      className="inline-flex items-center gap-2 text-left font-semibold text-heading hover:underline"
                       onClick={() => setSelected(open ? null : user)}
                     >
                       <span>{name}</span>
@@ -398,12 +397,12 @@ function AdminUsersPageInner() {
                             {biz.business_type && biz.business_type !== "platform" ? (
                               <Link
                                 href={ROUTES.admin.businessDetail(biz.business_id)}
-                                className="font-semibold text-[#1a6b4f] hover:underline"
+                                className="font-semibold text-link hover:underline"
                               >
                                 {biz.business_name || "Business"}
                               </Link>
                             ) : (
-                              <span className="font-semibold text-[#0d3b2a]">
+                              <span className="font-semibold text-heading">
                                 {biz.business_name || "Platform"}
                               </span>
                             )}
@@ -424,7 +423,7 @@ function AdminUsersPageInner() {
                       {user.status}
                     </span>
                     {user.suspension_reason ? (
-                      <p className="mt-1 max-w-[12rem] text-xs text-[#b42318]">
+                      <p className="mt-1 max-w-[12rem] text-xs text-destructive">
                         {user.suspension_reason}
                       </p>
                     ) : null}
@@ -444,14 +443,13 @@ function AdminUsersPageInner() {
                       ) : (
                         <AdminAct
                           tone="ok"
-                          onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Reactivate ${name}? They will be able to sign in again.`,
-                              )
-                            ) {
-                              return;
-                            }
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: `Reactivate ${name}?`,
+                              body: "They will be able to sign in again.",
+                              confirmLabel: "Reactivate",
+                            });
+                            if (!ok) return;
                             void identityApi
                               .reactivatePlatformUser(user.id)
                               .then(() => {
@@ -485,7 +483,7 @@ function AdminUsersPageInner() {
           {selected ? (
             <div className="space-y-3 text-sm">
               <p className="tb-section-label">Account</p>
-              <p className="font-[family-name:var(--font-outfit)] text-lg font-bold text-[#0d3b2a] inline-flex items-center gap-2">
+              <p className="font-[family-name:var(--font-outfit)] text-lg font-bold text-heading inline-flex items-center gap-2">
                 {platformUserName(selected)}
                 <VerifiedBadge
                   verified={Boolean(selected.email_verified_at)}
@@ -497,15 +495,15 @@ function AdminUsersPageInner() {
                   }
                 />
               </p>
-              <p className="text-[#4a5f55]">{selected.email}</p>
+              <p className="text-muted-foreground">{selected.email}</p>
               <p>
                 <span className="tb-status" data-tone={statusTone(selected.status)}>
                   {selected.status}
                 </span>
               </p>
-              <dl className="space-y-2 border-t border-[#e8efeb] pt-3">
+              <dl className="space-y-2 border-t border-border pt-3">
                 <div className="flex items-center justify-between gap-2">
-                  <dt className="text-[#6b7a72]">Email</dt>
+                  <dt className="text-muted-foreground">Email</dt>
                   <dd>
                     <VerifiedBadge
                       verified={Boolean(selected.email_verified_at)}
@@ -518,22 +516,22 @@ function AdminUsersPageInner() {
                   </dd>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <dt className="text-[#6b7a72]">Joined</dt>
+                  <dt className="text-muted-foreground">Joined</dt>
                   <dd>{formatJoined(selected.created_at)}</dd>
                 </div>
               </dl>
-              <div className="border-t border-[#e8efeb] pt-3">
+              <div className="border-t border-border pt-3">
                 <p className="tb-section-label">Memberships ({selected.businesses.length})</p>
                 {selected.businesses.length === 0 ? (
-                  <p className="mt-2 text-[#5a6a62]">No company memberships.</p>
+                  <p className="mt-2 text-muted-foreground">No company memberships.</p>
                 ) : (
                   <ul className="mt-2 space-y-2">
                     {selected.businesses.map((biz) => (
-                      <li key={biz.membership_id} className="rounded-lg bg-[#eef3f0] px-3 py-2">
+                      <li key={biz.membership_id} className="rounded-lg bg-muted px-3 py-2">
                         {biz.business_type !== "platform" ? (
                           <Link
                             href={ROUTES.admin.businessDetail(biz.business_id)}
-                            className="font-semibold text-[#0d3b2a] hover:underline"
+                            className="font-semibold text-heading hover:underline"
                           >
                             {biz.business_name || "Business"}
                           </Link>
@@ -549,7 +547,7 @@ function AdminUsersPageInner() {
                 )}
               </div>
               {canUpdate && currentUser?.id !== selected.id ? (
-                <div className="border-t border-[#e8efeb] pt-3">
+                <div className="border-t border-border pt-3">
                   {selected.status !== "suspended" ? (
                     <AdminAct
                       tone="danger"
@@ -584,7 +582,7 @@ function AdminUsersPageInner() {
               ) : null}
             </div>
           ) : (
-            <p className="text-sm text-[#5a6a62]">
+            <p className="text-sm text-muted-foreground">
               Select <strong>Inspect</strong> on a row to see full memberships and take
               account actions.
             </p>
@@ -593,7 +591,7 @@ function AdminUsersPageInner() {
       </div>
 
       {total > 0 ? (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#b8c0b9] pt-4">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-input pt-4">
           <p className="tb-meta">
             {total} accounts · showing {filteredSorted.length} after page filters
           </p>

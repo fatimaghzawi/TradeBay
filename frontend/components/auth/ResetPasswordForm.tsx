@@ -23,6 +23,7 @@ export function ResetPasswordForm() {
     if (/^\d{6}$/.test(prefill)) return prefill.split("");
     return Array(CODE_LEN).fill("");
   });
+  const [email, setEmail] = useState(emailHint);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -43,7 +44,10 @@ export function ResetPasswordForm() {
     [password, confirm],
   );
 
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
   const canSubmit =
+    emailValid &&
     /^\d{6}$/.test(code) &&
     checks.length &&
     checks.number &&
@@ -60,6 +64,10 @@ export function ResetPasswordForm() {
         setConfirmError(null);
         setCodeError(null);
 
+        if (!emailValid) {
+          setError("Enter the email address you requested the code for.");
+          return;
+        }
         if (!/^\d{6}$/.test(code)) {
           setCodeError("Enter the 6-digit code from your email.");
           setError("Enter the 6-digit code from your email.");
@@ -77,7 +85,7 @@ export function ResetPasswordForm() {
 
         setPending(true);
         void authApi
-          .resetPassword(code, password)
+          .resetPassword(email.trim(), code, password)
           .then(() => {
             router.replace(ROUTES.resetPasswordSuccess);
           })
@@ -113,7 +121,7 @@ export function ResetPasswordForm() {
           {emailHint ? (
             <>
               {" "}
-              at <span className="font-semibold text-[#0d3b2a]">{emailHint}</span>
+              at <span className="font-semibold text-heading">{emailHint}</span>
             </>
           ) : null}
           , then choose a new password.
@@ -121,13 +129,29 @@ export function ResetPasswordForm() {
       </div>
 
       {error ? (
-        <p className="rounded-xl bg-[#fef3f2] px-3.5 py-2.5 text-sm text-[#b42318] ring-1 ring-[#fecdca]">
+        <p role="alert" className="tb-alert tb-alert--error">
           {error}
         </p>
       ) : null}
 
+      {emailHint ? null : (
+        <AuthField
+          label="Email address"
+          name="email"
+          type="email"
+          icon="mail"
+          autoComplete="email"
+          placeholder="you@company.com"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError(null);
+          }}
+        />
+      )}
+
       <div>
-        <p className="mb-2 text-sm font-semibold text-[#0d3b2a]">Reset code</p>
+        <p className="mb-2 text-sm font-semibold text-heading">Reset code</p>
         <OtpInput
           length={CODE_LEN}
           value={digits}
@@ -188,7 +212,7 @@ export function ResetPasswordForm() {
       />
 
       <div>
-        <p className="text-[0.8rem] font-semibold text-[#0d3b2a]">
+        <p className="text-[0.8rem] font-semibold text-heading">
           Password must:
         </p>
         <ul className="mt-2 space-y-1.5">
@@ -203,18 +227,18 @@ export function ResetPasswordForm() {
         {pending ? "Saving…" : "Reset password"}
       </AuthSubmitButton>
 
-      <p className="text-center text-sm text-[#5a6a62]">
+      <p className="text-center text-sm text-muted-foreground">
         Need a new code?{" "}
         <Link
           href={ROUTES.forgotPassword}
-          className="font-semibold text-[#0d3b2a] hover:underline"
+          className="font-semibold text-heading hover:underline"
         >
           Request again
         </Link>
         {" · "}
         <Link
           href={ROUTES.login}
-          className="font-semibold text-[#0d3b2a] hover:underline"
+          className="font-semibold text-heading hover:underline"
         >
           Sign in
         </Link>
@@ -225,13 +249,13 @@ export function ResetPasswordForm() {
 
 function Req({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <li className="flex items-center gap-2 text-sm text-[#5a6a62]">
+    <li className="flex items-center gap-2 text-sm text-muted-foreground">
       <span
         className={cn(
           "flex h-4 w-4 items-center justify-center rounded-full border transition",
           ok
-            ? "border-[#1a6b4f] bg-[#1a6b4f] text-white shadow-[0_0_10px_-2px_rgba(26,107,79,0.7)]"
-            : "border-[#c5d0c9] bg-white",
+            ? "border-primary bg-primary text-primary-foreground shadow-[0_0_10px_-2px_rgba(26,107,79,0.7)]"
+            : "border-input bg-card",
         )}
       >
         {ok ? (
@@ -275,16 +299,16 @@ export function ResetStepper({
                 aria-hidden
                 className={cn(
                   "absolute left-[calc(50%+14px)] right-[calc(-50%+14px)] top-3.5 h-0.5",
-                  i < activeIdx ? "bg-[#1a6b4f]" : "bg-[#e2e8e4]",
+                  i < activeIdx ? "bg-primary" : "bg-muted",
                 )}
               />
             ) : null}
             <span
               className={cn(
                 "relative z-[1] flex h-7 w-7 items-center justify-center rounded-full text-[0.65rem] font-bold",
-                done && "bg-[#1a6b4f] text-white",
-                current && "bg-[#e86f2a] text-white",
-                !done && !current && "bg-[#e8eeea] text-[#6a726c]",
+                done && "bg-primary text-primary-foreground",
+                current && "bg-accent text-accent-foreground",
+                !done && !current && "bg-muted text-muted-foreground",
               )}
             >
               {done ? (
@@ -299,10 +323,10 @@ export function ResetStepper({
               className={cn(
                 "mt-1.5 text-[0.65rem] font-semibold",
                 current
-                  ? "text-[#e86f2a]"
+                  ? "text-accent-text"
                   : done
-                    ? "text-[#1a6b4f]"
-                    : "text-[#8a9690]",
+                    ? "text-link"
+                    : "text-subtle-foreground",
               )}
             >
               {step.label}

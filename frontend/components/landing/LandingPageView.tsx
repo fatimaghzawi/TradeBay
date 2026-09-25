@@ -87,7 +87,6 @@ function PathIcon({ name }: { name: "buyers" | "suppliers" | "planner" }) {
   );
 }
 
-/** Landing — continuous scroll story from hero to footer. */
 export function LandingPageView() {
   return (
     <div className="landing-root tb-lp tb-lp--story">

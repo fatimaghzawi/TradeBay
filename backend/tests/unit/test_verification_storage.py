@@ -1,9 +1,7 @@
-"""Supplier verification files stay off the public StaticFiles mount."""
 
 from __future__ import annotations
 
 import pytest
-
 from app.core.exceptions import BadRequestError, NotFoundError
 from app.modules.identity import storage
 from app.modules.identity.service import _serialize_verification_documents
@@ -21,11 +19,9 @@ def test_parse_verification_url_roundtrip() -> None:
         "tax_certificate-abc123.pdf",
     )
 
-
 def test_parse_rejects_pending_and_public_paths() -> None:
     assert storage.parse_verification_url("pending://tax_certificate") is None
     assert storage.parse_verification_url("/uploads/verification/biz1/tax.pdf") is None
-
 
 def test_resolve_and_is_stored(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(storage, "VERIFICATION_DIR", tmp_path)
@@ -45,7 +41,6 @@ def test_resolve_and_is_stored(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Non
         filename=filename,
     )
     assert path.is_file()
-
 
 def test_resolve_rejects_path_traversal(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(storage, "VERIFICATION_DIR", tmp_path)
@@ -67,7 +62,6 @@ def test_resolve_rejects_path_traversal(tmp_path, monkeypatch: pytest.MonkeyPatc
             document_type="tax_certificate",
             filename="tax_certificate-missing.pdf",
         )
-
 
 def test_serialize_strips_pending_placeholders() -> None:
     rows = _serialize_verification_documents(

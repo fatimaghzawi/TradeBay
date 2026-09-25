@@ -1,4 +1,3 @@
-"""Procurement happy-path integration: RFQ → invite → quote → award → PO → ship → receive."""
 
 from __future__ import annotations
 
@@ -16,7 +15,6 @@ from httpx import AsyncClient
 async def _verify_email(client: AsyncClient, token: str) -> None:
     response = await client.post("/api/v1/auth/email/verify", json={"token": token})
     assert response.status_code == 200, response.text
-
 
 async def _register(
     client: AsyncClient,
@@ -50,7 +48,6 @@ async def _register(
         "cookies": response.cookies,
     }
 
-
 async def _mark_supplier_verified(business_id: str) -> None:
     now = utc_now()
     await mongo_manager.database["business_accounts"].update_one(
@@ -69,7 +66,6 @@ async def _mark_supplier_verified(business_id: str) -> None:
         upsert=True,
     )
 
-
 async def _login(client: AsyncClient, email: str, password: str) -> None:
     response = await client.post(
         "/api/v1/auth/login",
@@ -77,7 +73,6 @@ async def _login(client: AsyncClient, email: str, password: str) -> None:
     )
     assert response.status_code == 200, response.text
     client.cookies = response.cookies
-
 
 @pytest.mark.asyncio
 async def test_procurement_end_to_end(
@@ -194,9 +189,10 @@ async def test_procurement_end_to_end(
     assert ship.status_code == 200, ship.text
     shipment = ship.json()["data"]
     shipment_id = shipment["id"]
-    assert shipment["status"] == "preparing"
+                                                                                     
+    assert shipment["status"] == "shipped"
 
-    for status in ("shipped", "in_transit", "delivered"):
+    for status in ("in_transit", "delivered"):
         track = await client.post(
             f"/api/v1/shipments/{shipment_id}/tracking-events",
             json={"status": status, "description": f"Moved to {status}", "location": "Lebanon"},

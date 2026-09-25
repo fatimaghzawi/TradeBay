@@ -4,17 +4,17 @@ import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
 const STYLES = {
-  info: "border-[var(--tb-line)] bg-[var(--tb-surface)] text-[var(--tb-ink)]",
+  info: "border-border bg-card text-foreground",
   success:
-    "border-[color-mix(in_srgb,var(--tb-success)_35%,var(--tb-line))] bg-[var(--tb-success-soft)] text-[var(--tb-success)]",
+    "border-[color-mix(in_srgb,var(--tb-success)_35%,var(--tb-line))] bg-success-soft text-success",
   warning:
-    "border-[color-mix(in_srgb,var(--tb-warning)_35%,var(--tb-line))] bg-[var(--tb-warning-soft)] text-[var(--tb-warning)]",
+    "border-[color-mix(in_srgb,var(--tb-warning)_35%,var(--tb-line))] bg-warning-soft text-warning",
   error:
-    "border-[color-mix(in_srgb,var(--tb-danger)_35%,var(--tb-line))] bg-[var(--tb-danger-soft)] text-[var(--tb-danger)]",
+    "border-[color-mix(in_srgb,var(--tb-danger)_35%,var(--tb-line))] bg-destructive-soft text-destructive",
 } as const;
 
 const ICONS = {
-  info: { bg: "bg-[var(--tb-primary)] text-[var(--tb-primary-foreground)]", mark: "i" },
+  info: { bg: "bg-primary text-primary-foreground", mark: "i" },
   success: { bg: "bg-[var(--tb-success)] text-white", mark: "✓" },
   warning: { bg: "bg-[var(--tb-warning)] text-white", mark: "!" },
   error: { bg: "bg-[var(--tb-danger)] text-white", mark: "!" },

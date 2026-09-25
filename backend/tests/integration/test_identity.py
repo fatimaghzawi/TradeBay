@@ -1,4 +1,3 @@
-"""Identity RBAC, invitations, commercial-write gate, and OTP rules."""
 
 from typing import Any
 
@@ -14,12 +13,11 @@ async def test_members_list_after_register(client: AsyncClient, registered_user:
     assert response.status_code == 200
     assert response.json()["meta"]["total"] >= 1
 
-
 @pytest.mark.asyncio
 async def test_system_roles_seeded_and_cannot_delete(
-    client: AsyncClient, registered_user: dict[str, Any]
+    client: AsyncClient, verified_user: dict[str, Any]
 ) -> None:
-    _ = registered_user
+    _ = verified_user
     roles = await client.get("/api/v1/roles")
     assert roles.status_code == 200
     items = roles.json()["data"]
@@ -35,12 +33,11 @@ async def test_system_roles_seeded_and_cannot_delete(
     deleted = await client.delete(f"/api/v1/roles/{system['id']}")
     assert deleted.status_code == 409
 
-
 @pytest.mark.asyncio
 async def test_permission_subset_rejects_escalation(
-    client: AsyncClient, registered_user: dict[str, Any]
+    client: AsyncClient, verified_user: dict[str, Any]
 ) -> None:
-    _ = registered_user
+    _ = verified_user
     roles = (await client.get("/api/v1/roles")).json()["data"]
     viewer = next(item for item in roles if item["name"] == "Viewer")
     created = await client.post(
@@ -55,12 +52,11 @@ async def test_permission_subset_rejects_escalation(
     )
     assert ok.status_code == 200
 
-
 @pytest.mark.asyncio
 async def test_invitation_carries_role_not_permissions(
-    client: AsyncClient, registered_user: dict[str, Any]
+    client: AsyncClient, verified_user: dict[str, Any]
 ) -> None:
-    _ = registered_user
+    _ = verified_user
     roles = (await client.get("/api/v1/roles")).json()["data"]
     viewer = next(item for item in roles if item["name"] == "Viewer")
     invited = await client.post(
@@ -76,7 +72,6 @@ async def test_invitation_carries_role_not_permissions(
     assert body["role_id"] == viewer["id"]
     assert body["permissions"] == sorted(viewer["permissions"])
     assert "token" not in body
-
 
 @pytest.mark.asyncio
 async def test_unverified_user_blocked_from_creating_business(

@@ -1,0 +1,826 @@
+/*
+ * TradeBay design system — shared component layer.
+ *
+ * Loaded after every feature stylesheet so these rules are the single source
+ * of truth for buttons, badges, page headers, toolbars, tabs, cards, focus and
+ * navigation across buyer, supplier and admin. Tokens live in globals.css
+ * (:root + html.dark). `:root .tb-app` prefixes exist only to outrank older
+ * feature rules that still use `!important`.
+ */
+
+/* ── Back control ──────────────────────────────────────────────────────── */
+.tb-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.22rem 0.75rem 0.22rem 0.22rem;
+  border: 1px solid color-mix(in srgb, var(--tb-accent) 38%, var(--tb-line));
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--tb-accent) 16%, transparent), transparent 42%),
+    var(--tb-surface);
+  color: var(--tb-heading);
+  font-size: 0.82rem;
+  font-weight: 680;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+
+.tb-back:hover {
+  border-color: var(--tb-accent);
+  transform: translateX(-2px);
+}
+
+.tb-back__arrow {
+  display: grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: var(--tb-accent);
+  color: var(--tb-accent-foreground);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tb-accent) 18%, transparent);
+}
+
+.tb-back__arrow i {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translate(1px, -1px);
+  transition: transform 0.18s ease;
+}
+
+.tb-back:hover .tb-back__arrow i {
+  transform: rotate(45deg) translate(-2px, 2px);
+}
+
+.tb-back--icon {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.tb-back--icon:hover {
+  transform: none;
+}
+
+.tb-back__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Focus ─────────────────────────────────────────────────────────────── */
+:where(a, button, [role="button"], [role="tab"], summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--tb-ring);
+  outline-offset: 2px;
+  border-radius: max(var(--tb-radius-field), 0.35rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+.tb-btn {
+  --btn-bg: transparent;
+  --btn-fg: var(--tb-ink-soft);
+  --btn-line: transparent;
+  --btn-bg-hover: var(--tb-hover);
+  --btn-fg-hover: var(--btn-fg);
+  --btn-line-hover: var(--btn-line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--btn-line);
+  border-radius: var(--tb-radius-button);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  text-decoration: none;
+  text-shadow: none;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--tb-duration) var(--tb-ease),
+    border-color var(--tb-duration) var(--tb-ease),
+    color var(--tb-duration) var(--tb-ease),
+    box-shadow var(--tb-duration) var(--tb-ease),
+    transform var(--tb-duration) var(--tb-ease);
+}
+
+.tb-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--btn-bg-hover);
+  color: var(--btn-fg-hover);
+  border-color: var(--btn-line-hover);
+}
+
+.tb-btn:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(1px);
+}
+
+.tb-btn:focus-visible {
+  outline: 2px solid var(--tb-ring);
+  outline-offset: 2px;
+  border-radius: var(--tb-radius-button);
+}
+
+.tb-btn:disabled,
+.tb-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.tb-btn[aria-busy="true"] {
+  cursor: progress;
+}
+
+.tb-btn svg {
+  flex-shrink: 0;
+}
+
+.tb-btn--sm {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
+  border-radius: calc(var(--tb-radius-button) - 0.1rem);
+}
+
+.tb-btn--lg {
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  font-size: 0.95rem;
+}
+
+.tb-btn--icon {
+  width: 2.5rem;
+  padding: 0;
+}
+
+.tb-btn--block {
+  width: 100%;
+}
+
+.tb-btn--primary {
+  --btn-bg: var(--tb-primary);
+  --btn-fg: var(--tb-primary-foreground);
+  --btn-bg-hover: var(--tb-primary-hover);
+  --btn-fg-hover: var(--tb-primary-foreground);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 6px 16px -10px color-mix(in srgb, var(--tb-primary) 70%, transparent);
+}
+
+.tb-btn--secondary {
+  --btn-bg: var(--tb-secondary-soft);
+  --btn-fg: var(--tb-heading);
+  --btn-bg-hover: var(--tb-secondary-soft-hover);
+}
+
+.tb-btn--accent {
+  --btn-bg: var(--tb-accent);
+  --btn-fg: var(--tb-accent-foreground);
+  --btn-bg-hover: color-mix(in srgb, var(--tb-accent) 88%, var(--tb-ink));
+  --btn-fg-hover: var(--tb-accent-foreground);
+}
+
+.tb-btn--outline {
+  --btn-bg: var(--tb-surface);
+  --btn-fg: var(--tb-ink-soft);
+  --btn-line: var(--tb-border);
+  --btn-bg-hover: var(--tb-surface-muted);
+  --btn-line-hover: color-mix(in srgb, var(--tb-ink) 28%, var(--tb-border));
+}
+
+.tb-btn--ghost {
+  --btn-fg: var(--tb-ink-soft);
+  --btn-bg-hover: var(--tb-hover);
+}
+
+.tb-btn--destructive {
+  --btn-bg: var(--tb-danger);
+  --btn-fg: var(--tb-danger-foreground);
+  --btn-bg-hover: color-mix(in srgb, var(--tb-danger) 86%, var(--tb-ink));
+  --btn-fg-hover: var(--tb-danger-foreground);
+}
+
+.tb-btn--danger {
+  --btn-bg: var(--tb-surface);
+  --btn-fg: var(--tb-danger);
+  --btn-line: color-mix(in srgb, var(--tb-danger) 45%, var(--tb-border));
+  --btn-bg-hover: var(--tb-danger-soft);
+  --btn-line-hover: var(--tb-danger);
+}
+
+.tb-btn--success {
+  --btn-bg: var(--tb-surface);
+  --btn-fg: var(--tb-success);
+  --btn-line: color-mix(in srgb, var(--tb-success) 40%, var(--tb-border));
+  --btn-bg-hover: var(--tb-success-soft);
+  --btn-line-hover: var(--tb-success);
+}
+
+.tb-btn--link {
+  --btn-fg: var(--tb-link);
+  --btn-bg-hover: transparent;
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  text-underline-offset: 3px;
+}
+
+.tb-btn--link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+/* Older context rules (admin rows, headers, auth) repaint a/button, some with !important; buttons keep theirs. */
+:root :is(.tb-app, .auth-root, body) .tb-btn.tb-btn {
+  background-color: var(--btn-bg) !important;
+  background-image: none !important;
+  border-color: var(--btn-line) !important;
+  color: var(--btn-fg) !important;
+}
+
+:root :is(.tb-app, .auth-root, body) .tb-btn.tb-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+  background-color: var(--btn-bg-hover) !important;
+  border-color: var(--btn-line-hover) !important;
+  color: var(--btn-fg-hover) !important;
+}
+
+/* Header actions are page-level: always the default size. */
+:root .tb-sign__actions .tb-btn--sm {
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+}
+
+/* ── Inline alerts (form / section level) ──────────────────────────────── */
+.tb-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--tb-tone-info-line);
+  border-radius: var(--tb-radius-control);
+  background: var(--tb-tone-info-bg);
+  color: var(--tb-tone-info-fg);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.tb-alert--error {
+  border-color: var(--tb-tone-bad-line);
+  background: var(--tb-tone-bad-bg);
+  color: var(--tb-tone-bad-fg);
+}
+
+.tb-alert--warning {
+  border-color: var(--tb-tone-wait-line);
+  background: var(--tb-tone-wait-bg);
+  color: var(--tb-tone-wait-fg);
+}
+
+.tb-alert--success {
+  border-color: var(--tb-tone-ok-line);
+  background: var(--tb-tone-ok-bg);
+  color: var(--tb-tone-ok-fg);
+}
+
+/* ── Status badges (one system: ok · wait · bad · info · off) ─────────── */
+:root :is(.tb-badge, .tb-status, .tb-inv-badge, .tb-roles-status) {
+  --badge-bg: var(--tb-tone-off-bg);
+  --badge-fg: var(--tb-tone-off-fg);
+  --badge-line: var(--tb-tone-off-line);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 1.45rem;
+  padding: 0.12rem 0.55rem;
+  border: 1px solid var(--badge-line);
+  border-radius: 999px;
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+:root :is(.tb-badge, .tb-status, .tb-inv-badge, .tb-roles-status)::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+:root :is(.tb-badge, .tb-status, .tb-inv-badge, .tb-roles-status)[data-tone="ok"] {
+  --badge-bg: var(--tb-tone-ok-bg);
+  --badge-fg: var(--tb-tone-ok-fg);
+  --badge-line: var(--tb-tone-ok-line);
+}
+
+:root :is(.tb-badge, .tb-status, .tb-inv-badge, .tb-roles-status)[data-tone="wait"] {
+  --badge-bg: var(--tb-tone-wait-bg);
+  --badge-fg: var(--tb-tone-wait-fg);
+  --badge-line: var(--tb-tone-wait-line);
+}
+
+:root :is(.tb-badge, .tb-status, .tb-inv-badge, .tb-roles-status)[data-tone="bad"] {
+  --badge-bg: var(--tb-tone-bad-bg);
+  --badge-fg: var(--tb-tone-bad-fg);
+  --badge-line: var(--tb-tone-bad-line);
+}
+
+:root :is(.tb-badge, .tb-status, .tb-inv-badge, .tb-roles-status)[data-tone="info"] {
+  --badge-bg: var(--tb-tone-info-bg);
+  --badge-fg: var(--tb-tone-info-fg);
+  --badge-line: var(--tb-tone-info-line);
+}
+
+.tb-badge[data-dot="false"]::before {
+  display: none;
+}
+
+/* Verified mark — same tone family as "ok" */
+:root .tb-app .tb-verified-badge.is-verified {
+  color: var(--tb-tone-ok-fg);
+  background: var(--tb-tone-ok-bg);
+  box-shadow: 0 0 0 1px var(--tb-tone-ok-line);
+}
+
+:root .tb-app .tb-verified-badge.is-unverified {
+  color: var(--tb-subtle-fg);
+  background: var(--tb-tone-off-bg);
+  box-shadow: 0 0 0 1px var(--tb-tone-off-line);
+}
+
+/* ── Page header (DirectoryMast) ───────────────────────────────────────── */
+:root .tb-app .tb-sign,
+:root .tb-sign {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  justify-items: stretch;
+  gap: 0.85rem 1.5rem;
+  padding: 1.25rem 1.5rem 1.3rem;
+  text-align: left;
+  border-radius: var(--tb-radius-card);
+  border: 1px solid var(--tb-line);
+  background:
+    radial-gradient(ellipse 60% 120% at 100% 0%, color-mix(in srgb, var(--tb-accent) 7%, transparent), transparent 60%),
+    var(--tb-surface);
+  box-shadow: var(--tb-shadow-card);
+}
+
+:root .tb-app :is(.tb-sign__bloom, .tb-sign__ring, .tb-sign__flourish),
+:root :is(.tb-sign__bloom, .tb-sign__ring, .tb-sign__flourish) {
+  display: none;
+}
+
+:root .tb-app .tb-sign__plate,
+:root .tb-sign__plate {
+  grid-column: 1 / -1;
+  justify-items: center;
+  align-items: center;
+  justify-self: center;
+  text-align: center;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+:root .tb-app .tb-sign__mark,
+:root .tb-sign__mark {
+  margin: 0 0 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  color: var(--tb-accent-text);
+}
+
+:root .tb-app .tb-sign__title,
+:root .tb-sign__title,
+:root .tb-app .tb-sign--page .tb-sign__title {
+  font-family: var(--font-signature), var(--font-fraunces), cursive;
+  font-size: clamp(2.9rem, 4.6vw, 3.85rem);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: 0.005em;
+  text-align: center;
+  color: var(--tb-heading);
+  text-shadow: none;
+  animation: none;
+}
+
+:root .tb-app .tb-sign__ink,
+:root .tb-sign__ink {
+  display: block;
+  width: min(12rem, 70%);
+  margin: 0.15rem auto 0;
+  color: var(--tb-accent);
+}
+
+:root .tb-app .tb-sign__lede,
+:root .tb-sign__lede,
+:root .tb-app .tb-sign__lede p {
+  margin: 0.45rem auto 0;
+  max-width: 40rem;
+  font-size: 0.95rem;
+  font-weight: 450;
+  line-height: 1.5;
+  color: var(--tb-muted-fg);
+  text-align: center;
+  animation: none;
+}
+
+:root .tb-app .tb-sign__actions,
+:root .tb-sign__actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  align-self: end;
+  gap: 0.5rem;
+  animation: none;
+}
+
+:root .tb-app .tb-sign__search,
+:root .tb-sign__search {
+  grid-column: 1 / -1;
+  width: min(100%, 40rem);
+  border-radius: var(--tb-radius-button);
+  background: var(--tb-field-bg);
+  border: 1px solid var(--tb-field-line);
+  box-shadow: none;
+  animation: none;
+}
+
+:root .tb-app .tb-sign__search button,
+:root .tb-sign__search button {
+  border-radius: calc(var(--tb-radius-button) - 0.15rem);
+  background: var(--tb-primary);
+  color: var(--tb-primary-foreground);
+}
+
+:root .tb-app .tb-sign__stats,
+:root .tb-sign__stats {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  position: static;
+  margin: 0.25rem 0 0;
+  transform: none;
+}
+
+:root .tb-app .tb-sign__stats li,
+:root .tb-sign__stats li {
+  background: var(--tb-surface-muted);
+  border: 1px solid var(--tb-line);
+  color: var(--tb-muted-fg);
+}
+
+:root .tb-app .tb-sign__stats strong,
+:root .tb-sign__stats strong {
+  color: var(--tb-heading);
+}
+
+@media (max-width: 720px) {
+  :root .tb-app .tb-sign,
+  :root .tb-sign {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 1.05rem 1.1rem;
+  }
+
+  :root .tb-app .tb-sign__actions,
+  :root .tb-sign__actions {
+    justify-content: flex-start;
+  }
+
+  :root .tb-app .tb-sign__title,
+  :root .tb-sign__title {
+    font-size: 2.65rem;
+  }
+}
+
+/* ── Toolbars & filters: controls sit in a row and wrap, never stack ───── */
+:root :is(.tb-inv-toolbar, .tb-toolbar, .tb-cc-filters) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+:root :is(.tb-inv-toolbar, .tb-toolbar, .tb-cc-filters) > :is(select, input:not([type="checkbox"], [type="radio"])),
+:root :is(.tb-inv-toolbar, .tb-toolbar, .tb-cc-filters) > label > :is(select, input:not([type="checkbox"], [type="radio"])) {
+  flex: 1 1 8.5rem;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  height: 2.5rem;
+}
+
+:root :is(.tb-inv-toolbar, .tb-toolbar, .tb-cc-filters) > label {
+  display: flex;
+  flex: 1 1 10.5rem;
+  min-width: 0;
+}
+
+/* Top-bar search keeps room for its leading icon; the global field rule's :not() chain outranks utilities. */
+:root .tb-icon-field {
+  padding-left: 2.75rem !important;
+  border-radius: 999px;
+}
+
+/* Identity-page search + role filter share a row and wrap together. */
+:root .tb-roles-toolbar .tb-roles-search {
+  flex: 1 1 11rem;
+  min-width: 0;
+  max-width: 22rem;
+}
+
+/* A caption label wrapping its control stacks: caption above, field below. */
+:root :is(.tb-inv-toolbar, .tb-toolbar, .tb-cc-filters) > label:has(> :is(select, input:not([type="checkbox"], [type="radio"]))) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+:root :is(.tb-inv-toolbar, .tb-toolbar, .tb-cc-filters) > label > :is(select, input:not([type="checkbox"], [type="radio"])) {
+  flex: 0 0 auto;
+  width: 100%;
+  margin-top: 0;
+}
+
+:root :is(.tb-inv-toolbar, .tb-toolbar, .tb-cc-filters) > input:is([type="search"], [type="text"], :not([type])) {
+  flex: 2 1 12rem;
+}
+
+/* Filter chips (All / Active / Pending …) */
+:root .tb-app .tb-filter {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0 0.8rem;
+  border: 1px solid var(--tb-line);
+  border-radius: 999px;
+  background: var(--tb-surface);
+  color: var(--tb-muted-fg);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--tb-duration) ease, color var(--tb-duration) ease, border-color var(--tb-duration) ease;
+}
+
+:root .tb-app .tb-filter:hover:not([data-active="true"]) {
+  color: var(--tb-ink);
+  background: var(--tb-surface-muted);
+}
+
+:root .tb-app .tb-filter[data-active="true"] {
+  color: var(--tb-heading);
+  background: var(--tb-secondary-soft);
+  border-color: color-mix(in srgb, var(--tb-primary) 30%, var(--tb-line));
+  font-weight: 700;
+}
+
+/* ── Tabs (inventory, admin identity rail, command-center) ─────────────── */
+:root .tb-app :is(.tb-inv-tabs, .tb-admin-id-nav) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  border-radius: calc(var(--tb-radius-button) + 0.2rem);
+  background: var(--tb-surface-muted);
+  border: 1px solid var(--tb-line);
+  box-shadow: none;
+}
+
+:root .tb-app :is(.tb-inv-tab, .tb-admin-id-nav a, .tb-admin-id-nav button, .tb-cc-tabs button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.1rem;
+  padding: 0 0.85rem;
+  border: 1px solid transparent;
+  border-radius: var(--tb-radius-button);
+  background: transparent;
+  color: var(--tb-muted-fg);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-decoration: none;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+:root .tb-app :is(.tb-inv-tab, .tb-admin-id-nav a, .tb-admin-id-nav button, .tb-cc-tabs button):hover {
+  color: var(--tb-ink);
+  background: var(--tb-hover);
+}
+
+:root .tb-app :is(
+  .tb-inv-tab[data-active="true"],
+  .tb-inv-tab[aria-selected="true"],
+  .tb-admin-id-nav a[data-active="true"],
+  .tb-admin-id-nav button[data-active="true"],
+  .tb-cc-tabs button.is-active
+) {
+  color: var(--tb-heading);
+  background: var(--tb-surface);
+  border-color: var(--tb-line);
+  box-shadow: 0 1px 2px rgba(13, 59, 42, 0.08);
+}
+
+:root .tb-app .tb-admin-id-nav__label {
+  color: var(--tb-subtle-fg);
+}
+
+/* ── Cards / panels: one surface, one border, one elevation ────────────── */
+:root .tb-app :is(.tb-panel, .tb-cc-panel, .tb-inv-panel) {
+  background: var(--tb-surface);
+  border: 1px solid var(--tb-line);
+  border-radius: var(--tb-radius-card);
+  box-shadow: var(--tb-shadow-card);
+}
+
+:root .tb-app :is(.tb-cc-panel__head h2, .tb-inv-panel-title) {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: 1.08rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--tb-heading);
+}
+
+:root .tb-app .tb-inv-panel-sub {
+  color: var(--tb-muted-fg);
+}
+
+/* KPI tiles share one frame */
+:root .tb-app :is(.tb-summary-item, .tb-cc-kpi) {
+  background: var(--tb-surface);
+  border: 1px solid var(--tb-line);
+  border-radius: var(--tb-radius-card);
+  box-shadow: var(--tb-shadow-card);
+}
+
+:root .tb-app :is(.tb-summary-label, .tb-cc-kpi__top span) {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--tb-muted-fg);
+}
+
+:root .tb-app :is(.tb-summary-value, .tb-cc-kpi strong) {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--tb-heading);
+}
+
+/* ── Tables ────────────────────────────────────────────────────────────── */
+:root .tb-app :is(.tb-inv-table-wrap, .tb-admin-table-wrap) {
+  border: 1px solid var(--tb-line);
+  border-radius: calc(var(--tb-radius-card) - 0.15rem);
+  background: var(--tb-surface);
+}
+
+:root .tb-app :is(.tb-inv-table, .tb-admin-table) th {
+  background: var(--tb-surface-muted);
+  color: var(--tb-muted-fg) !important;
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--tb-line);
+}
+
+:root .tb-app :is(.tb-inv-table, .tb-admin-table) td {
+  color: var(--tb-ink) !important;
+  border-bottom: 1px solid var(--tb-line-soft);
+}
+
+:root .tb-app :is(.tb-inv-table, .tb-admin-table) tbody tr {
+  transition: background-color var(--tb-duration) ease;
+}
+
+:root .tb-app :is(.tb-inv-table, .tb-admin-table) tbody tr:hover td {
+  background: var(--tb-hover);
+}
+
+:root .tb-app :is(.tb-inv-table, .tb-admin-table) tbody tr[aria-selected="true"] td,
+:root .tb-app :is(.tb-inv-table, .tb-admin-table) tbody tr[data-selected="true"] td {
+  background: var(--tb-secondary-soft);
+}
+
+/* ── Navigation rails (buyer, supplier, admin) ─────────────────────────── */
+:root .tb-app :is(.tb-app-sidebar, .tb-id-sidebar, .tb-inv-sidebar.tb-id-sidebar) {
+  background: var(--tb-nav-bg) !important;
+  border-color: var(--tb-nav-line) !important;
+  color: var(--tb-nav-fg) !important;
+}
+
+:root .tb-app :is(.tb-app-sidebar-link, .tb-id-sidebar-link, .tb-inv-sidebar .tb-id-sidebar-link) {
+  font-family: var(--font-figtree), system-ui, sans-serif !important;
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  color: var(--tb-nav-fg) !important;
+  text-shadow: none !important;
+  border-radius: var(--tb-radius-button);
+}
+
+:root .tb-app :is(.tb-app-sidebar-link, .tb-id-sidebar-link, .tb-inv-sidebar .tb-id-sidebar-link):hover {
+  background: var(--tb-nav-hover) !important;
+  color: #ffffff !important;
+}
+
+:root .tb-app :is(.tb-app-sidebar-link.is-active, .tb-id-sidebar-link.is-active, .tb-inv-sidebar .tb-id-sidebar-link.is-active) {
+  background: var(--tb-nav-active-bg) !important;
+  color: #ffffff !important;
+  box-shadow: inset 3px 0 0 var(--tb-nav-active-bar) !important;
+  text-shadow: none !important;
+}
+
+:root .tb-app .tb-inv-sidebar .tb-id-sidebar-link.is-active::before {
+  display: none;
+}
+
+:root .tb-app :is(.tb-app-sidebar-link.is-active .tb-app-sidebar-icon, .tb-id-sidebar-link.is-active .tb-id-sidebar-icon) {
+  color: var(--tb-nav-active-bar) !important;
+}
+
+:root .tb-app :is(.tb-app-sidebar-group, .tb-id-sidebar-group-label) {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tb-nav-muted) !important;
+}
+
+:root .tb-app :is(.tb-inv-sidebar-title, .tb-id-sidebar-brand p:nth-child(2)) {
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+:root .tb-app .tb-inv-sidebar-kicker {
+  color: var(--tb-nav-active-bar) !important;
+}
+
+/* ── Typography roles ──────────────────────────────────────────────────── */
+:root .tb-app :is(.tb-type-page) {
+  color: var(--tb-heading);
+}
+
+:root .tb-app :is(.tb-type-section, .tb-type-card) {
+  color: var(--tb-heading);
+}
+
+.tb-type-caption {
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--tb-subtle-fg);
+}
+
+.tb-type-body {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--tb-ink-soft);
+}
+
+.tb-type-small {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--tb-muted-fg);
+}

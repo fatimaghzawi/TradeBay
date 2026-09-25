@@ -301,7 +301,7 @@ function OverviewInner() {
               action={
                 <Link
                   href={ROUTES.inventoryProducts}
-                  className="text-xs font-bold text-[#1a6b4f] hover:underline"
+                  className="text-xs font-bold text-link hover:underline"
                 >
                   View all
                 </Link>
@@ -310,7 +310,7 @@ function OverviewInner() {
               {!isSupplier ? (
                 <div className="tb-mkt-grid-compact">
                   {featured.length === 0 ? (
-                    <p className="py-4 text-sm text-[#5a6a62]">No products to show yet.</p>
+                    <p className="py-4 text-sm text-muted-foreground">No products to show yet.</p>
                   ) : (
                     featured.map((p) => (
                       <Link
@@ -359,7 +359,7 @@ function OverviewInner() {
               ) : (
               <div className="tb-inv-activity">
                 {featured.length === 0 ? (
-                  <p className="py-4 text-sm text-[#5a6a62]">No products to show yet.</p>
+                  <p className="py-4 text-sm text-muted-foreground">No products to show yet.</p>
                 ) : (
                   featured.map((p) => (
                     <Link
@@ -378,8 +378,8 @@ function OverviewInner() {
                         <span className="tb-inv-activity-dot" />
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-[#0d3b2a]">{p.name}</p>
-                        <p className="text-xs text-[#5a6a62]">
+                        <p className="text-sm font-semibold text-heading">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">
                           {p.status === "draft" ? "Draft touched" : "Listing updated"}
                           {p.updated_at
                             ? ` · ${new Date(p.updated_at).toLocaleString()}`
@@ -417,13 +417,13 @@ function OverviewInner() {
                         <td>
                           <Link
                             href={ROUTES.inventoryProduct(p.id)}
-                            className="font-semibold text-[#0d3b2a] hover:underline"
+                            className="font-semibold text-heading hover:underline"
                           >
                             {p.name}
                           </Link>
                         </td>
                         <td className="font-mono text-xs">{p.sku}</td>
-                        <td className="font-semibold text-[#b42318]">
+                        <td className="font-semibold text-destructive">
                           {p.inventory?.available_quantity ?? "0"}
                         </td>
                         <td>{p.moq}</td>

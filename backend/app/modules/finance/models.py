@@ -1,10 +1,3 @@
-"""Customer finance (AR) document shapes.
-
-ERD §7. Invoices, payments, credit notes and refunds are source documents;
-`financial_transactions` is the append-only ledger that records their effect. What a
-buyer owes is always summed from the ledger — there is deliberately no balance field
-anywhere in this module.
-"""
 
 from __future__ import annotations
 
@@ -19,7 +12,6 @@ from app.shared.types.money import Money, OptionalMoney
 
 
 class InvoiceLineEmbedded(MongoEmbedded):
-    """Snapshot of an order line at issue time. Embedded — never a collection."""
 
     order_item_id: OptionalDocumentId = None
     product_id: OptionalDocumentId = None
@@ -31,9 +23,7 @@ class InvoiceLineEmbedded(MongoEmbedded):
     tax_snapshot: Money = Decimal("0")
     line_total: Money
 
-
 class CustomerInvoiceDocument(MongoDocument):
-    """Issued from a confirmed order. Never edited after issue — correct with a credit note."""
 
     invoice_number: str
     order_id: DocumentId
@@ -53,17 +43,13 @@ class CustomerInvoiceDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class PaymentAllocationEmbedded(MongoEmbedded):
-    """One payment may settle several invoices. Each allocation posts its own ledger row."""
 
     invoice_id: DocumentId
     allocated_amount: Money
     allocated_at: datetime
 
-
 class PaymentDocument(MongoDocument):
-    """Receipt fields live here; there is no separate `receipts` collection."""
 
     payment_reference: str
     idempotency_key: str | None = None
@@ -83,16 +69,13 @@ class PaymentDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class CreditNoteLineEmbedded(MongoEmbedded):
     description: str
     quantity: OptionalMoney = None
     unit_price: OptionalMoney = None
     line_total: Money
 
-
 class CreditNoteDocument(MongoDocument):
-    """Reduces what the buyer owes. Can be issued without any cash moving back."""
 
     credit_note_number: str
     invoice_id: DocumentId
@@ -109,9 +92,7 @@ class CreditNoteDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class RefundDocument(MongoDocument):
-    """Cash going back. Never deletes or reduces the original payment."""
 
     refund_number: str
     payment_id: DocumentId
@@ -129,13 +110,7 @@ class RefundDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class FinancialTransactionDocument(MongoDocument):
-    """Append-only AR ledger row, written in the same transaction as its source document.
-
-    Never updated in place: a correction inserts a `reversal` row pointing back through
-    `reverses_transaction_id`.
-    """
 
     transaction_number: str
     business_account_id: DocumentId

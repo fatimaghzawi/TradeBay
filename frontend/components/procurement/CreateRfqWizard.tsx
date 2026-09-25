@@ -24,6 +24,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FieldError, NumberInput } from "@/components/ui/FormField";
+import { BackLink } from "@/components/ui/BackLink";
 
 type DraftItem = CreateRFQItemInput & { key: string };
 
@@ -322,9 +323,7 @@ export function CreateRfqWizard(_props?: { mode?: "catalog" | "sourcing" | "lega
           <p className="tb-deal-stamp">New RFQ</p>
           <p className="tb-deal-status">Create RFQ</p>
           <div className="tb-deal-hero__actions">
-            <InventoryLinkBtn href={ROUTES.procurement} tone="soft">
-              ← Procurement
-            </InventoryLinkBtn>
+            <BackLink href={ROUTES.procurement}>Procurement</BackLink>
           </div>
         </div>
         <h1 className="tb-deal-title">Build the ask across the table</h1>
@@ -509,7 +508,7 @@ export function CreateRfqWizard(_props?: { mode?: "catalog" | "sourcing" | "lega
                           )}
                         </span>
                         <div>
-                          <p className="font-semibold text-[var(--tb-ink)]">{it.product_name}</p>
+                          <p className="font-semibold text-foreground">{it.product_name}</p>
                           {it.sku ? <p className="tb-inv-muted text-xs">{it.sku}</p> : null}
                         </div>
                       </div>
@@ -553,9 +552,7 @@ export function CreateRfqWizard(_props?: { mode?: "catalog" | "sourcing" | "lega
             )}
 
             <div className="tb-rfq-flow__footer">
-              <InventoryBtn tone="soft" onClick={() => goTo(0)}>
-                ← Back
-              </InventoryBtn>
+              <BackLink onClick={() => goTo(0)}>Back</BackLink>
               <InventoryBtn tone="soft" busy={busy} disabled={busy} onClick={() => void saveDraft()}>
                 Save draft
               </InventoryBtn>
@@ -644,9 +641,7 @@ export function CreateRfqWizard(_props?: { mode?: "catalog" | "sourcing" | "lega
               </p>
             ) : null}
             <div className="tb-rfq-flow__footer">
-              <InventoryBtn tone="soft" onClick={() => goTo(1)}>
-                ← Back
-              </InventoryBtn>
+              <BackLink onClick={() => goTo(1)}>Back</BackLink>
               <InventoryBtn tone="accent" busy={busy} disabled={busy} onClick={() => goTo(3)}>
                 Next · handshake →
               </InventoryBtn>
@@ -701,9 +696,7 @@ export function CreateRfqWizard(_props?: { mode?: "catalog" | "sourcing" | "lega
             </article>
 
             <div className="tb-rfq-flow__footer">
-              <InventoryBtn tone="soft" onClick={() => goTo(2)}>
-                ← Back
-              </InventoryBtn>
+              <BackLink onClick={() => goTo(2)}>Back</BackLink>
               <InventoryBtn
                 tone="accent"
                 busy={busy}

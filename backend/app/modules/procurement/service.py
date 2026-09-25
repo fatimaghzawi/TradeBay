@@ -1,7 +1,7 @@
-"""Procurement & fulfilment service — RFQ → quote → award → PO → shipment → receive."""
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -11,6 +11,7 @@ from pymongo import ReturnDocument
 from app.db.collections import CollectionName
 from app.db.mongodb import mongo_manager
 from app.db.transactions import run_in_transaction
+from app.modules.catalog.constants import ProductStatus
 from app.modules.identity.constants import (
     BusinessAccountStatus,
     BusinessAccountType,
@@ -23,7 +24,6 @@ from app.modules.procurement.commercial import (
     optional_money,
     quantize,
 )
-from app.modules.catalog.constants import ProductStatus
 from app.modules.procurement.constants import (
     ORDER_TRANSITIONS,
     QUOTATION_TRANSITIONS,
@@ -60,6 +60,8 @@ from app.modules.procurement.repository import (
     ShipmentItemRepository,
     ShipmentRepository,
 )
+from app.modules.settings.tax import as_decimal as tax_as_decimal
+from app.modules.settings.tax import compute_tax
 from app.shared.events.bus import (
     ORDER_CREATED,
     QUOTATION_ACCEPTED,
@@ -68,11 +70,11 @@ from app.shared.events.bus import (
     DomainEvent,
     event_bus,
 )
+from app.shared.repositories.base import MongoSession
 from app.shared.services.audit import AuditService
 from app.shared.types.money import to_decimal128
-from app.shared.utils.datetime import utc_now
+from app.shared.utils.datetime import as_utc, utc_now
 from app.shared.utils.objectid import parse_object_id
-from app.modules.settings.tax import compute_tax, as_decimal as tax_as_decimal
 
 
 def _dec(value: Any) -> Decimal:
@@ -82,18 +84,15 @@ def _dec(value: Any) -> Decimal:
         return value
     return Decimal(str(value))
 
-
 def _money_out(value: Any) -> str | None:
     if value is None:
         return None
     return format(_dec(value), "f")
 
-
 def _rate_out(value: Any) -> str | None:
     if value is None:
         return None
     return format(tax_as_decimal(value).quantize(Decimal("0.0001")), "f")
-
 
 def _pct_label(rate: Any) -> str | None:
     if rate is None:
@@ -102,12 +101,10 @@ def _pct_label(rate: Any) -> str | None:
     text = format(pct.quantize(Decimal("0.01")), "f").rstrip("0").rstrip(".")
     return f"{text}%"
 
-
 async def _active_tax_settings() -> dict[str, Any] | None:
     from app.modules.settings.service import SettingsService
 
     return await SettingsService().get_active_tax()
-
 
 def _compose_order_money(
     *,
@@ -117,7 +114,6 @@ def _compose_order_money(
     tax_rate: Any | None = None,
     existing_tax_total: Any | None = None,
 ) -> dict[str, Any]:
-    """Apply platform VAT when a rate is provided; otherwise keep existing tax."""
     sub = _dec(subtotal)
     disc = _dec(discount_total or "0")
     charge = _dec(charge_total or "0")
@@ -145,13 +141,11 @@ def _compose_order_money(
         "tax_rate_snapshot": None,
     }
 
-
 def group_catalog_items_by_supplier(
     items: list[dict[str, Any]],
     *,
     product_owners: dict[str, str],
 ) -> dict[str, list[dict[str, Any]]]:
-    """Bucket RFQ lines by owning supplier. Unowned/open lines use key ''."""
     groups: dict[str, list[dict[str, Any]]] = {}
     for item in items:
         sid = item.get("supplier_business_id")
@@ -163,23 +157,19 @@ def group_catalog_items_by_supplier(
         groups.setdefault(key, []).append(item)
     return groups
 
-
 def freeze_catalog_price(
     *,
     previous: Any = None,
     looked_up: Any = None,
     client: Any = None,
 ) -> Any:
-    """Listed price is frozen at snapshot. The buyer cannot overwrite it later."""
     if previous is not None:
         return previous
     if looked_up is not None:
         return looked_up
     return client
 
-
 def rfq_is_unsent(rfq: dict[str, Any]) -> bool:
-    """True until suppliers are invited. Publish-without-invite is still editable."""
     if str(rfq.get("status") or "") in {
         RFQStatus.CANCELLED,
         RFQStatus.EXPIRED,
@@ -188,25 +178,46 @@ def rfq_is_unsent(rfq: dict[str, Any]) -> bool:
         return False
     return not (rfq.get("supplier_invites") or [])
 
+def _aware(value: Any) -> datetime | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return as_utc(value) if isinstance(value, datetime) else None
+
+def assert_rfq_dates(required_by: Any, response_deadline: Any) -> None:
+    now = utc_now()
+    deadline = _aware(response_deadline)
+    needed = _aware(required_by)
+    if deadline is not None and deadline <= now:
+        raise ProcurementValidationError("The quote deadline must be in the future.")
+    if needed is not None and needed <= now:
+        raise ProcurementValidationError("The required-by date must be in the future.")
+    if deadline is not None and needed is not None and needed < deadline:
+        raise ProcurementValidationError(
+            "The required-by date can't be earlier than the quote deadline."
+        )
+
+def rfq_deadline_passed(rfq: dict[str, Any]) -> bool:
+    deadline = _aware(rfq.get("response_deadline"))
+    return deadline is not None and deadline <= utc_now()
+
+def quotation_expired(quote: dict[str, Any]) -> bool:
+    valid_until = _aware(quote.get("valid_until"))
+    return valid_until is not None and valid_until <= utc_now()
 
 def quotation_cannot_be_edited(status: str, *, allow_revision: bool = False) -> str | None:
-    """Supplier quotation fields freeze after submit. Negotiation may revise internally.
-
-    Passing on a counter must not lock the quote. ``rejected`` can still be revived
-    when a later counter is taken (``allow_revision=True``). Awarded quotes stay frozen.
-    """
-    if status in {
-        QuotationStatus.ACCEPTED,
-        QuotationStatus.WITHDRAWN,
-        QuotationStatus.EXPIRED,
-    }:
-        return "Cannot modify an accepted or rejected quotation"
+    if status == QuotationStatus.ACCEPTED:
+        return "This quotation was accepted, so it can no longer be changed."
+    if status == QuotationStatus.WITHDRAWN:
+        return "This quotation was withdrawn, so it can no longer be changed."
+    if status == QuotationStatus.EXPIRED:
+        return "This quotation expired, so it can no longer be changed."
     if status == QuotationStatus.REJECTED and not allow_revision:
-        return "Cannot modify an accepted or rejected quotation"
+        return "The buyer declined this quotation, so it can no longer be changed."
     if status in {QuotationStatus.SUBMITTED, QuotationStatus.NEGOTIATING} and not allow_revision:
         return "This quotation was already submitted and cannot be changed"
     return None
-
 
 def _item_doc_to_payload(item: dict[str, Any]) -> dict[str, Any]:
     sid = item.get("supplier_business_id")
@@ -225,21 +236,17 @@ def _item_doc_to_payload(item: dict[str, Any]) -> dict[str, Any]:
         "supplier_business_id": str(sid) if sid else None,
     }
 
-
 def _oid(value: Any) -> str | None:
     if value is None:
         return None
     return str(value)
-
 
 def _public_evidence_url(shipment_id: str, stored_url: str | None) -> str | None:
     from app.modules.procurement.storage import public_evidence_url
 
     return public_evidence_url(shipment_id=shipment_id, stored_url=stored_url)
 
-
 class ProcurementService:
-    """RFQ → quotation → award → PO → shipment → receive."""
 
     def __init__(self) -> None:
         self.rfqs = RFQRepository()
@@ -262,13 +269,17 @@ class ProcurementService:
             raise ProcurementForbiddenError("Select a supplier company to continue")
         return str(business["_id"])
 
-    async def _next_number(self, prefix: str, collection: CollectionName, field: str) -> str:
-        year = utc_now().year
-        head = f"{prefix}-{year}-"
-        count = await mongo_manager.collection(str(collection)).count_documents(
-            {field: {"$regex": f"^{head}"}}
-        )
-        return f"{head}{count + 1:04d}"
+    async def _next_number(
+        self,
+        prefix: str,
+        collection: CollectionName,
+        field: str,
+        *,
+        session: MongoSession = None,
+    ) -> str:
+        from app.modules.settings.numbering import allocate_seeded_number
+
+        return await allocate_seeded_number(prefix, str(collection), field, session=session)
 
     async def _verified_supplier_ids(self, ids: list[str]) -> set[str]:
         if not ids:
@@ -287,7 +298,7 @@ class ProcurementService:
         )
         return {str(p["business_account_id"]) for p in profiles}
 
-    # ── RFQ ──────────────────────────────────────────────────────────────
+                                                                           
 
     async def create_rfq(
         self,
@@ -298,7 +309,6 @@ class ProcurementService:
         ip: str | None = None,
         hydrate: bool = True,
     ) -> dict[str, Any]:
-        """Legacy/generic create. Prefer create_product_rfq / create_sourcing_rfq."""
         buyer_id = self._require_buyer(business)
         items = payload.get("items") or []
         if not items:
@@ -306,6 +316,7 @@ class ProcurementService:
         rfq_type = str(payload.get("rfq_type") or RFQType.SOURCING).lower()
         if rfq_type not in {RFQType.PRODUCT, RFQType.SOURCING}:
             raise ProcurementValidationError("Choose a product quote or a sourcing request")
+        assert_rfq_dates(payload.get("required_by"), payload.get("response_deadline"))
         now = utc_now()
         number = await self._next_number("RFQ", CollectionName.RFQS, "rfq_number")
         dest = payload.get("destination")
@@ -370,7 +381,6 @@ class ProcurementService:
         payload: dict[str, Any],
         ip: str | None = None,
     ) -> dict[str, Any]:
-        """Product RFQ: one listed product → owning supplier only."""
         buyer_id = self._require_buyer(business)
         product_id = str(payload.get("product_id") or "").strip()
         if not product_id:
@@ -396,7 +406,7 @@ class ProcurementService:
         if supplier_id == buyer_id:
             raise ProductRFQValidationError("You cannot request a quote for your own product")
 
-        # Client must not override supplier — reject mismatch if they try.
+                                                                          
         client_supplier = payload.get("supplier_business_id") or payload.get("supplier_id")
         if client_supplier and str(client_supplier) != supplier_id:
             raise ProductRFQValidationError(
@@ -461,7 +471,7 @@ class ProcurementService:
                     ip=ip,
                 )
             except Exception:
-                # Published even if invite soft-fails (e.g. already invited)
+                                                                            
                 rfq = await self.get_rfq(user_id=user_id, business=business, rfq_id=str(rfq["id"]))
         return rfq
 
@@ -473,7 +483,6 @@ class ProcurementService:
         payload: dict[str, Any],
         ip: str | None = None,
     ) -> dict[str, Any]:
-        """Sourcing RFQ: requirement-first; no product/supplier lock."""
         buyer_id = self._require_buyer(business)
         title = (payload.get("title") or "").strip()
         if not title:
@@ -686,7 +695,7 @@ class ProcurementService:
                 "This request was already sent to suppliers and can no longer be edited"
             )
         if str(rfq.get("rfq_type") or "") == RFQType.PRODUCT:
-            # Product RFQs keep product/supplier lock; items may adjust qty/requirements only.
+                                                                                              
             if payload.get("items") is not None:
                 for raw in payload["items"]:
                     data = raw.model_dump() if hasattr(raw, "model_dump") else dict(raw)
@@ -695,6 +704,11 @@ class ProcurementService:
                         raise ProductRFQValidationError(
                             "Cannot change the locked product on a Product RFQ"
                         )
+        if payload.get("required_by") is not None or payload.get("response_deadline") is not None:
+            assert_rfq_dates(
+                payload.get("required_by") or rfq.get("required_by"),
+                payload.get("response_deadline") or rfq.get("response_deadline"),
+            )
         updates: dict[str, Any] = {"updated_at": utc_now()}
         for key in (
             "title",
@@ -740,11 +754,6 @@ class ProcurementService:
         rfq_id: str,
         ip: str | None = None,
     ) -> dict[str, Any]:
-        """Publish a draft and invite only the supplier that owns each catalog line.
-
-        Mixed-supplier carts become one RFQ per supplier so nobody sees a
-        competitor's products.
-        """
         buyer_id = self._require_buyer(business)
         rfq = await self._get_buyer_rfq(rfq_id, buyer_id)
         if not rfq_is_unsent(rfq):
@@ -943,7 +952,7 @@ class ProcurementService:
         await event_bus.publish(
             DomainEvent(name=RFQ_PUBLISHED, payload={"rfq_id": rfq_id, "buyer_business_id": buyer_id})
         )
-        # Product RFQ: auto-invite the locked supplier after publish.
+                                                                     
         if (
             auto_invite
             and str(rfq.get("rfq_type") or "") == RFQType.PRODUCT
@@ -997,48 +1006,58 @@ class ProcurementService:
             raise ProcurementValidationError(
                 "No verified suppliers in the selection. Unverified suppliers cannot be invited."
             )
-        invites = list(rfq.get("supplier_invites") or [])
-        existing = {str(i.get("supplier_business_id")) for i in invites}
+        existing = {str(i.get("supplier_business_id")) for i in rfq.get("supplier_invites") or []}
         now = utc_now()
-        added = 0
-        for sid in verified:
-            if sid in existing:
-                continue
-            invites.append(
-                {
-                    "supplier_business_id": parse_object_id(sid),
-                    "invited_by_user_id": parse_object_id(user_id),
-                    "invited_at": now,
-                    "viewed_at": None,
-                    "responded_at": None,
-                    "declined_at": None,
-                    "decline_reason": None,
-                    "status": SupplierInviteStatus.INVITED,
-                }
+        new_ids = [sid for sid in verified if sid not in existing]
+        if not new_ids:
+            raise ProcurementConflictError("All selected verified suppliers were already invited")
+        new_invites = [
+            {
+                "supplier_business_id": parse_object_id(sid),
+                "invited_by_user_id": parse_object_id(user_id),
+                "invited_at": now,
+                "viewed_at": None,
+                "responded_at": None,
+                "declined_at": None,
+                "decline_reason": None,
+                "status": SupplierInviteStatus.INVITED,
+            }
+            for sid in new_ids
+        ]
+        pushed = await self.rfqs.collection.update_one(
+            {
+                "_id": rfq["_id"],
+                "supplier_invites.supplier_business_id": {
+                    "$nin": [parse_object_id(sid) for sid in new_ids]
+                },
+            },
+            {
+                "$push": {"supplier_invites": {"$each": new_invites}},
+                "$set": {"visibility": RFQVisibility.INVITED, "updated_at": now},
+            },
+        )
+        if pushed.modified_count == 0:
+            raise ProcurementConflictError(
+                "Someone on your team just invited these suppliers. Refresh to see the latest list."
             )
-            added += 1
+        added = len(new_ids)
+        scope_note = (
+            "Only your products are included. "
+            if str(rfq.get("rfq_type") or "") == RFQType.PRODUCT
+            else ""
+        )
+        for sid in new_ids:
             await notify(
                 recipient_business_id=sid,
                 type="RFQ_INVITATION",
                 title=f"Quote request: {rfq.get('rfq_number')}",
                 message=(
-                    f"A buyer requested a quotation on {rfq.get('title')}. "
-                    "Only your products are included. Message the buyer to negotiate, "
-                    "then submit your quotation."
+                    f"A buyer requested a quotation on {rfq.get('title')}. {scope_note}"
+                    "Message the buyer to negotiate, then submit your quotation."
                 ),
                 reference_type="rfq",
                 reference_id=rfq["_id"],
             )
-        if added == 0:
-            raise ProcurementConflictError("All selected verified suppliers were already invited")
-        await self.rfqs.update(
-            rfq["_id"],
-            {
-                "supplier_invites": invites,
-                "visibility": RFQVisibility.INVITED,
-                "updated_at": now,
-            },
-        )
         await self.audit.log(
             action="RFQ_SUPPLIERS_INVITED",
             resource_type="rfq",
@@ -1098,8 +1117,8 @@ class ProcurementService:
             if str(p.get("verification_status")) == SupplierVerificationStatus.VERIFIED
         }
 
-        # Catalog RFQs: always seat product owners (even if not currently verified).
-        # Open sourcing with no lines: fall back to verified suppliers.
+                                                                                    
+                                                                       
         if supplier_ids:
             candidate_ids = list(supplier_ids)[:limit]
         else:
@@ -1155,15 +1174,45 @@ class ProcurementService:
             (i for i in invites if str(i.get("supplier_business_id")) == supplier_id),
             None,
         )
+        if rfq.get("status") == RFQStatus.DRAFT:
+            raise RFQNotFoundError()
         if invite is None and rfq.get("visibility") != RFQVisibility.OPEN:
             raise ProcurementForbiddenError()
         if invite and invite.get("status") == SupplierInviteStatus.INVITED:
-            for i in invites:
-                if str(i.get("supplier_business_id")) == supplier_id:
-                    i["status"] = SupplierInviteStatus.VIEWED
-                    i["viewed_at"] = utc_now()
-            await self.rfqs.update(rfq["_id"], {"supplier_invites": invites, "updated_at": utc_now()})
+            await self._set_invite_status(
+                rfq["_id"],
+                supplier_id,
+                SupplierInviteStatus.VIEWED,
+                from_statuses=[SupplierInviteStatus.INVITED],
+                extra={"viewed_at": utc_now()},
+            )
+            rfq = await self.rfqs.get_by_id(rfq["_id"]) or rfq
         return await self._serialize_rfq(rfq, include_quotes_for=supplier_id)
+
+    async def _set_invite_status(
+        self,
+        rfq_oid: ObjectId,
+        supplier_id: str,
+        status: str,
+        *,
+        from_statuses: list[str],
+        extra: dict[str, Any] | None = None,
+    ) -> bool:
+        now = utc_now()
+        fields = {"supplier_invites.$[inv].status": status, "updated_at": now}
+        for key, value in (extra or {}).items():
+            fields[f"supplier_invites.$[inv].{key}"] = value
+        result = await self.rfqs.collection.update_one(
+            {"_id": rfq_oid},
+            {"$set": fields},
+            array_filters=[
+                {
+                    "inv.supplier_business_id": parse_object_id(supplier_id),
+                    "inv.status": {"$in": from_statuses},
+                }
+            ],
+        )
+        return result.modified_count > 0
 
     async def respond_invite(
         self,
@@ -1179,22 +1228,37 @@ class ProcurementService:
         if rfq is None:
             raise RFQNotFoundError()
         invites = list(rfq.get("supplier_invites") or [])
-        found = False
-        now = utc_now()
-        for i in invites:
-            if str(i.get("supplier_business_id")) != supplier_id:
-                continue
-            found = True
-            i["responded_at"] = now
-            if accept:
-                i["status"] = SupplierInviteStatus.ACCEPTED
-            else:
-                i["status"] = SupplierInviteStatus.DECLINED
-                i["declined_at"] = now
-                i["decline_reason"] = reason
-        if not found:
+        if not any(str(i.get("supplier_business_id")) == supplier_id for i in invites):
             raise ProcurementForbiddenError("You were not invited to this RFQ")
-        await self.rfqs.update(rfq["_id"], {"supplier_invites": invites, "updated_at": now})
+        if rfq.get("status") not in {
+            RFQStatus.PUBLISHED,
+            RFQStatus.RESPONDING,
+            RFQStatus.NEGOTIATING,
+        }:
+            raise ProcurementConflictError("This request is closed, so it no longer needs a reply.")
+        now = utc_now()
+        responding_from = [
+            SupplierInviteStatus.INVITED,
+            SupplierInviteStatus.VIEWED,
+            SupplierInviteStatus.ACCEPTED,
+            SupplierInviteStatus.DECLINED,
+        ]
+        if accept:
+            await self._set_invite_status(
+                rfq["_id"],
+                supplier_id,
+                SupplierInviteStatus.ACCEPTED,
+                from_statuses=responding_from,
+                extra={"responded_at": now},
+            )
+        else:
+            await self._set_invite_status(
+                rfq["_id"],
+                supplier_id,
+                SupplierInviteStatus.DECLINED,
+                from_statuses=responding_from,
+                extra={"responded_at": now, "declined_at": now, "decline_reason": reason},
+            )
         await notify(
             recipient_business_id=rfq["buyer_business_id"],
             type="RFQ_INVITE_RESPONSE",
@@ -1264,7 +1328,7 @@ class ProcurementService:
             raise ProcurementForbiddenError()
         return rfq
 
-    # ── Quotations ───────────────────────────────────────────────────────
+                                                                           
 
     async def upsert_quotation(
         self,
@@ -1289,6 +1353,13 @@ class ProcurementService:
             RFQStatus.NEGOTIATING,
         }:
             raise ProcurementValidationError("RFQ is not open for quotations")
+        if rfq_deadline_passed(rfq) and not allow_revision:
+            raise ProcurementConflictError(
+                "The buyer's deadline for quotations has passed, so new quotes can't be sent."
+            )
+        valid_until = _aware(payload.get("valid_until"))
+        if valid_until is not None and valid_until <= utc_now():
+            raise ProcurementValidationError("Choose a validity date in the future.")
         rfq_type = str(rfq.get("rfq_type") or RFQType.SOURCING).lower()
         if rfq_type == RFQType.PRODUCT:
             target = str(rfq.get("supplier_business_id") or "")
@@ -1306,10 +1377,16 @@ class ProcurementService:
         rfq_items = {str(i["_id"]): i for i in await self.rfq_items.list_for_rfq(rfq_id)}
         owners = await self._product_owners(list(rfq_items.values()))
         line_inputs = []
+        seen_items: set[str] = set()
         for raw in payload["lines"]:
             data = raw.model_dump() if hasattr(raw, "model_dump") else dict(raw)
             if data["rfq_item_id"] not in rfq_items:
                 raise ProcurementValidationError("Quotation line must reference an RFQ item")
+            if data["rfq_item_id"] in seen_items:
+                raise ProcurementValidationError(
+                    "Each requested item can only be priced once per quotation."
+                )
+            seen_items.add(data["rfq_item_id"])
             rfq_item = rfq_items[data["rfq_item_id"]]
             owner = str(rfq_item.get("supplier_business_id") or "") or owners.get(
                 str(rfq_item["product_id"]) if rfq_item.get("product_id") else ""
@@ -1433,23 +1510,17 @@ class ProcurementService:
             )
 
         if submit:
-            invites = list(rfq.get("supplier_invites") or [])
-            invite_changed = False
-            for invite in invites:
-                if str(invite.get("supplier_business_id")) != supplier_id:
-                    continue
-                if invite.get("status") in {
+            await self._set_invite_status(
+                rfq["_id"],
+                supplier_id,
+                SupplierInviteStatus.ACCEPTED,
+                from_statuses=[
                     SupplierInviteStatus.INVITED,
                     SupplierInviteStatus.VIEWED,
-                }:
-                    invite["status"] = SupplierInviteStatus.ACCEPTED
-                    invite["responded_at"] = now
-                    invite_changed = True
-            if invite_changed:
-                await self.rfqs.update(
-                    rfq["_id"],
-                    {"supplier_invites": invites, "updated_at": now},
-                )
+                    SupplierInviteStatus.DECLINED,
+                ],
+                extra={"responded_at": now},
+            )
 
         if submit and rfq["status"] == RFQStatus.PUBLISHED:
             await self.rfqs.update(
@@ -1507,10 +1578,14 @@ class ProcurementService:
         if str(quote.get("supplier_id")) != supplier_id:
             raise ProcurementForbiddenError()
         assert_transition(QUOTATION_TRANSITIONS, quote["status"], QuotationStatus.WITHDRAWN)
-        await self.quotations.update(
-            quote["_id"],
-            {"status": QuotationStatus.WITHDRAWN, "updated_at": utc_now()},
+        withdrawn = await self.quotations.collection.find_one_and_update(
+            {"_id": quote["_id"], "status": quote["status"]},
+            {"$set": {"status": QuotationStatus.WITHDRAWN, "updated_at": utc_now()}},
         )
+        if withdrawn is None:
+            raise ProcurementConflictError(
+                "This quotation changed a moment ago (it may have been accepted). Refresh to see it."
+            )
         rfq = await self.rfqs.get_by_id(quote.get("rfq_id"))
         try:
             await notify(
@@ -1610,7 +1685,6 @@ class ProcurementService:
         confirm: bool,
         ip: str | None = None,
     ) -> dict[str, Any]:
-        """OK the deal: lock the quotation and prepare a draft purchase order."""
         if not confirm:
             raise ProcurementValidationError("Confirm you want to lock in this deal")
         return await self._close_deal(
@@ -1670,7 +1744,6 @@ class ProcurementService:
         delivery_terms: str | None = None,
         ip: str | None = None,
     ) -> dict[str, Any]:
-        """Promote a draft handshake PO to a live purchase order."""
         buyer_id = self._require_buyer(business)
         order = await self.orders.get_by_id(order_id)
         if order is None:
@@ -1769,6 +1842,15 @@ class ProcurementService:
                         user_id=user_id, business=business, order_id=str(existing["_id"])
                     )
             raise ProcurementValidationError("Quotation is not eligible for award")
+        if quotation_expired(quote):
+            raise ProcurementConflictError(
+                "This quotation has expired. Ask the supplier to send an updated quote."
+            )
+        supplier_id = str(quote.get("supplier_id") or "")
+        if supplier_id not in await self._verified_supplier_ids([supplier_id]):
+            raise ProcurementConflictError(
+                "This supplier isn't verified to sell right now, so the quote can't be accepted."
+            )
 
         existing = await self.orders.find_one({"rfq_id": rfq["_id"]})
         if existing and existing.get("status") != OrderStatus.CANCELLED:
@@ -1862,11 +1944,18 @@ class ProcurementService:
                     session=session,
                 )
 
-        await self.quotations.update(
-            quote["_id"],
-            {"status": QuotationStatus.ACCEPTED, "updated_at": now},
+        accepted = await self.quotations.collection.find_one_and_update(
+            {
+                "_id": quote["_id"],
+                "status": {"$in": [QuotationStatus.SUBMITTED, QuotationStatus.NEGOTIATING]},
+            },
+            {"$set": {"status": QuotationStatus.ACCEPTED, "updated_at": now}},
             session=session,
         )
+        if accepted is None:
+            raise ProcurementConflictError(
+                "The supplier just changed or withdrew this quotation. Refresh and review it again."
+            )
 
         order_number = await self._next_number("PO", CollectionName.ORDERS, "order_number")
         draft_note = (
@@ -1877,7 +1966,7 @@ class ProcurementService:
         active_tax = await _active_tax_settings()
         tax_name = (active_tax or {}).get("name") or "VAT"
         tax_rate = (active_tax or {}).get("rate")
-        # Prefer platform VAT when configured; otherwise keep quotation tax totals.
+                                                                                   
         money_row = _compose_order_money(
             subtotal=quote.get("subtotal"),
             discount_total=quote.get("discount_total"),
@@ -1999,158 +2088,18 @@ class ProcurementService:
             )
         return str(order["_id"])
 
-    async def create_direct_order_from_cart_lines(
-        self,
-        *,
-        user_id: str,
-        business: dict[str, Any] | None,
-        supplier_business_id: str,
-        currency: str,
-        lines: list[dict[str, Any]],
-        ip: str | None = None,
-    ) -> dict[str, Any]:
-        """Create a purchase order directly from cart lines (no RFQ/quotation)."""
-        buyer_id = self._require_buyer(business)
-        if not lines:
-            raise ProcurementValidationError("Order requires at least one line")
-        now = utc_now()
-        zero = to_decimal128(Decimal("0"))
-        built: list[dict[str, Any]] = []
-        subtotal = Decimal("0")
-        for raw in lines:
-            qty = _dec(raw["quantity"])
-            unit_price = _dec(raw["unit_price"])
-            if qty <= 0 or unit_price < 0:
-                raise ProcurementValidationError("Invalid order line amounts")
-            line_total = quantize(qty * unit_price)
-            subtotal += line_total
-            built.append(
-                {
-                    "product_id": parse_object_id(raw["product_id"]) if raw.get("product_id") else None,
-                    "product_name_snapshot": raw.get("product_name") or "Product",
-                    "sku_snapshot": raw.get("sku"),
-                    "quantity": to_decimal128(qty),
-                    "unit": raw.get("unit") or "unit",
-                    "unit_price": to_decimal128(unit_price),
-                    "line_total": to_decimal128(line_total),
-                    "subtotal": to_decimal128(line_total),
-                }
-            )
-
-        order_number = await self._next_number("PO", CollectionName.ORDERS, "order_number")
-        active_tax = await _active_tax_settings()
-        tax_name = (active_tax or {}).get("name") or "VAT"
-        tax_rate = (active_tax or {}).get("rate")
-        money_row = _compose_order_money(
-            subtotal=subtotal,
-            discount_total="0",
-            charge_total="0",
-            tax_rate=tax_rate,
-            existing_tax_total="0",
-        )
-        order = await self.orders.create(
-            {
-                "order_number": order_number,
-                "buyer_business_id": parse_object_id(buyer_id),
-                "supplier_business_id": parse_object_id(supplier_business_id),
-                "rfq_id": None,
-                "quotation_id": None,
-                "source": "cart_direct",
-                "status": OrderStatus.PENDING,
-                "currency": currency or "USD",
-                "subtotal": to_decimal128(money_row["subtotal"]),
-                "discount_total": to_decimal128(money_row["discount_total"]),
-                "charge_total": to_decimal128(money_row["charge_total"]),
-                "tax_total": to_decimal128(money_row["tax_total"]),
-                "total": to_decimal128(money_row["total"]),
-                "tax_rate_snapshot": to_decimal128(money_row["tax_rate_snapshot"])
-                if money_row["tax_rate_snapshot"] is not None
-                else None,
-                "tax_name_snapshot": tax_name if money_row["tax_rate_snapshot"] is not None else None,
-                "shipping_address": None,
-                "billing_address": None,
-                "payment_terms": "Net 30",
-                "payment_method": "Bank transfer",
-                "delivery_terms": None,
-                "payment_status": "unpaid",
-                "stock_reservation_status": "pending",
-                "status_history": [
-                    {
-                        "status": OrderStatus.PENDING,
-                        "changed_by_user_id": parse_object_id(user_id),
-                        "note": "Created directly from marketplace cart",
-                        "changed_at": now,
-                    }
-                ],
-                "rejection_reason": None,
-                "confirmed_at": None,
-                "completed_at": None,
-                "cancelled_at": None,
-                "created_at": now,
-                "updated_at": now,
-            }
-        )
-        for ln in built:
-            await self.order_items.create(
-                {
-                    "order_id": order["_id"],
-                    "quotation_item_id": None,
-                    "rfq_item_id": None,
-                    "product_id": ln["product_id"],
-                    "product_name_snapshot": ln["product_name_snapshot"],
-                    "sku_snapshot": ln["sku_snapshot"],
-                    "quantity": ln["quantity"],
-                    "unit": ln["unit"],
-                    "unit_price": ln["unit_price"],
-                    "discount_snapshot": zero,
-                    "tax_snapshot": zero,
-                    "subtotal": ln["subtotal"],
-                    "line_total": ln["line_total"],
-                    "shipped_quantity": zero,
-                    "received_quantity": zero,
-                    "damaged_quantity": zero,
-                    "missing_quantity": zero,
-                    "rejected_quantity": zero,
-                }
-            )
-
-        await self.audit.log(
-            action="ORDER_CREATED_FROM_CART",
-            resource_type="order",
-            resource_id=order["_id"],
-            business_account_id=buyer_id,
-            user_id=user_id,
-            actor_id=user_id,
-            ip_address=ip,
-            metadata={
-                "order_number": order_number,
-                "supplier_business_id": supplier_business_id,
-                "line_count": len(built),
-            },
-        )
-        await notify(
-            recipient_business_id=supplier_business_id,
-            type="ORDER_CREATED",
-            title=f"New direct order {order_number}",
-            message="A buyer placed a direct purchase order. Confirm it in TradeBay to continue fulfilment.",
-            reference_type="order",
-            reference_id=order["_id"],
-        )
-        await event_bus.publish(
-            DomainEvent(name=ORDER_CREATED, payload={"order_id": str(order["_id"])})
-        )
-        return await self.get_order(user_id=user_id, business=business, order_id=str(order["_id"]))
-
     def _assert_quote_access(self, quote: dict[str, Any], business: dict[str, Any] | None) -> None:
         if not business:
             raise ProcurementForbiddenError()
         if str(business.get("type")) == BusinessAccountType.PLATFORM:
             return
         bid = str(business["_id"])
-        if bid not in {str(quote.get("supplier_id")), str(quote.get("buyer_business_id"))}:
+        if bid == str(quote.get("supplier_id")):
+            return
+        if bid != str(quote.get("buyer_business_id")) or quote.get("status") == QuotationStatus.DRAFT:
             raise ProcurementForbiddenError()
 
-    # ── Orders / PO ──────────────────────────────────────────────────────
+                                                                           
 
     async def list_orders(
         self,
@@ -2162,6 +2111,13 @@ class ProcurementService:
     ) -> tuple[list[dict[str, Any]], int]:
         if not business:
             raise ProcurementForbiddenError()
+        if str(business.get("type")) == BusinessAccountType.PLATFORM:
+            skip = (page - 1) * page_size
+            rows = await self.orders.list_for_business(
+                None, skip=skip, limit=page_size, status=status, include_unpaid=True
+            )
+            total = await self.orders.count_for_business(None, status=status, include_unpaid=True)
+            return [await self._serialize_order_summary(o) for o in rows], total
         as_buyer = str(business.get("type")) == BusinessAccountType.BUYER
         bid = str(business["_id"])
         return await self.list_orders_for_business(
@@ -2180,17 +2136,18 @@ class ProcurementService:
         page: int = 1,
         page_size: int = 20,
         status: str | None = None,
+        include_unpaid: bool | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
-        """Platform/admin oversight — list POs for a trading company by id."""
         rows = await self.orders.list_for_business(
             business_id,
             as_buyer=as_buyer,
             skip=(page - 1) * page_size,
             limit=page_size,
             status=status,
+            include_unpaid=include_unpaid,
         )
         total = await self.orders.count_for_business(
-            business_id, as_buyer=as_buyer, status=status
+            business_id, as_buyer=as_buyer, status=status, include_unpaid=include_unpaid
         )
         return [await self._serialize_order_summary(o) for o in rows], total
 
@@ -2202,7 +2159,6 @@ class ProcurementService:
         page_size: int = 20,
         status: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
-        """Platform/admin oversight — list RFQs created by a buyer company."""
         rows = await self.rfqs.list_for_buyer(
             business_id,
             skip=(page - 1) * page_size,
@@ -2216,7 +2172,144 @@ class ProcurementService:
         self, *, user_id: str, business: dict[str, Any] | None, order_id: str
     ) -> dict[str, Any]:
         order = await self._get_accessible_order(order_id, business)
-        return await self._serialize_order(order)
+        data = await self._serialize_order(order)
+        data.update(await self._order_commerce_view(order, business))
+        return data
+
+    async def _order_commerce_view(
+        self, order: dict[str, Any], business: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        viewer_type = str((business or {}).get("type") or "")
+        db = mongo_manager
+        invoice = await db.collection(CollectionName.CUSTOMER_INVOICES).find_one({"order_id": order["_id"]})
+        if invoice and viewer_type == BusinessAccountType.SUPPLIER and invoice.get("status") == "draft":
+            invoice = None
+        payment = None
+        if invoice is not None:
+            payment = await db.collection(CollectionName.PAYMENTS).find_one(
+                {"allocations.invoice_id": invoice["_id"], "status": {"$ne": "cancelled"}},
+                sort=[("created_at", -1)],
+            )
+
+        payment_view = None
+        if payment is not None:
+            allocated = next(
+                (
+                    a.get("allocated_amount")
+                    for a in payment.get("allocations") or []
+                    if a.get("invoice_id") == invoice["_id"]
+                ),
+                None,
+            )
+            payment_view = {
+                "id": str(payment["_id"]),
+                "reference": payment.get("payment_reference"),
+                "receipt_number": payment.get("receipt_number"),
+                "method": payment.get("payment_method") or payment.get("method"),
+                "provider": payment.get("provider"),
+                "status": payment.get("status"),
+                "amount_for_this_order": _money_out(allocated),
+                "paid_at": payment.get("paid_at").isoformat() if payment.get("paid_at") else None,
+            }
+
+        if payment is not None and payment.get("status") == "completed":
+            payment_status = "paid"
+        elif order.get("status") == OrderStatus.CANCELLED:
+            payment_status = "cancelled"
+        elif order.get("payment_method") == "cash":
+            payment_status = "awaiting_cash"
+        elif order.get("status") == OrderStatus.AWAITING_PAYMENT or (payment and payment.get("status") in {"pending", "failed"}):
+            payment_status = "awaiting_payment"
+        else:
+            payment_status = order.get("payment_status")
+
+        financials = None
+        if viewer_type in {BusinessAccountType.SUPPLIER, BusinessAccountType.PLATFORM}:
+            commission = await db.collection(CollectionName.COMMISSION_RECORDS).find_one({"order_id": order["_id"]})
+            if commission is not None:
+                financials = {
+                    "order_amount": _money_out(commission.get("gross_amount")),
+                    "platform_fee": _money_out(commission.get("commission_amount")),
+                    "platform_fee_rate": _rate_out(commission.get("rate")),
+                    "platform_fee_percent": _pct_label(commission.get("rate")),
+                    "supplier_earnings": _money_out(commission.get("net_amount")),
+                    "commission_status": commission.get("status"),
+                    "currency": commission.get("currency"),
+                }
+
+        return {
+            "payment_status": payment_status,
+            "payment": payment_view,
+            "invoice": (
+                {
+                    "id": str(invoice["_id"]),
+                    "invoice_number": invoice.get("invoice_number"),
+                    "status": invoice.get("status"),
+                    "total": _money_out(invoice.get("total")),
+                    "amount_paid": _money_out(invoice.get("amount_paid")),
+                    "balance_due": _money_out(invoice.get("balance_due")),
+                }
+                if invoice is not None
+                else None
+            ),
+            "financials": financials,
+            "timeline": await self._order_timeline(order, payment),
+        }
+
+    async def _order_timeline(
+        self, order: dict[str, Any], payment: dict[str, Any] | None
+    ) -> list[dict[str, Any]]:
+        history = order.get("status_history") or []
+
+        def first_at(*statuses: str) -> Any:
+            for h in history:
+                if h.get("status") in statuses and h.get("changed_at"):
+                    return h["changed_at"]
+            return None
+
+        shipments = await self.shipments.list_for_order(str(order["_id"]))
+        shipped_at = min((s["shipped_at"] for s in shipments if s.get("shipped_at")), default=None)
+        paid_at = payment.get("paid_at") if payment and payment.get("status") == "completed" else None
+        is_card = order.get("payment_method") == "card"
+        steps: list[tuple[str, str, Any]] = [
+            ("placed", "Order placed", order.get("created_at")),
+        ]
+        if is_card:
+            steps.append(("paid", "Payment received", paid_at))
+        steps.extend(
+            [
+                ("shipped", "Shipped", shipped_at or first_at(OrderStatus.SHIPPED)),
+                ("delivered", "Delivered", first_at(OrderStatus.DELIVERED)),
+            ]
+        )
+        cancelled = order.get("status") == OrderStatus.CANCELLED
+        out: list[dict[str, Any]] = []
+        current_assigned = False
+        for key, label, at in steps:
+            if at is not None:
+                state = "done"
+            elif cancelled:
+                state = "skipped"
+            elif not current_assigned:
+                state = "current"
+                current_assigned = True
+            else:
+                state = "upcoming"
+            out.append(
+                {"key": key, "label": label, "state": state, "at": at.isoformat() if at else None}
+            )
+        if cancelled:
+            out.append(
+                {
+                    "key": "cancelled",
+                    "label": "Cancelled",
+                    "state": "cancelled",
+                    "at": (first_at(OrderStatus.CANCELLED) or order.get("updated_at")).isoformat()
+                    if (first_at(OrderStatus.CANCELLED) or order.get("updated_at"))
+                    else None,
+                }
+            )
+        return out
 
     async def acknowledge_order(
         self, *, user_id: str, business: dict[str, Any] | None, order_id: str
@@ -2227,15 +2320,21 @@ class ProcurementService:
             raise OrderNotFoundError()
         if str(order.get("supplier_business_id")) != supplier_id:
             raise ProcurementForbiddenError()
+        if order.get("status") == OrderStatus.AWAITING_PAYMENT:
+            raise OrderNotFoundError()
         assert_transition(ORDER_TRANSITIONS, order["status"], OrderStatus.CONFIRMED)
 
-        # Reserve catalog lines before confirm — never leave a confirmed PO with silent stock miss.
-        reservation = await self._reserve_stock_for_order(
-            order_id=str(order["_id"]),
-            user_id=user_id,
-            supplier_id=supplier_id,
-            require_success=True,
-        )
+                                                                                     
+        pre_reserved = order.get("stock_reservation_status") == "reserved"
+        if pre_reserved:
+            reservation = "reserved"
+        else:
+            reservation = await self._reserve_stock_for_order(
+                order_id=str(order["_id"]),
+                user_id=user_id,
+                supplier_id=supplier_id,
+                require_success=True,
+            )
 
         now = utc_now()
         history = list(order.get("status_history") or [])
@@ -2247,17 +2346,25 @@ class ProcurementService:
                 "changed_at": now,
             }
         )
-        await self.orders.update(
-            order["_id"],
+        confirmed = await mongo_manager.collection(CollectionName.ORDERS).update_one(
+            {"_id": order["_id"], "status": order["status"]},
             {
-                "status": OrderStatus.CONFIRMED,
-                "confirmed_at": now,
-                "stock_reservation_status": reservation,
-                "status_history": history,
-                "updated_at": now,
+                "$set": {
+                    "status": OrderStatus.CONFIRMED,
+                    "confirmed_at": now,
+                    "stock_reservation_status": reservation,
+                    "status_history": history,
+                    "updated_at": now,
+                }
             },
         )
-        # Finance + platform money: invoice + commission/payable from confirmed PO
+        if confirmed.modified_count == 0:
+            if reservation == "reserved" and not pre_reserved:
+                await self._release_stock_for_order(
+                    order_id=str(order["_id"]), user_id=user_id, supplier_id=supplier_id
+                )
+            raise ProcurementConflictError("This purchase order was already updated. Refresh to see its status.")
+                                                                                  
         await self._try_issue_finance_on_confirm(order_id=str(order["_id"]), user_id=user_id)
         await notify(
             recipient_business_id=order["buyer_business_id"],
@@ -2293,7 +2400,7 @@ class ProcurementService:
             await issue_invoice_for_confirmed_order(order=order, order_items=items, user_id=user_id)
             await create_commission_and_payable_for_order(order=order)
         except Exception:
-            # Finance must not block fulfilment acknowledgement
+                                                               
             pass
 
     async def _reserve_stock_for_order(
@@ -2304,7 +2411,6 @@ class ProcurementService:
         supplier_id: str,
         require_success: bool,
     ) -> str:
-        """Reserve catalog lines. Returns stock_reservation_status."""
         from app.modules.catalog.exceptions import InsufficientStockError
         from app.modules.catalog.service import CatalogService
 
@@ -2328,7 +2434,7 @@ class ProcurementService:
                 )
                 reserved.append((pid, _dec(item["quantity"])))
         except InsufficientStockError:
-            # Roll back any lines already reserved in this attempt.
+                                                                   
             for pid, qty in reserved:
                 try:
                     await catalog.release_stock(
@@ -2368,6 +2474,61 @@ class ProcurementService:
             raise
         return "reserved"
 
+    async def _consume_reserved_stock(
+        self,
+        *,
+        order: dict[str, Any],
+        order_items: dict[str, dict[str, Any]],
+        requested: dict[str, Decimal],
+        user_id: str,
+    ) -> None:
+        from app.db.transactions import run_in_transaction
+        from app.modules.catalog.exceptions import InsufficientReservedError
+        from app.modules.catalog.service import CatalogService
+
+        catalog = CatalogService()
+        order_id = str(order["_id"])
+        supplier_id = str(order["supplier_business_id"])
+        lines = [
+            (str(order_items[key]["product_id"]), qty)
+            for key, qty in requested.items()
+            if order_items[key].get("product_id") and qty > 0
+        ]
+        if not lines:
+            return
+        remaining = {
+            key: _dec(oi["quantity"]) - _dec(oi.get("shipped_quantity") or 0) - requested.get(key, Decimal("0"))
+            for key, oi in order_items.items()
+            if oi.get("product_id")
+        }
+        fully_shipped = all(v <= 0 for v in remaining.values())
+
+        async def work(session: MongoSession) -> None:
+            for product_id, qty in lines:
+                await catalog.sale_stock(
+                    product_id,
+                    business_id=supplier_id,
+                    user_id=user_id,
+                    quantity=qty,
+                    reference_type="order",
+                    reference_id=order_id,
+                    reason=f"Dispatched on {order.get('order_number')}",
+                    session=session,
+                )
+            if fully_shipped:
+                await mongo_manager.collection(CollectionName.ORDERS).update_one(
+                    {"_id": order["_id"]},
+                    {"$set": {"stock_reservation_status": "consumed", "updated_at": utc_now()}},
+                    session=session,
+                )
+
+        try:
+            await run_in_transaction(work)
+        except InsufficientReservedError as exc:
+            raise ProcurementConflictError(
+                "Reserved stock for this order no longer matches — refresh inventory before dispatching."
+            ) from exc
+
     async def _release_stock_for_order(
         self, *, order_id: str, user_id: str, supplier_id: str
     ) -> None:
@@ -2393,7 +2554,7 @@ class ProcurementService:
                 )
                 released_any = True
             except InsufficientReservedError:
-                # Already released or never reserved — idempotent cancel path.
+                                                                              
                 continue
         if released_any:
             await self.orders.update(
@@ -2411,14 +2572,15 @@ class ProcurementService:
         if str(business.get("type")) == BusinessAccountType.PLATFORM:
             return order
         bid = str(business["_id"])
-        if bid not in {
-            str(order.get("buyer_business_id")),
-            str(order.get("supplier_business_id")),
-        }:
-            raise ProcurementForbiddenError()
-        return order
+        if bid == str(order.get("buyer_business_id")):
+            return order
+        if bid == str(order.get("supplier_business_id")):
+            if order.get("status") == OrderStatus.AWAITING_PAYMENT:
+                raise OrderNotFoundError()
+            return order
+        raise ProcurementForbiddenError()
 
-    # ── Shipments ────────────────────────────────────────────────────────
+                                                                           
 
     async def create_shipment(
         self,
@@ -2448,6 +2610,23 @@ class ProcurementService:
             key = str(s["order_item_id"])
             shipped_by_item[key] = shipped_by_item.get(key, Decimal("0")) + _dec(s["quantity"])
 
+        requested: dict[str, Decimal] = {}
+        for raw in payload["lines"]:
+            data = raw.model_dump() if hasattr(raw, "model_dump") else dict(raw)
+            oi = order_items.get(data["order_item_id"])
+            if not oi:
+                raise ProcurementValidationError("Shipment line must reference an order item")
+            key = data["order_item_id"]
+            requested[key] = requested.get(key, Decimal("0")) + money(data["quantity"])
+            if shipped_by_item.get(key, Decimal("0")) + requested[key] > _dec(oi["quantity"]):
+                raise ProcurementValidationError(
+                    f"Cannot ship more than ordered for {oi.get('product_name_snapshot')}"
+                )
+        if order.get("stock_reservation_status") == "reserved":
+            await self._consume_reserved_stock(
+                order=order, order_items=order_items, requested=requested, user_id=user_id
+            )
+
         now = utc_now()
         number = await self._next_number("SHP", CollectionName.SHIPMENTS, "shipment_number")
         shipment = await self.shipments.create(
@@ -2456,7 +2635,7 @@ class ProcurementService:
                 "order_id": parse_object_id(order_id),
                 "supplier_business_id": parse_object_id(supplier_id),
                 "buyer_business_id": order["buyer_business_id"],
-                # One-shot dispatch: journey milestones after this are ETA-driven, not manual taps.
+                                                                                                   
                 "status": ShipmentStatus.SHIPPED,
                 "carrier_name": payload.get("carrier_name"),
                 "tracking_number": payload.get("tracking_number"),
@@ -2571,8 +2750,8 @@ class ProcurementService:
         shipment_id: str,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
-        # Only the fulfilling supplier (or carrier webhook) may advance status.
-        # Buyers confirm receipt via receive_shipment after DELIVERED.
+                                                                               
+                                                                      
         supplier_id = self._require_supplier(business)
         shipment = await self._get_accessible_shipment(shipment_id, business)
         if str(shipment.get("supplier_business_id") or "") != supplier_id:
@@ -2727,7 +2906,7 @@ class ProcurementService:
                         ),
                     },
                 )
-                # Buyer inventory increase for accepted goods
+                                                             
                 if received > 0 and oi.get("product_id"):
                     await self._try_stock_received(
                         product_id=str(oi["product_id"]),
@@ -2762,11 +2941,6 @@ class ProcurementService:
         quantity: Decimal,
         shipment_id: str,
     ) -> None:
-        """Receiving increases buyer inventory only if the product belongs to the buyer.
-
-        For marketplace wholesale buys, inventory typically lives with the supplier.
-        We attempt stock_received; failures are ignored (buyer may not own the SKU).
-        """
         try:
             from app.modules.catalog.service import CatalogService
 
@@ -2819,7 +2993,7 @@ class ProcurementService:
                     {"status": OrderStatus.DELIVERED, "status_history": history, "updated_at": now},
                 )
             return
-        # Full accounting of quantities → delivered then completed
+                                                                  
         now = utc_now()
         history = list(order.get("status_history") or [])
         status = order["status"]
@@ -2899,7 +3073,7 @@ class ProcurementService:
             str(shipment.get("buyer_business_id")),
             str(shipment.get("supplier_business_id")),
         }:
-            # Fall back via order
+                                 
             order = await self.orders.get_by_id(shipment["order_id"])
             if not order or bid not in {
                 str(order.get("buyer_business_id")),
@@ -2936,7 +3110,7 @@ class ProcurementService:
                 "orders": orders,
                 "quotes_waiting": quotes_waiting,
             }
-        # supplier
+                  
         invited, inv_total = await self.list_rfqs(
             business=business, page=1, page_size=5, as_supplier=True
         )
@@ -2957,7 +3131,7 @@ class ProcurementService:
             "pending_acknowledgements": pending_ack,
         }
 
-    # ── Serialization ────────────────────────────────────────────────────
+                                                                           
 
     async def _serialize_rfq_summary(self, rfq: dict[str, Any]) -> dict[str, Any]:
         invites = rfq.get("supplier_invites") or []
@@ -2977,7 +3151,7 @@ class ProcurementService:
             if rfq.get("response_deadline")
             else None,
             "invite_count": len(invites),
-            "quotation_count": len(quotes),
+            "quotation_count": sum(1 for q in quotes if q.get("status") != QuotationStatus.DRAFT),
             "buyer_business_id": _oid(rfq.get("buyer_business_id")),
             "buyer_name": buyer["name"],
             "buyer_logo_url": buyer["logo_url"],
@@ -3048,7 +3222,6 @@ class ProcurementService:
         quotations: list[dict[str, Any]],
         rfq_status: str,
     ) -> list[dict[str, Any]]:
-        """One progress row per engaged supplier, with the products they can quote."""
         quotes_by_sid = {q.get("supplier_id"): q for q in quotations if q.get("supplier_id")}
         items_by_sid: dict[str, list[dict[str, Any]]] = {}
         names: dict[str, str | None] = {}
@@ -3172,8 +3345,14 @@ class ProcurementService:
         quotes = await self.quotations.list_for_rfq(str(rfq["_id"]))
         if include_quotes_for:
             quotes = [q for q in quotes if str(q.get("supplier_id")) == include_quotes_for]
+        else:
+                                                                           
+            quotes = [q for q in quotes if q.get("status") != QuotationStatus.DRAFT]
         invites_out = []
         for i in rfq.get("supplier_invites") or []:
+                                                                                       
+            if include_quotes_for and str(i.get("supplier_business_id")) != include_quotes_for:
+                continue
             card = await self._business_card(i.get("supplier_business_id"))
             invites_out.append(
                 {
@@ -3192,9 +3371,15 @@ class ProcurementService:
         source_ids = [
             sid
             for sid in (_oid(x) for x in (rfq.get("source_supplier_ids") or []))
-            if sid
+            if sid and (not include_quotes_for or sid == include_quotes_for)
         ]
         order = await self.orders.find_one({"rfq_id": rfq["_id"]})
+        if (
+            order is not None
+            and include_quotes_for
+            and str(order.get("supplier_business_id")) != include_quotes_for
+        ):
+            order = None
         quote_payloads = [await self._serialize_quotation(q) for q in quotes]
         supplier_card = await self._business_card(rfq.get("supplier_business_id"))
         return {
@@ -3357,6 +3542,10 @@ class ProcurementService:
             "rfq_id": _oid(order.get("rfq_id")),
             "quotation_id": _oid(order.get("quotation_id")),
             "quotation_number": quotation_number,
+            "source": order.get("source"),
+            "checkout_id": _oid(order.get("checkout_id")),
+            "checkout_number": order.get("checkout_number"),
+            "payment_method": order.get("payment_method"),
             "created_at": order.get("created_at").isoformat() if order.get("created_at") else None,
             "confirmed_at": order.get("confirmed_at").isoformat()
             if order.get("confirmed_at")
@@ -3372,20 +3561,6 @@ class ProcurementService:
         tax_name = order.get("tax_name_snapshot")
         tax_total = order.get("tax_total")
         total = order.get("total")
-        # Backfill VAT for older orders that skipped platform tax.
-        if tax_rate is None:
-            active_tax = await _active_tax_settings()
-            if active_tax and active_tax.get("rate") is not None:
-                money_row = _compose_order_money(
-                    subtotal=order.get("subtotal"),
-                    discount_total=order.get("discount_total"),
-                    charge_total=order.get("charge_total"),
-                    tax_rate=active_tax.get("rate"),
-                )
-                tax_rate = money_row["tax_rate_snapshot"]
-                tax_name = active_tax.get("name") or "VAT"
-                tax_total = money_row["tax_total"]
-                total = money_row["total"]
 
         return {
             **summary,

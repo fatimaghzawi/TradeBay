@@ -53,7 +53,7 @@ function normalizeError(status: number, body: unknown): ApiError {
 export type ApiRequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
   params?: Record<string, string | number | boolean | undefined | null>;
-  /** Internal: do not try /auth/refresh again after a 401. */
+  
   skipRefresh?: boolean;
 };
 

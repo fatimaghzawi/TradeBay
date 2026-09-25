@@ -1,4 +1,4 @@
-/** Cross-feature live update bus — pages refresh without a full page reload. */
+
 
 export const LIVE_BUMP_EVENT = "tradebay:live-bump";
 

@@ -1,9 +1,3 @@
-"""Platform money document shapes.
-
-ERD §8. Customer finance asks what the buyer owes; this module asks where the cash went
-once it moved through TradeBay. `platform_transactions` is the append-only routing
-ledger — held, released, paid and refunded positions are summed from it, never stored.
-"""
 
 from __future__ import annotations
 
@@ -16,7 +10,6 @@ from app.shared.types.money import Money
 
 
 class CommissionRecordDocument(MongoDocument):
-    """The PlatformFee. Rate and base are copied from settings at order confirm and frozen."""
 
     order_id: DocumentId
     supplier_business_id: DocumentId
@@ -31,9 +24,7 @@ class CommissionRecordDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class SupplierPayableDocument(MongoDocument):
-    """What TradeBay owes the supplier. This is the AP document — there is no `supplier_bills`."""
 
     payable_number: str
     supplier_business_id: DocumentId
@@ -48,9 +39,7 @@ class SupplierPayableDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class SupplierPayoutDocument(MongoDocument):
-    """What TradeBay actually sent. A payable is settled only once its payout completes."""
 
     payout_number: str
     settlement_batch_id: OptionalDocumentId = None
@@ -73,9 +62,7 @@ class SupplierPayoutDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class SettlementBatchDocument(MongoDocument):
-    """Admin grouping of payouts for one approval. A convenience, not a money concept."""
 
     batch_number: str
     status: str
@@ -90,14 +77,7 @@ class SettlementBatchDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class PlatformTransactionDocument(MongoDocument):
-    """Append-only routing ledger.
-
-    `funds_state` is TradeBay's internal money lifecycle, not legal escrow — the payment
-    provider holds the regulated funds. `idempotency_key` is `{source}:{event_id}:{type}`
-    so one provider event can post several row types without colliding with itself.
-    """
 
     transaction_number: str
     type: str

@@ -1,11 +1,3 @@
-"""System settings document shapes.
-
-ERD §10. These hold what is true *now*. Documents keep their own copies of what was
-true when they were created — `customer_invoices.tax_rate`, `commission_records.rate`,
-`order_items.unit_price` — so changing a setting can never rewrite history.
-
-Provider secrets are never stored here; the database keeps the provider name only.
-"""
 
 from __future__ import annotations
 
@@ -21,7 +13,6 @@ from app.shared.types.money import Money, OptionalMoney
 
 
 class PlatformSettingsDocument(MongoDocument):
-    """Singleton. How TradeBay operates: commission, currency, order floor, provider name."""
 
     key: str = Field(default=SINGLETON_KEY)
     platform_name: str
@@ -36,9 +27,7 @@ class PlatformSettingsDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class TaxSettingsDocument(MongoDocument):
-    """One active row at a time, enforced in the service layer. Not a tax engine."""
 
     name: str
     rate: Money
@@ -50,9 +39,7 @@ class TaxSettingsDocument(MongoDocument):
     created_at: datetime
     updated_at: datetime
 
-
 class BusinessSettingsDocument(MongoDocument):
-    """Singleton letterhead printed on invoices, receipts and credit notes."""
 
     key: str = Field(default=SINGLETON_KEY)
     business_name: str

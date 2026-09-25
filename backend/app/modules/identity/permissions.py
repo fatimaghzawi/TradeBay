@@ -1,8 +1,3 @@
-"""Permission catalog and system-role grants.
-
-Authorization uses atomic `resource.action` codes only — never role-name checks.
-Platform-only codes are never granted to trading-company roles.
-"""
 
 from __future__ import annotations
 
@@ -22,8 +17,7 @@ from app.modules.identity.constants import (
 def permission_code(resource: str, action: str) -> str:
     return f"{resource}.{action}"
 
-
-# Full catalog — seeded at API startup. One dialect only (`resource.action`).
+                                                                             
 DEFAULT_PERMISSION_CATALOG: list[tuple[str, str, str]] = [
     (R.USERS, A.READ, "View users"),
     (R.USERS, A.INVITE, "Invite users"),
@@ -87,7 +81,7 @@ DEFAULT_PERMISSION_CATALOG: list[tuple[str, str, str]] = [
     (R.BUSINESS_PLANS, A.MANAGE, "Update or convert business plans"),
 ]
 
-# Platform-wide — never granted to trading-company roles.
+                                                         
 PLATFORM_ONLY: frozenset[tuple[str, str]] = frozenset(
     {
         (R.SUPPLIERS, A.VERIFY),
@@ -101,7 +95,6 @@ PLATFORM_ONLY: frozenset[tuple[str, str]] = frozenset(
 ALL_CODES: frozenset[tuple[str, str]] = frozenset((r, a) for r, a, _ in DEFAULT_PERMISSION_CATALOG)
 READ_CODES: frozenset[tuple[str, str]] = frozenset((r, a) for r, a, _ in DEFAULT_PERMISSION_CATALOG if a == A.READ)
 TRADING_CODES: frozenset[tuple[str, str]] = ALL_CODES - PLATFORM_ONLY
-
 
 def _sales_manager_codes() -> frozenset[tuple[str, str]]:
     return frozenset(
@@ -150,7 +143,6 @@ def _sales_manager_codes() -> frozenset[tuple[str, str]]:
         }
     )
 
-
 def _sales_representative_codes() -> frozenset[tuple[str, str]]:
     return frozenset(
         {
@@ -180,7 +172,6 @@ def _sales_representative_codes() -> frozenset[tuple[str, str]]:
         }
     )
 
-
 def _finance_codes() -> frozenset[tuple[str, str]]:
     return READ_CODES | {
         (R.INVOICES, A.CREATE),
@@ -189,12 +180,10 @@ def _finance_codes() -> frozenset[tuple[str, str]]:
         (R.REFUNDS, A.CREATE),
     }
 
-
 def _platform_operator_codes() -> frozenset[tuple[str, str]]:
     return READ_CODES | PLATFORM_ONLY | {
         (R.DISPUTES, A.CREATE),
     }
-
 
 SYSTEM_ROLE_GRANTS: dict[str, frozenset[tuple[str, str]]] = {
     SYSTEM_ROLE_BUSINESS_ADMIN: TRADING_CODES,

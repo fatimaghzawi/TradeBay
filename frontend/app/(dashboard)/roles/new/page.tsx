@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BusyText } from "@/components/ui/LoadingState";
+import { BackLink } from "@/components/ui/BackLink";
 
 const STEPS = [
   { id: 0, label: "Role Details" },
@@ -57,9 +58,7 @@ export default function CreateRolePage() {
   if (!canManage) {
     return (
       <div className="space-y-3">
-        <Link href={ROUTES.roles} className="text-sm font-semibold text-[#0d3b2a] hover:underline">
-          ← Back to roles
-        </Link>
+        <BackLink href={ROUTES.roles}>Back to roles</BackLink>
         <FeedbackBanner tone="warning" title="Access restricted">
           You don&apos;t have access to create custom roles. Ask a Business Admin if you
           need a new role.
@@ -129,7 +128,7 @@ export default function CreateRolePage() {
       />
 
       {error ? (
-        <p className="rounded-xl bg-[#fef3f2] px-3.5 py-2.5 text-sm text-[#b42318]">
+        <p role="alert" className="tb-alert tb-alert--error">
           {error}
         </p>
       ) : null}
@@ -276,12 +275,12 @@ export default function CreateRolePage() {
       <footer className="tb-role-create-foot">
         {step === 0 ? (
           <>
-            <Link href={ROUTES.roles} className="tb-ov-btn-ghost">
+            <Link href={ROUTES.roles} className="tb-btn tb-btn--outline">
               Cancel
             </Link>
             <button
               type="button"
-              className="tb-ov-btn-primary"
+              className="tb-btn tb-btn--primary"
               disabled={!name.trim() || !note.trim()}
               onClick={() => {
                 setError(null);
@@ -295,14 +294,14 @@ export default function CreateRolePage() {
           <>
             <button
               type="button"
-              className="tb-ov-btn-ghost"
+              className="tb-btn tb-btn--outline"
               onClick={() => setStep(0)}
             >
               Back
             </button>
             <button
               type="button"
-              className="tb-ov-btn-primary"
+              className="tb-btn tb-btn--primary"
               disabled={selected.length === 0}
               onClick={() => {
                 setError(null);
@@ -316,14 +315,14 @@ export default function CreateRolePage() {
           <>
             <button
               type="button"
-              className="tb-ov-btn-ghost"
+              className="tb-btn tb-btn--outline"
               onClick={() => setStep(1)}
             >
               Back
             </button>
             <button
               type="button"
-              className="tb-ov-btn-primary"
+              className="tb-btn tb-btn--primary"
               disabled={pending}
               onClick={create}
              aria-busy={pending || undefined}>

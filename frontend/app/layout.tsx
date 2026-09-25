@@ -10,22 +10,21 @@ import "./globals.css";
 import "./deal-room.css";
 import "./commercial-docs.css";
 import "./order-tracking.css";
+import "./commerce.css";
+import "./design-system.css";
 
-/** UI body — calm, readable. */
 const figtree = Figtree({
   subsets: ["latin"],
   variable: "--font-figtree",
   display: "swap",
 });
 
-/** Display — optical soft-serif for TradeBay titles (port / editorial). */
 const fraunces = Fraunces({
   subsets: ["latin"],
   variable: "--font-fraunces",
   display: "swap",
 });
 
-/** Signature — handwritten mark for page openings. */
 const signature = Great_Vibes({
   subsets: ["latin"],
   weight: "400",
@@ -46,10 +45,8 @@ const themeBootScript = `
 (function(){
   try {
     var t = localStorage.getItem('tradebay-theme');
-    if (t !== 'dark' && t !== 'light') {
-      t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    if (t === 'dark') document.documentElement.classList.add('dark');
+    if (t !== 'dark' && t !== 'light') t = 'dark';
+    document.documentElement.classList.toggle('dark', t === 'dark');
     document.documentElement.dataset.theme = t;
   } catch (e) {}
 })();
@@ -59,7 +56,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${figtree.variable} ${fraunces.variable} ${signature.variable}`}
+      className={`${figtree.variable} ${fraunces.variable} ${signature.variable} dark`}
+      data-theme="dark"
       suppressHydrationWarning
     >
       <head>

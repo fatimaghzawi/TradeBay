@@ -6,6 +6,7 @@ import { ChangeMemberRoleModal } from "@/components/team/ChangeMemberRoleModal";
 import { StatusBadge } from "@/components/team/StatusBadge";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/useConfirm";
 import { ApiError } from "@/lib/api/client";
 import { identityApi, type Member, type Role } from "@/lib/api/identityApi";
 import { ROUTES } from "@/lib/constants";
@@ -21,12 +22,14 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function MemberDetailsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { hasPermission, business } = useAuth();
   const { success, error: toastError } = useToast();
+  const { confirm, dialog } = useConfirm();
   const [member, setMember] = useState<Member | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [tab, setTab] = useState<"overview" | "activity">("overview");
@@ -69,9 +72,7 @@ export default function MemberDetailsPage() {
   if (error && !member) {
     return (
       <div className="space-y-3">
-        <Link href={ROUTES.members} className="text-sm font-semibold text-[#0d3b2a] hover:underline">
-          ← Back to team
-        </Link>
+        <BackLink href={ROUTES.members}>Back to team</BackLink>
         <FeedbackBanner tone="error" title="Member not found">
           {error}
         </FeedbackBanner>
@@ -89,6 +90,7 @@ export default function MemberDetailsPage() {
 
   return (
     <div className="tb-page">
+      {dialog}
       <p className="tb-ov-crumb mb-3">
         <Link href={ROUTES.members} className="hover:underline">
           Team
@@ -116,7 +118,7 @@ export default function MemberDetailsPage() {
             {canUpdate && member.status === "active" ? (
               <button
                 type="button"
-                className="h-10 rounded-xl bg-[#0d3b2a] px-4 text-sm font-semibold text-white"
+                className="tb-btn tb-btn--primary"
                 onClick={() => setRoleOpen(true)}
               >
                 Change role
@@ -125,7 +127,7 @@ export default function MemberDetailsPage() {
             {canManageRoles && role && roleEditable ? (
               <Link
                 href={`${ROUTES.roles}/${role.id}/edit`}
-                className="inline-flex h-10 items-center rounded-xl border border-[#d4e0da] px-4 text-sm font-semibold text-[#0d3b2a] hover:border-[#0d3b2a]/35"
+                className="tb-btn tb-btn--outline"
               >
                 Edit role permissions
               </Link>
@@ -133,7 +135,7 @@ export default function MemberDetailsPage() {
             {canUpdate && member.status === "active" ? (
               <button
                 type="button"
-                className="h-10 rounded-xl border border-[#f5d0a9] px-4 text-sm font-semibold text-[#8a4b2a] hover:bg-[#e8ebe6]"
+                className="tb-btn tb-btn--outline"
                 onClick={() => setSuspendOpen(true)}
               >
                 Suspend
@@ -142,7 +144,7 @@ export default function MemberDetailsPage() {
             {canUpdate && member.status === "suspended" ? (
               <button
                 type="button"
-                className="h-10 rounded-xl border border-[#dce5e0] px-4 text-sm font-semibold text-[#0d3b2a] hover:bg-[#e8ebe6]"
+                className="tb-btn tb-btn--outline"
                 onClick={() => {
                   setError(null);
                   void identityApi
@@ -169,15 +171,15 @@ export default function MemberDetailsPage() {
               <button
                 type="button"
                 disabled={removing}
-                className="h-10 rounded-xl border border-[#f3c1bb] px-4 text-sm font-semibold text-[#b42318] hover:bg-[#fef3f2] disabled:opacity-60"
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      `Remove ${name} from this business? They will lose access immediately.`,
-                    )
-                  ) {
-                    return;
-                  }
+                className="tb-btn tb-btn--danger"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `Remove ${name} from this business?`,
+                    body: "They will lose access immediately.",
+                    confirmLabel: "Remove member",
+                    destructive: true,
+                  });
+                  if (!ok) return;
                   setError(null);
                   setRemoving(true);
                   void identityApi
@@ -214,14 +216,14 @@ export default function MemberDetailsPage() {
         </FeedbackBanner>
       ) : null}
 
-      <p className="mt-6 border-l-2 border-[#e86f2a] pl-4 text-sm leading-relaxed text-[#4a5f55]">
-        Permissions come from the member&apos;s <strong className="text-[#0d3b2a]">role</strong>,
-        not from individual toggles. Use <strong className="text-[#0d3b2a]">Change role</strong> to
-        assign a different role, or <strong className="text-[#0d3b2a]">Edit role permissions</strong>{" "}
+      <p className="mt-6 border-l-2 border-accent pl-4 text-sm leading-relaxed text-muted-foreground">
+        Permissions come from the member&apos;s <strong className="text-heading">role</strong>,
+        not from individual toggles. Use <strong className="text-heading">Change role</strong> to
+        assign a different role, or <strong className="text-heading">Edit role permissions</strong>{" "}
         to change what everyone with that role can do.
       </p>
 
-      <div className="flex gap-1 border-b border-[#dce5e0]">
+      <div className="flex gap-1 border-b border-border">
         {(
           [
             ["overview", "Overview"],
@@ -235,8 +237,8 @@ export default function MemberDetailsPage() {
             className={cn(
               "border-b-2 px-3 py-2.5 text-sm font-semibold",
               tab === key
-                ? "border-[#0d3b2a] text-[#0d3b2a]"
-                : "border-transparent text-[#5a6a62] hover:text-[#0c1612]",
+                ? "border-primary text-heading"
+                : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
             {label}
@@ -249,17 +251,17 @@ export default function MemberDetailsPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="tb-section-label">Assigned role</p>
-              <p className="mt-2 font-[family-name:var(--font-outfit)] text-xl font-bold text-[#0d3b2a]">
+              <p className="mt-2 font-[family-name:var(--font-outfit)] text-xl font-bold text-heading">
                 {member.role_name ?? "—"}
               </p>
-              <p className="mt-2 text-sm text-[#4a5f55]">{roleBlurb(member.role_name)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{roleBlurb(member.role_name)}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {canUpdate && member.status === "active" ? (
                 <button
                   type="button"
                   onClick={() => setRoleOpen(true)}
-                  className="bg-[#0d3b2a] px-3 py-2 text-sm font-semibold text-white"
+                  className="tb-btn tb-btn--primary tb-btn--sm"
                 >
                   Change role
                 </button>
@@ -267,13 +269,13 @@ export default function MemberDetailsPage() {
               {canManageRoles && role && roleEditable ? (
                 <Link
                   href={`${ROUTES.roles}/${role.id}/edit`}
-                  className="border border-[#d4e0da] px-3 py-2 text-sm font-semibold text-[#0d3b2a]"
+                  className="border border-input px-3 py-2 text-sm font-semibold text-heading"
                 >
                   Edit permissions
                 </Link>
               ) : null}
               {role?.name === "Business Admin" ? (
-                <p className="self-center text-xs text-[#6b7a72]">
+                <p className="self-center text-xs text-muted-foreground">
                   Business Admin access is full and locked.
                 </p>
               ) : null}
@@ -289,12 +291,12 @@ export default function MemberDetailsPage() {
                     key={mod.label}
                     className="flex items-center justify-between rounded-xl border border-[var(--tb-line-soft)] px-3.5 py-2.5 text-sm"
                   >
-                    <span className="font-semibold text-[var(--tb-ink)]">{mod.label}</span>
+                    <span className="font-semibold text-foreground">{mod.label}</span>
                     <span
                       className={
                         mod.allowed
-                          ? "font-bold text-[#157347]"
-                          : "font-semibold text-[var(--tb-muted-fg)]"
+                          ? "font-bold text-success"
+                          : "font-semibold text-muted-foreground"
                       }
                     >
                       {mod.allowed ? "✓ Access" : "No access"}
@@ -306,9 +308,9 @@ export default function MemberDetailsPage() {
                 <summary className="cursor-pointer text-sm font-semibold text-[var(--tb-secondary)]">
                   View permission codes ({role.permissions.length})
                 </summary>
-                <ul className="mt-2 divide-y divide-[#e8efeb] border-y border-[#e8efeb]">
+                <ul className="mt-2 divide-y divide-border border-y border-border">
                   {role.permissions.map((code) => (
-                    <li key={code} className="py-2 font-mono text-xs text-[#3f4f47]">
+                    <li key={code} className="py-2 font-mono text-xs text-ink-soft">
                       {code}
                     </li>
                   ))}
@@ -316,7 +318,7 @@ export default function MemberDetailsPage() {
               </details>
             </div>
           ) : (
-            <p className="mt-4 text-sm text-[#4a5f55]">
+            <p className="mt-4 text-sm text-muted-foreground">
               No permissions loaded for this role.
             </p>
           )}

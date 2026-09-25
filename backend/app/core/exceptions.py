@@ -1,4 +1,3 @@
-"""Centralized API exceptions and consistent error envelopes."""
 
 from __future__ import annotations
 
@@ -15,7 +14,6 @@ from app.core.logging import get_logger, request_id_ctx
 
 logger = get_logger(__name__)
 
-
 class AppError(Exception):
     def __init__(
         self,
@@ -31,11 +29,9 @@ class AppError(Exception):
         self.status_code = status_code
         self.details = details or {}
 
-
 class BadRequestError(AppError):
     def __init__(self, message: str = "Please check your details and try again", *, details: dict[str, Any] | None = None) -> None:
         super().__init__(ErrorCode.BAD_REQUEST, message, status_code=400, details=details)
-
 
 class UnauthorizedError(AppError):
     def __init__(
@@ -47,7 +43,6 @@ class UnauthorizedError(AppError):
     ) -> None:
         super().__init__(code, message, status_code=401, details=details)
 
-
 class ForbiddenError(AppError):
     def __init__(
         self,
@@ -58,11 +53,9 @@ class ForbiddenError(AppError):
     ) -> None:
         super().__init__(code, message, status_code=403, details=details)
 
-
 class NotFoundError(AppError):
     def __init__(self, message: str = "We couldn’t find what you’re looking for") -> None:
         super().__init__(ErrorCode.RESOURCE_NOT_FOUND, message, status_code=404)
-
 
 class ConflictError(AppError):
     def __init__(
@@ -74,20 +67,16 @@ class ConflictError(AppError):
     ) -> None:
         super().__init__(code, message, status_code=409, details=details)
 
-
 class RateLimitError(AppError):
     def __init__(self, message: str = "Too many requests") -> None:
         super().__init__(ErrorCode.RATE_LIMITED, message, status_code=429)
-
 
 class NotReadyError(AppError):
     def __init__(self, message: str = "Application is not ready") -> None:
         super().__init__(ErrorCode.NOT_READY, message, status_code=503)
 
-
 def error_body(code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
     return {"error": {"code": code, "message": message, "details": details or {}}}
-
 
 def _request_id_header() -> dict[str, str]:
     request_id = request_id_ctx.get()
@@ -95,14 +84,12 @@ def _request_id_header() -> dict[str, str]:
         return {}
     return {REQUEST_ID_HEADER: request_id}
 
-
 async def app_error_handler(_: Request, exc: AppError) -> ORJSONResponse:
     return ORJSONResponse(
         status_code=exc.status_code,
         content=error_body(exc.code, exc.message, exc.details),
         headers=_request_id_header(),
     )
-
 
 async def http_exception_handler(_: Request, exc: StarletteHTTPException) -> ORJSONResponse:
     mapping = {
@@ -123,9 +110,7 @@ async def http_exception_handler(_: Request, exc: StarletteHTTPException) -> ORJ
         headers=_request_id_header(),
     )
 
-
 def _jsonable_validation_errors(errors: Sequence[Any]) -> list[dict[str, Any]]:
-    """Pydantic may put raw Exception/Decimal in error ctx; orjson cannot serialize those."""
     from decimal import Decimal
 
     def _coerce(value: Any) -> Any:
@@ -144,7 +129,6 @@ def _jsonable_validation_errors(errors: Sequence[Any]) -> list[dict[str, Any]]:
         cleaned.append(item)
     return cleaned
 
-
 def _first_validation_message(errors: Sequence[dict[str, Any]]) -> str:
     for error in errors:
         msg = str(error.get("msg") or "").strip()
@@ -155,7 +139,6 @@ def _first_validation_message(errors: Sequence[dict[str, Any]]) -> str:
         return msg
     return "Validation error"
 
-
 async def validation_exception_handler(_: Request, exc: RequestValidationError) -> ORJSONResponse:
     details = {"errors": _jsonable_validation_errors(exc.errors())}
     message = _first_validation_message(details["errors"])
@@ -164,7 +147,6 @@ async def validation_exception_handler(_: Request, exc: RequestValidationError) 
         content=error_body(str(ErrorCode.VALIDATION_ERROR), message, details),
         headers=_request_id_header(),
     )
-
 
 def _is_mongo_connectivity_error(exc: Exception) -> bool:
     try:
@@ -188,7 +170,6 @@ def _is_mongo_connectivity_error(exc: Exception) -> bool:
         ),
     )
 
-
 async def unhandled_exception_handler(_: Request, exc: Exception) -> ORJSONResponse:
     if _is_mongo_connectivity_error(exc):
         logger.exception("mongodb_unavailable", error_type=type(exc).__name__)
@@ -206,7 +187,6 @@ async def unhandled_exception_handler(_: Request, exc: Exception) -> ORJSONRespo
         content=error_body(str(ErrorCode.INTERNAL_ERROR), "An unexpected error occurred"),
         headers=_request_id_header(),
     )
-
 
 def register_exception_handlers(app: Any) -> None:
     app.add_exception_handler(AppError, app_error_handler)

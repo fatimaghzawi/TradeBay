@@ -29,7 +29,7 @@ export const registerSchema = registerBaseSchema
     path: ["confirmPassword"],
   })
   .superRefine((data, ctx) => {
-    // Owner signup needs a trading business. Invitees join an existing one.
+    
     if (data.invitation_token) return;
     if (!data.business_name?.trim()) {
       ctx.addIssue({

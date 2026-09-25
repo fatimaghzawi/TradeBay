@@ -24,6 +24,7 @@ export type AnalyzeResult = {
   sourcing_request_id: string;
   requirements: ProcurementRequirements;
   status: string;
+  clarification?: string | null;
 };
 
 export type RecommendationProduct = {
@@ -46,6 +47,7 @@ export type RecommendationProduct = {
   matched_requirements: string[];
   unmatched_requirements: string[];
   reasons: string[];
+  signals?: Record<string, number>;
 };
 
 export type SupplierMatch = {
@@ -63,7 +65,9 @@ export type RecommendationsResult = {
   status: string;
   products: RecommendationProduct[];
   suppliers: SupplierMatch[];
+  message?: string | null;
   suggestions: string[];
+  loose_match?: boolean;
 };
 
 export type SourcingRequestSummary = {

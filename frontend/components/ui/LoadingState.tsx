@@ -3,9 +3,6 @@ import type { ReactNode } from "react";
 
 type SpinnerSize = "sm" | "md";
 
-/**
- * The only spinner in the product — three dots, same motion everywhere.
- */
 export function Spinner({
   size = "md",
   className,
@@ -28,7 +25,6 @@ export function Spinner({
   );
 }
 
-/** Prefix a control label with the shared spinner while an action is in flight. */
 export function BusyText({
   busy,
   children,
@@ -52,9 +48,6 @@ type LoadingStateProps = {
   className?: string;
 };
 
-/**
- * Page or section wait — spinner + short copy. Tables use the same mark via LoadingEntity.
- */
 export function LoadingState({
   variant = "section",
   title = "Loading",
@@ -77,7 +70,6 @@ export function LoadingState({
   );
 }
 
-/** Inline list/table/select wait: “Loading products…”. */
 export function LoadingEntity({
   entity,
   className,

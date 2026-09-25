@@ -37,7 +37,7 @@ export function LebanesePhoneField({
     <label className={cn("block", className)}>
       <span className="tb-field-label mb-1.5 block text-sm font-semibold">
         {label}
-        {required ? <span className="text-[#e86f2a]"> *</span> : null}
+        {required ? <span className="text-accent-text"> *</span> : null}
       </span>
       <div className="tb-phone" data-state={error ? "error" : undefined}>
         <span className="tb-phone-code" aria-hidden>

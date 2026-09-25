@@ -17,7 +17,6 @@ class NegotiationOfferStatus(StrEnum):
     REJECTED = "REJECTED"
     EXPIRED = "EXPIRED"
 
-
 NEGOTIATION_TRANSITIONS: dict[str, set[str]] = {
     NegotiationStatus.OPEN: {
         NegotiationStatus.IN_PROGRESS,

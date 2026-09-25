@@ -1,4 +1,3 @@
-"""Email template rendering stays free of provider SDKs."""
 
 from app.core.config import Settings
 from app.modules.identity.email import render_message
@@ -14,7 +13,6 @@ def _settings() -> Settings:
         frontend_url="http://localhost:3000",
         app_name="TradeBay",
     )
-
 
 def test_render_verification_includes_otp_not_link() -> None:
     subject, html, text = render_message(
@@ -33,7 +31,6 @@ def test_render_verification_includes_otp_not_link() -> None:
     assert "TradeBay" in html
     assert "Source · Connect · Grow" in html
 
-
 def test_render_password_reset_includes_otp_not_link() -> None:
     subject, html, text = render_message(
         template="password_reset",
@@ -49,7 +46,6 @@ def test_render_password_reset_includes_otp_not_link() -> None:
     assert "#0d3b2a" in html
     assert "#e86f2a" in html
 
-
 def test_render_invitation_keeps_link() -> None:
     settings = _settings()
     _, invite_html, _ = render_message(
@@ -62,7 +58,6 @@ def test_render_invitation_keeps_link() -> None:
     assert "/accept-invitation?token=invite-token" in invite_html
     assert "#0d3b2a" in invite_html
     assert "Accept invitation" in invite_html
-
 
 def test_business_event_email_names_the_company() -> None:
     subject, html, text = render_message(
@@ -86,7 +81,6 @@ def test_business_event_email_names_the_company() -> None:
     assert "This update is for" in html
     assert "Levant Wholesale" in html
 
-
 def test_outbound_omits_localhost_and_http_links() -> None:
     _, html, text = render_message(
         template="invitation",
@@ -99,7 +93,6 @@ def test_outbound_omits_localhost_and_http_links() -> None:
     assert "/accept-invitation?token=invite-token" in text
     assert "Copy this address into your browser" in html
     assert "Gmail" not in html
-
 
 def test_https_app_url_keeps_cta() -> None:
     settings = _settings()

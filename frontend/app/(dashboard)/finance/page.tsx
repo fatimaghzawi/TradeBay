@@ -1,7 +1,12 @@
 ﻿"use client";
 
-import { ComingSoonView } from "@/components/shared/ComingSoonView";
+import { PermissionGate } from "@/components/auth/PermissionGate";
+import { FinanceHub } from "@/components/commerce/FinanceHub";
 
-export default function FinanceComingSoonPage() {
-  return <ComingSoonView kind="finance" title="Finance tools are coming soon" />;
+export default function FinancePage() {
+  return (
+    <PermissionGate permission={["invoices.read", "payables.read"]}>
+      <FinanceHub />
+    </PermissionGate>
+  );
 }

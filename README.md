@@ -1,76 +1,43 @@
-# TradeBay
+TradeBay is a **Lebanon-focused B2B wholesale marketplace** connecting buyer and supplier companies in one platform for catalogs, RFQs, quotations, negotiation, orders, payments, and invoices. 
 
-B2B wholesale marketplace — FastAPI backend, Next.js frontend, MongoDB.
+**Core functionality**
 
-## Stack
+* **Identity & businesses:** Registration, email verification, authentication, company memberships, roles, invitations, and permissions.
+* **Suppliers:** Suppliers submit business documents and must be **verified before selling**.
+* **Catalog & inventory:** Products, categories, pricing, images, minimum orders, and stock reservations.
+* **RFQ & quotations:** Buyers request quotes; suppliers respond; buyers can award quotations.
+* **Negotiation:** Buyers and suppliers can exchange offers before accepting a quote.
+* **Orders:** Accepted quotes or paid checkouts create orders that move through confirmation → shipping → delivery.
+* **Finance:** Cash/card payments, invoices, receipts, commissions, supplier payouts, refunds, and credit notes.
+* **AI:**
 
-| Layer | Tech |
-| --- | --- |
-| Backend | FastAPI, Motor/MongoDB, JWT auth |
-| Frontend | Next.js (App Router), TypeScript, Tailwind |
-| Data | MongoDB 7 (replica set) |
-| Ops | Docker Compose, GitHub Actions |
+  * **Ask the Bay:** Natural-language product sourcing from verified suppliers.
+  * **Business Planner:** Generates a business/sourcing plan based on user answers and catalog data.
+* **Notifications, reviews, disputes, and admin management** are also included. 
 
-## Specs
+### Main workflow
 
-- [docs/BRD.pdf](docs/BRD.pdf) — Business Requirements
-- [docs/ERD.html](docs/ERD.html) — Entity Relationship Diagram
+**Register → Verify → Create/switch company → Supplier verification → Products/stock → Buyer cart/RFQ/AI → Quotation → Negotiation → Accept/Checkout → Reserve stock → Invoice/Payment → Confirm → Ship → Deliver → Complete.** 
 
-## Quick start
+### Architecture
 
-```bash
-cp .env.example .env
-docker compose up --build
-```
+* **Frontend:** Next.js 15, React 19, TypeScript, Tailwind CSS
+* **Backend:** FastAPI, Pydantic v2, Python 3.12
+* **Database:** MongoDB 7 with replica-set transactions
+* **Auth:** JWT + HTTP-only cookies + bcrypt
+* **Integrations:** Stripe, Elastic Email, Sentry, OpenAI-compatible API
+* **Infrastructure:** Docker Compose + GitHub Actions 
 
-- Frontend: http://localhost:3000  
-- Backend: http://localhost:8000  
-- Health: `GET /health`, `GET /ready`
+### Security
 
-### Local (without Docker)
+The system includes bcrypt password hashing, HTTP-only cookies, refresh-token reuse detection, verification/reset attempt limits, role-based authorization, CORS restrictions, security headers, request IDs, rate limiting, audit logs, and webhook validation. Production requires HTTPS, strong secrets, restricted MongoDB access, and appropriate shared storage for multiple API instances. 
 
-```bash
-# MongoDB must be running (replica set)
+### Production status
 
-cd backend
-pip install -e ".[dev]"
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+**Implemented:** Core marketplace domains, cash checkout, RFQs, negotiation, orders, shipments, invoices, Ask the Bay, and Business Planner.
 
-cd frontend
-cp .env.example .env.local
-npm install
-npm run dev
-```
+**Partial:** Card payments, email, carrier webhooks, and some observability/CI coverage require additional configuration or work.
 
-## Demo credentials
+**Important production considerations:** MongoDB must be a replica set; uploads currently use local disk; rate limiting is per API process; backups, DNS, and MongoDB infrastructure are not provisioned by the repository. 
 
-Seeded accounts for local / demo environments (not for production):
-
-| Role | Email | Password |
-| --- | --- | --- |
-| Supplier | `hassan@tyrefresh.com` | `TradeBay123!` |
-| Buyer | `ziad@mountainspices.com` | `TradeBay123!` |
-| Platform admin | `admin@tradebay.com` | `AdminPass123!` |
-
-Admin password can be overridden with `PLATFORM_ADMIN_PASSWORD` in `.env`.
-
-## Configuration
-
-Copy `.env.example` to `.env`. Required: `SECRET_KEY`, `JWT_SECRET_KEY`, `MONGODB_URI`, `MONGODB_DATABASE`, `CORS_ORIGINS`.
-
-Do not commit `.env` or real secrets.
-
-## Layout
-
-```text
-tradebay/
-├── backend/          # FastAPI API
-├── frontend/         # Next.js app
-├── docs/             # BRD + ERD
-├── docker-compose.yml
-└── .env.example
-```
-
-## License
-
-Proprietary.
+**In one sentence:** TradeBay is a full B2B marketplace for Lebanese businesses, with company-based permissions, verified suppliers, procurement/RFQ workflows, negotiation, inventory, finance, and AI-assisted sourcing/planning.

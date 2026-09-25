@@ -19,6 +19,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LoadingEntity, BusyText } from "@/components/ui/LoadingState";
+import { BackLink } from "@/components/ui/BackLink";
 
 const TRACK = [
   "preparing",
@@ -184,7 +185,7 @@ export function ShipmentWorkspace({ shipmentId }: Props) {
               </label>
               <button
                 type="button"
-                className="tb-inv-btn tb-inv-btn-accent"
+                className="tb-btn tb-btn--primary"
                 disabled={busy || !evidenceUrl.trim()}
                 onClick={() => {
                   if (!evidenceLive.finish()) return;
@@ -276,7 +277,7 @@ export function ShipmentWorkspace({ shipmentId }: Props) {
               })}
               <button
                 type="button"
-                className="tb-inv-btn tb-inv-btn-accent"
+                className="tb-btn tb-btn--primary"
                 disabled={busy}
                 onClick={() => {
                   const next: Record<string, string> = {};
@@ -325,11 +326,11 @@ export function ShipmentWorkspace({ shipmentId }: Props) {
 
           {shipment.order_id ? (
             <p className="tb-inv-foot">
-              <Link href={ROUTES.procurementOrder(shipment.order_id)}>← Back to purchase order</Link>
+              <BackLink href={ROUTES.procurementOrder(shipment.order_id)}>Back to purchase order</BackLink>
             </p>
           ) : (
             <p className="tb-inv-foot">
-              <Link href={ROUTES.procurement}>← Back to procurement</Link>
+              <BackLink href={ROUTES.procurement}>Back to procurement</BackLink>
             </p>
           )}
         </section>

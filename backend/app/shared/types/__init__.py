@@ -1,4 +1,3 @@
-"""Shared type aliases."""
 
 from app.shared.types.document import MongoDocument, MongoEmbedded
 from app.shared.types.ids import (

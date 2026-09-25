@@ -4,13 +4,11 @@ import { ROUTES } from "@/lib/constants";
 import { mediaUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/AuthProvider";
-import { useTheme } from "@/providers/ThemeProvider";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 export function UserMenu({ company }: { company?: string | null }) {
   const { user, business, logout, roleName } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -128,11 +126,6 @@ export function UserMenu({ company }: { company?: string | null }) {
               label="Sessions"
               title="Devices signed in"
               onClick={() => go(ROUTES.sessions)}
-            />
-            <MenuRow
-              label={theme === "dark" ? "Light mode" : "Dark mode"}
-              title="Toggle theme"
-              onClick={() => toggleTheme()}
             />
           </div>
 

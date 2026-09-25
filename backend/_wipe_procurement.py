@@ -1,4 +1,3 @@
-"""Clear procurement, chat, negotiation, order, and related finance data."""
 
 from __future__ import annotations
 
@@ -7,7 +6,6 @@ import os
 from pathlib import Path
 
 from motor.motor_asyncio import AsyncIOMotorClient
-
 
 def _load_dotenv() -> None:
     for path in (
@@ -22,7 +20,6 @@ def _load_dotenv() -> None:
                 continue
             key, _, value = stripped.partition("=")
             os.environ.setdefault(key.strip(), value.strip().strip("'").strip('"'))
-
 
 COLS = [
     "rfqs",
@@ -59,7 +56,6 @@ COLS = [
     "notifications",
 ]
 
-
 async def main() -> None:
     _load_dotenv()
     uri = os.environ["MONGODB_URI"]
@@ -77,7 +73,6 @@ async def main() -> None:
     total += counters.deleted_count
     client.close()
     print(f"done — {total} documents removed")
-
 
 if __name__ == "__main__":
     asyncio.run(main())

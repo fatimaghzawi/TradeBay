@@ -1,5 +1,6 @@
 "use client";
 
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { IdentityPageShell } from "@/components/identity/IdentityPageShell";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -139,7 +140,7 @@ function RolesPageInner() {
       lede="Define business roles and manage permissions for your team."
       action={
         canManage ? (
-          <Link href={ROUTES.rolesNew} className="tb-ov-btn-primary">
+          <Link href={ROUTES.rolesNew} className="tb-btn tb-btn--primary">
             + Create Role
           </Link>
         ) : null
@@ -208,7 +209,7 @@ function RolesPageInner() {
             roles don’t cover.
           </p>
           {canManage ? (
-            <Link href={ROUTES.rolesNew} className="tb-ov-btn-primary mt-4 inline-flex">
+            <Link href={ROUTES.rolesNew} className="tb-btn tb-btn--primary mt-4">
               + Create Role
             </Link>
           ) : null}
@@ -256,7 +257,7 @@ function RolesPageInner() {
                     <span>Permissions</span>
                   </div>
                 </div>
-                <span className="tb-roles-status">Active</span>
+                <StatusBadge status="active" />
                 <div className="relative">
                   <button
                     type="button"
@@ -322,7 +323,7 @@ function RolesPageInner() {
       ) : null}
 
       {total > 0 && layer === "all" ? (
-        <div className="mt-4 flex items-center justify-between border-t border-[var(--tb-line)] pt-4">
+        <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
           <p className="tb-meta">{total} roles</p>
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
@@ -354,9 +355,9 @@ function RolesPageInner() {
           }
         }}
       >
-        <p className="text-sm text-[#5c574e]">
+        <p className="text-sm text-muted-foreground">
           Soft-delete role{" "}
-          <span className="font-semibold text-[#0d3b2a]">{deleteRole?.name}</span>?
+          <span className="font-semibold text-heading">{deleteRole?.name}</span>?
         </p>
       </ConfirmModal>
     </IdentityPageShell>

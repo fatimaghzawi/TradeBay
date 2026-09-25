@@ -68,7 +68,7 @@ export function NotificationBell() {
         setUnread(count.count);
       })
       .catch(() => {
-        /* bell stays quiet on errors */
+        
       });
   }, [canRead]);
 
@@ -103,7 +103,7 @@ export function NotificationBell() {
       );
       setUnread((c) => Math.max(0, c - 1));
     } catch {
-      /* ignore */
+      
     }
   }
 
@@ -115,7 +115,7 @@ export function NotificationBell() {
       setItems((prev) => prev.map((x) => ({ ...x, is_read: true })));
       setUnread(0);
     } catch {
-      /* ignore */
+      
     } finally {
       setMarking(false);
     }
@@ -131,7 +131,7 @@ export function NotificationBell() {
         aria-expanded={open}
         onClick={() => void onOpen()}
         className={cn(
-          "relative flex h-10 w-10 items-center justify-center rounded-full border border-[var(--tb-border)] bg-[var(--tb-surface-muted)] text-[var(--tb-ink)] transition",
+          "relative flex h-10 w-10 items-center justify-center rounded-full border border-border-strong bg-muted text-foreground transition",
           open
             ? "border-[var(--tb-secondary)]"
             : "hover:border-[color-mix(in_srgb,var(--tb-secondary)_40%,var(--tb-border))]",
@@ -152,22 +152,22 @@ export function NotificationBell() {
           />
         </svg>
         {unread > 0 ? (
-          <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#b42318] px-1 text-[0.6rem] font-bold text-white">
+          <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[0.6rem] font-bold text-destructive-foreground">
             {unread > 9 ? "9+" : unread}
           </span>
         ) : null}
       </button>
 
       {open ? (
-        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[var(--tb-border)] bg-[var(--tb-raise)] shadow-[var(--tb-shadow-modal)]">
-          <div className="flex items-center justify-between border-b border-[var(--tb-line)] px-4 py-3">
-            <p className="font-[family-name:var(--font-outfit)] text-sm font-semibold text-[var(--tb-ink)]">
+        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border-strong bg-popover shadow-[var(--tb-shadow-modal)]">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <p className="font-[family-name:var(--font-outfit)] text-sm font-semibold text-foreground">
               Activity
             </p>
             {unread > 0 ? (
               <button
                 type="button"
-                className="text-xs font-bold text-[#1a6b4f] hover:underline disabled:opacity-50"
+                className="text-xs font-bold text-link hover:underline disabled:opacity-50"
                 disabled={marking}
                 aria-busy={marking || undefined}
                 onClick={() => void markAll()}
@@ -181,10 +181,10 @@ export function NotificationBell() {
             <LoadingEntity entity="notifications" className="px-4 py-8 justify-center" />
           ) : items.length === 0 ? (
             <div className="px-4 py-8 text-center">
-              <p className="font-[family-name:var(--font-outfit)] text-sm font-semibold text-[var(--tb-ink)]">
+              <p className="font-[family-name:var(--font-outfit)] text-sm font-semibold text-foreground">
                 You’re all caught up
               </p>
-              <p className="mt-1.5 text-xs leading-relaxed text-[var(--tb-muted-fg)]">
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                 No notifications yet.
               </p>
             </div>
@@ -193,11 +193,11 @@ export function NotificationBell() {
               {items.map((n) => {
                 const href = hrefFor(n);
                 return (
-                  <li key={n.id} className="border-b border-[var(--tb-line)] last:border-0">
+                  <li key={n.id} className="border-b border-border last:border-0">
                     <Link
                       href={href}
                       className={cn(
-                        "block px-4 py-3 transition hover:bg-[var(--tb-surface-muted)]",
+                        "block px-4 py-3 transition hover:bg-muted",
                         !n.is_read && "bg-[color-mix(in_srgb,var(--tb-secondary)_6%,transparent)]",
                       )}
                       onClick={() => {
@@ -206,17 +206,17 @@ export function NotificationBell() {
                       }}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-semibold text-[var(--tb-ink)]">{n.title}</p>
+                        <p className="text-sm font-semibold text-foreground">{n.title}</p>
                         {!n.is_read ? (
-                          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#1a6b4f]" />
+                          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
                         ) : null}
                       </div>
                       {n.message ? (
-                        <p className="mt-0.5 line-clamp-2 text-xs text-[var(--tb-muted-fg)]">
+                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                           {n.message}
                         </p>
                       ) : null}
-                      <p className="mt-1 text-[0.65rem] text-[var(--tb-muted-fg)]">
+                      <p className="mt-1 text-[0.65rem] text-muted-foreground">
                         {relativeTime(n.created_at)}
                       </p>
                     </Link>
@@ -226,10 +226,10 @@ export function NotificationBell() {
             </ul>
           )}
 
-          <div className="border-t border-[var(--tb-line)] px-4 py-2.5 text-center">
+          <div className="border-t border-border px-4 py-2.5 text-center">
             <Link
               href={ROUTES.notifications}
-              className="text-xs font-bold text-[#1a6b4f] hover:underline"
+              className="text-xs font-bold text-link hover:underline"
               onClick={() => setOpen(false)}
             >
               View all notifications

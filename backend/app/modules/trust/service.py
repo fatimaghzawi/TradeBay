@@ -1,4 +1,3 @@
-"""Trust / disputes — open cases against purchase orders."""
 
 from __future__ import annotations
 
@@ -20,7 +19,6 @@ class DisputeNotFoundError(NotFoundError):
     def __init__(self) -> None:
         super().__init__("Dispute not found")
 
-
 async def _next_dispute_number() -> str:
     year = utc_now().year
     head = f"DSP-{year}-"
@@ -28,7 +26,6 @@ async def _next_dispute_number() -> str:
         {"dispute_number": {"$regex": f"^{head}"}}
     )
     return f"{head}{count + 1:04d}"
-
 
 class TrustService:
     def __init__(self) -> None:
@@ -104,7 +101,7 @@ class TrustService:
         }
         await mongo_manager.collection(CollectionName.DISPUTES).insert_one(dispute)
 
-        # Mark order disputed when transition allows
+                                                    
         status = order.get("status")
         if status in ORDER_TRANSITIONS and OrderStatus.DISPUTED in ORDER_TRANSITIONS.get(status, set()):
             assert_transition(ORDER_TRANSITIONS, status, OrderStatus.DISPUTED)
@@ -139,7 +136,7 @@ class TrustService:
             metadata={"reason": reason.strip(), "order_id": order_id},
         )
 
-        # Notify the counterparty
+                                 
         from app.modules.trust.constants import NotificationType
         from app.modules.trust.notify import notify
 
@@ -249,7 +246,7 @@ class TrustService:
             },
         )
 
-        # Restore order out of disputed when possible
+                                                     
         order = await mongo_manager.collection(CollectionName.ORDERS).find_one(
             {"_id": dispute["order_id"]}
         )

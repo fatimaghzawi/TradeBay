@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LoadingState, BusyText } from "@/components/ui/LoadingState";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function RoleDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -52,7 +53,7 @@ export default function RoleDetailsPage() {
       list.push(permission);
       map.set(permission.resource, list);
     }
-    // Include any codes not in catalog
+    
     for (const code of role.permissions) {
       if (catalog.some((p) => p.code === code)) continue;
       const [resource = "other", action = code] = code.split(".");
@@ -71,10 +72,8 @@ export default function RoleDetailsPage() {
   if (error && !role) {
     return (
       <div className="space-y-3">
-        <Link href={ROUTES.roles} className="text-sm font-semibold text-[#0d3b2a] hover:underline">
-          ← Back to roles
-        </Link>
-        <p className="rounded-xl bg-[#fef3f2] px-3.5 py-2.5 text-sm text-[#b42318]">{error}</p>
+        <BackLink href={ROUTES.roles}>Back to roles</BackLink>
+        <p role="alert" className="tb-alert tb-alert--error">{error}</p>
       </div>
     );
   }
@@ -98,7 +97,7 @@ export default function RoleDetailsPage() {
         lede={
           <>
             {role.description || roleBlurb(role.name)}
-            <span className="mt-2 block text-sm text-[#4a5f55]">
+            <span className="mt-2 block text-sm text-muted-foreground">
               {role.permissions.length} permission
               {role.permissions.length === 1 ? "" : "s"} assigned
               {" · "}
@@ -115,7 +114,7 @@ export default function RoleDetailsPage() {
             {canManage && canEditRolePermissions(role, { fullControl }) ? (
               <Link
                 href={`${ROUTES.roles}/${role.id}/edit`}
-                className="inline-flex h-10 items-center rounded-xl bg-[#0d3b2a] px-4 text-sm font-semibold text-white"
+                className="tb-btn tb-btn--primary"
               >
                 Edit permissions
               </Link>
@@ -124,7 +123,7 @@ export default function RoleDetailsPage() {
               <button
                 type="button"
                 disabled={deleting}
-                className="h-10 rounded-xl border border-[#f3c1bb] px-4 text-sm font-semibold text-[#b42318] hover:bg-[#fef3f2] disabled:opacity-50"
+                className="tb-btn tb-btn--danger"
                 onClick={() => {
                   setDeleting(true);
                   setError(null);
@@ -147,7 +146,7 @@ export default function RoleDetailsPage() {
               </button>
             ) : null}
             {role.name === "Business Admin" && !fullControl ? (
-              <p className="self-center text-xs text-[#5a6a62]">
+              <p className="self-center text-xs text-muted-foreground">
                 Business Admin always has full access and cannot be limited.
               </p>
             ) : null}
@@ -156,11 +155,11 @@ export default function RoleDetailsPage() {
       />
 
       {error ? (
-        <p className="rounded-xl bg-[#fef3f2] px-3.5 py-2.5 text-sm text-[#b42318]">{error}</p>
+        <p role="alert" className="tb-alert tb-alert--error">{error}</p>
       ) : null}
 
       {canManage && canEditRolePermissions(role, { fullControl }) ? (
-        <p className="text-xs text-[#5a6a62]">
+        <p className="text-xs text-muted-foreground">
           You currently hold {permissions.length} permission
           {permissions.length === 1 ? "" : "s"} — edits must stay within that set.
         </p>
@@ -175,14 +174,14 @@ export default function RoleDetailsPage() {
           </div>
         ) : (
           byResource.map(([resource, items]) => (
-            <div key={resource} className="mt-5 border-t border-[#d4e0da] pt-4">
-              <p className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-[#6b7a72]">
+            <div key={resource} className="mt-5 border-t border-input pt-4">
+              <p className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-muted-foreground">
                 {resource.replace(/_/g, " ")}
               </p>
               <ul className="tb-data mt-1">
                 {items.map((permission) => (
                   <li key={permission.code} className="tb-data-row grid-cols-1">
-                    <p className="font-medium text-[#0d3b2a]">{permissionTitle(permission)}</p>
+                    <p className="font-medium text-heading">{permissionTitle(permission)}</p>
                     {permission.description ? (
                       <p className="tb-meta">{permission.description}</p>
                     ) : null}

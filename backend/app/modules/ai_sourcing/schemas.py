@@ -1,4 +1,3 @@
-"""AI Sourcing API schemas."""
 
 from __future__ import annotations
 
@@ -12,34 +11,28 @@ from app.modules.ai.requirements import ProcurementRequirements, QuantityRequire
 class AnalyzeSourcingRequest(BaseModel):
     business_description: str = Field(min_length=8, max_length=8000)
 
-
 class ConfirmRequirementsRequest(BaseModel):
     sourcing_request_id: str
     requirements: ProcurementRequirements
-
 
 class RecommendRequest(BaseModel):
     sourcing_request_id: str
     limit: int = Field(default=20, ge=1, le=40)
 
-
 class CreateSourcingDraftRequest(BaseModel):
     sourcing_request_id: str
-
 
 class QuantityRequirementOut(QuantityRequirement):
     pass
 
-
 class ProcurementRequirementsOut(ProcurementRequirements):
     pass
-
 
 class AnalyzeSourcingResponse(BaseModel):
     sourcing_request_id: str
     requirements: ProcurementRequirementsOut
     status: str
-
+    clarification: str | None = None
 
 class RecommendationOut(BaseModel):
     id: str
@@ -61,7 +54,7 @@ class RecommendationOut(BaseModel):
     matched_requirements: list[str] = Field(default_factory=list)
     unmatched_requirements: list[str] = Field(default_factory=list)
     reasons: list[str] = Field(default_factory=list)
-
+    signals: dict[str, float] = Field(default_factory=dict)
 
 class SupplierMatchOut(BaseModel):
     supplier_id: str
@@ -72,14 +65,14 @@ class SupplierMatchOut(BaseModel):
     reasons: list[str] = Field(default_factory=list)
     relevance_label: str | None = None
 
-
 class RecommendationsResponse(BaseModel):
     sourcing_request_id: str
     status: str
     products: list[RecommendationOut]
     suppliers: list[SupplierMatchOut]
+    message: str | None = None
     suggestions: list[str] = Field(default_factory=list)
-
+    loose_match: bool = False
 
 class SourcingRequestOut(BaseModel):
     id: str

@@ -1,12 +1,12 @@
-"""Business Planner service — discovery, market snapshot, AI draft, Decimal finance."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
 from app.modules.ai.provider import get_ai_provider
+from app.modules.ai.quota import AIQuotaExceededError, consume_ai_quota
 from app.modules.ai_sourcing.constants import SourcingRequestStatus
 from app.modules.ai_sourcing.repository import (
     SourcingRequestItemRepository,
@@ -50,18 +50,66 @@ from app.modules.business_planner.repository import (
     BusinessPlanSessionRepository,
     PriceEstimateRepository,
 )
-from app.modules.business_planner.schemas import AIPlanDraft, PlannerPreferences
+from app.modules.business_planner.schemas import (
+    AIPlanDraft,
+    AIProductStrategyItem,
+    PlannerPreferences,
+)
+from app.modules.identity.constants import SupplierVerificationStatus
 from app.shared.types.money import to_decimal128
+from app.shared.utils.datetime import utc_now
 from app.shared.utils.objectid import parse_object_id
 
 
 def _now() -> datetime:
-    return datetime.now(UTC)
+    return utc_now()
 
+def resolve_strategy_lines(
+    items: list[AIProductStrategyItem],
+    *,
+    market: dict[str, Any],
+) -> list[dict[str, Any]]:
+    cand_by_id = {
+        c["product_id"]: c for c in (market.get("candidates") or []) if c.get("product_id")
+    }
+    known_category_ids = {
+        str(c["category_id"]) for c in cand_by_id.values() if c.get("category_id")
+    }
+    resolved: list[dict[str, Any]] = []
+    for item in items:
+        cand = cand_by_id.get(item.product_id) if item.product_id else None
+        if cand is not None and not cand.get("unit_price"):
+            cand = None
+            item = item.model_copy(
+                update={"product_id": None, "source_type": ItemSourceType.AI_ESTIMATE}
+            )
+        unit_cost_str = item.estimated_purchase_price
+        source = item.source_type
+        if cand:
+            unit_cost_str = cand["unit_price"]
+            source = ItemSourceType.MARKETPLACE
+        if not unit_cost_str:
+            continue
+        qty = Decimal(item.quantity)
+        moq = (cand.get("moq") if cand else None) or item.suggested_moq
+        if moq and qty < Decimal(int(moq)):
+            qty = Decimal(int(moq))
+        resolved.append(
+            {
+                "draft": item,
+                "cand": cand,
+                "unit_cost": money(unit_cost_str),
+                "sell": money(item.target_selling_price),
+                "qty": qty,
+                "source": source,
+                "moq": moq,
+                "category_id": item.category_id if item.category_id in known_category_ids else None,
+            }
+        )
+    return resolved
 
 def _oid_str(value: Any) -> str:
     return str(value)
-
 
 def _money_out(value: Any) -> str | None:
     if value is None:
@@ -71,7 +119,6 @@ def _money_out(value: Any) -> str | None:
     if isinstance(value, Decimal128):
         return str(value.to_decimal())
     return str(value)
-
 
 class BusinessPlannerService:
     def __init__(
@@ -148,13 +195,13 @@ class BusinessPlannerService:
             adaptive = dict(prefs.get("adaptive") or {})
             adaptive.update(answers)
             prefs["adaptive"] = adaptive
-            # Promote a few adaptive keys
+                                         
             if "margin_confirm" in answers and not prefs.get("desired_margin"):
                 prefs["desired_margin"] = answers["margin_confirm"]
             if "channel_pref" in answers and not prefs.get("business_model"):
                 prefs["business_model"] = [answers["channel_pref"]]
         else:
-            # Generic merge for forward-compat
+                                              
             prefs.update({k: v for k, v in answers.items() if v is not None})
         return prefs
 
@@ -248,7 +295,10 @@ class BusinessPlannerService:
                 doc["_id"],
                 {"status": PlannerSessionStatus.READY, "updated_at": _now()},
             )
-            if isinstance(exc, (PlannerValidationError, PlannerGenerationError)):
+            if isinstance(
+                exc, (PlannerValidationError, PlannerGenerationError, AIQuotaExceededError)
+            ):
+                                                                                      
                 raise
             raise PlannerGenerationError() from exc
 
@@ -272,6 +322,11 @@ class BusinessPlannerService:
         version: int = 1,
         business_account_id: str | None = None,
     ) -> dict[str, Any]:
+        await consume_ai_quota(
+            subject_id=business_account_id or user_id,
+            subject_type="business" if business_account_id else "user",
+            feature="business_planner_generate",
+        )
         market = await build_market_snapshot(preferences=preferences)
         try:
             draft = await generate_plan_draft(self.ai, preferences=preferences, market=market)
@@ -279,40 +334,11 @@ class BusinessPlannerService:
         except Exception as exc:
             raise PlannerGenerationError("AI returned an invalid plan. Please try again.") from exc
 
-        # Enrich purchase prices from market candidates when missing
-        cand_by_id = {c["product_id"]: c for c in (market.get("candidates") or []) if c.get("product_id")}
-        line_inputs: list[dict[str, Any]] = []
-        enriched_items: list[dict[str, Any]] = []
-        for item in draft.product_strategy:
-            cand = cand_by_id.get(item.product_id) if item.product_id else None
-            unit_cost_str = item.estimated_purchase_price
-            source = item.source_type
-            if cand and cand.get("unit_price"):
-                unit_cost_str = cand["unit_price"]
-                source = ItemSourceType.MARKETPLACE
-            if not unit_cost_str:
-                continue
-            unit_cost = money(unit_cost_str)
-            sell = money(item.target_selling_price)
-            qty = Decimal(item.quantity)
-            # Respect MOQ floor from marketplace
-            moq = item.suggested_moq or (cand.get("moq") if cand else None)
-            if moq and qty < Decimal(int(moq)):
-                qty = Decimal(int(moq))
-            line_inputs.append(
-                {"quantity": qty, "unit_cost": unit_cost, "selling_price": sell}
-            )
-            enriched_items.append(
-                {
-                    "draft": item,
-                    "cand": cand,
-                    "unit_cost": unit_cost,
-                    "sell": sell,
-                    "qty": qty,
-                    "source": source,
-                    "moq": moq,
-                }
-            )
+        enriched_items = resolve_strategy_lines(draft.product_strategy, market=market)
+        line_inputs = [
+            {"quantity": row["qty"], "unit_cost": row["unit_cost"], "selling_price": row["sell"]}
+            for row in enriched_items
+        ]
 
         available = resolve_budget_midpoint(preferences)
         inv_cap = None
@@ -336,7 +362,7 @@ class BusinessPlannerService:
             auto_scale=True,
         )
 
-        # Align quantities with scaled finance lines
+                                                    
         for i, ln in enumerate(finance.lines):
             if i < len(enriched_items):
                 enriched_items[i]["qty"] = ln.quantity
@@ -401,8 +427,8 @@ class BusinessPlannerService:
             item_doc = await self.items.create(
                 {
                     "business_plan_id": plan_doc["_id"],
-                    "category_id": parse_object_id(item.category_id)
-                    if item.category_id
+                    "category_id": parse_object_id(row["category_id"])
+                    if row.get("category_id")
                     else (
                         parse_object_id(cand["category_id"])
                         if cand and cand.get("category_id")
@@ -563,7 +589,7 @@ class BusinessPlannerService:
                 "created_at": _now(),
             }
         )
-        # Soft-apply preference patches without regenerating automatically
+                                                                          
         if mutations and mutations.get("preferences_patch"):
             prefs = dict(plan.get("preferences") or {})
             prefs.update(mutations["preferences_patch"])
@@ -584,10 +610,53 @@ class BusinessPlannerService:
             ],
         }
 
+    async def _still_sourceable(self, items: list[dict[str, Any]]) -> set[str]:
+        from app.db.collections import CollectionName
+        from app.db.mongodb import mongo_manager
+        from app.modules.catalog.constants import ProductStatus
+
+        product_ids = []
+        for row in items:
+            pid = row.get("product_id")
+            if not pid:
+                continue
+            try:
+                product_ids.append(parse_object_id(str(pid)))
+            except Exception:
+                continue
+        if not product_ids:
+            return set()
+
+        products = await mongo_manager.collection(CollectionName.PRODUCTS).find(
+            {"_id": {"$in": product_ids}, "status": ProductStatus.ACTIVE},
+            {"business_account_id": 1},
+        ).to_list(length=len(product_ids))
+        if not products:
+            return set()
+
+        business_ids = list({p["business_account_id"] for p in products if p.get("business_account_id")})
+        verified = set()
+        if business_ids:
+            profiles = await mongo_manager.collection(CollectionName.SUPPLIER_PROFILES).find(
+                {
+                    "business_account_id": {"$in": business_ids},
+                    "verification_status": SupplierVerificationStatus.VERIFIED,
+                },
+                {"business_account_id": 1},
+            ).to_list(length=len(business_ids))
+            verified = {str(row["business_account_id"]) for row in profiles}
+
+        return {
+            str(p["_id"])
+            for p in products
+            if str(p.get("business_account_id") or "") in verified
+        }
+
     async def create_sourcing_draft(self, *, user_id: str, plan_id: str) -> dict[str, Any]:
         plan = await self._owned_plan(plan_id, user_id=user_id)
         items = await self.items.list_for_plan(plan_id)
         now = _now()
+        sourceable = await self._still_sourceable(items)
         product_names = [str(i.get("item_name")) for i in items]
         requirements = {
             "business_type": plan.get("business_type"),
@@ -611,7 +680,7 @@ class BusinessPlannerService:
             "budget_range": _money_out(plan.get("budget")),
             "missing_information": [],
         }
-        # Buyer business optional — store with user as buyer reference; business_id may be null
+                                                                                               
         raw_biz = plan.get("business_account_id")
         business_id = parse_object_id(str(raw_biz)) if raw_biz else None
         req = await self.sourcing_requests.create(
@@ -640,7 +709,10 @@ class BusinessPlannerService:
                     "quantity": i.get("quantity"),
                     "unit": i.get("unit") or "unit",
                     "destination": plan.get("location"),
-                    "product_id": i.get("product_id"),
+                                                                   
+                    "product_id": i.get("product_id")
+                    if str(i.get("product_id") or "") in sourceable
+                    else None,
                     "created_at": now,
                 }
             )
@@ -685,7 +757,7 @@ class BusinessPlannerService:
             for i in items
         ]
         return {
-            "publishable": True,
+            "publishable": False,
             "message": (
                 "RFQ draft prepared from your business plan. "
                 "Use convert-to-rfq to create a real draft RFQ in Procurement."
@@ -708,7 +780,6 @@ class BusinessPlannerService:
         }
 
     async def convert_to_rfq(self, *, user_id: str, plan_id: str, business: dict[str, Any] | None) -> dict[str, Any]:
-        """Create a real draft RFQ from the plan (does not publish)."""
         from app.modules.procurement.service import ProcurementService
 
         preview = await self.rfq_preview(user_id=user_id, plan_id=plan_id)
@@ -834,7 +905,6 @@ class BusinessPlannerService:
         }
 
     async def _enrich_plan_media(self, detail: dict[str, Any]) -> dict[str, Any]:
-        """Attach catalog product images and supplier logos for creative listings."""
         from bson import ObjectId
 
         from app.modules.catalog.repository import ProductImageRepository

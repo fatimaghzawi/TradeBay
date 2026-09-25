@@ -136,7 +136,7 @@ function AdminPermissionsPageInner() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search modules or actions…"
-          className="h-9 w-full max-w-xs rounded-lg border border-[#d4e0da] px-3 text-sm outline-none focus:border-[#e86f2a]"
+          className="h-9 w-full max-w-xs rounded-lg border border-input px-3 text-sm outline-none focus:border-ring"
         />
       </div>
 
@@ -188,7 +188,7 @@ function AdminPermissionsPageInner() {
                       <span className="tb-perm-item-title">
                         {permissionTitle(permission)}
                         {PLATFORM_ONLY_PERMISSION_CODES.has(permission.code) ? (
-                          <em className="ml-1 text-[11px] not-italic text-[#e86f2a]">
+                          <em className="ml-1 text-[11px] not-italic text-accent-text">
                             · platform
                           </em>
                         ) : null}

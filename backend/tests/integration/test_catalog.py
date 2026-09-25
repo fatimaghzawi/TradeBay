@@ -1,25 +1,25 @@
-"""Domain 2 — Catalog & Inventory integration tests."""
 
 from __future__ import annotations
 
 import asyncio
 import os
+from decimal import Decimal
 from typing import Any
 
 import pytest
-from bson import ObjectId
-from httpx import AsyncClient
-
 from app.db.mongodb import mongo_manager
+from app.modules.catalog.exceptions import InsufficientReservedError
+from app.modules.catalog.service import CatalogService
 from app.modules.identity.constants import SYSTEM_ROLE_PLATFORM_ADMIN
 from app.modules.identity.email import MemoryEmailSender
 from app.shared.utils.datetime import utc_now
+from bson import ObjectId
+from httpx import AsyncClient
 
 
 async def _verify_email(client: AsyncClient, token: str) -> None:
     response = await client.post("/api/v1/auth/email/verify", json={"token": token})
     assert response.status_code == 200, response.text
-
 
 async def _register(
     client: AsyncClient,
@@ -54,7 +54,6 @@ async def _register(
         "cookies": response.cookies,
     }
 
-
 async def _mark_supplier_verified(business_id: str) -> None:
     now = utc_now()
     await mongo_manager.database["business_accounts"].update_one(
@@ -72,7 +71,6 @@ async def _mark_supplier_verified(business_id: str) -> None:
         },
     )
 
-
 async def _login(client: AsyncClient, email: str, password: str) -> None:
     response = await client.post(
         "/api/v1/auth/login",
@@ -80,7 +78,6 @@ async def _login(client: AsyncClient, email: str, password: str) -> None:
     )
     assert response.status_code == 200, response.text
     client.cookies = response.cookies
-
 
 async def _elevate_platform_admin(user_id: str) -> str:
     platform = await mongo_manager.database["business_accounts"].find_one({"type": "platform"})
@@ -110,14 +107,12 @@ async def _elevate_platform_admin(user_id: str) -> str:
     )
     return str(platform["_id"])
 
-
 async def _switch_business(client: AsyncClient, business_id: str) -> None:
     response = await client.post(
         "/api/v1/businesses/current/switch",
         json={"business_id": business_id},
     )
     assert response.status_code == 200, response.text
-
 
 async def _seed_category(client: AsyncClient, email: str, password: str, user_id: str) -> str:
     platform_id = await _elevate_platform_admin(user_id)
@@ -130,7 +125,6 @@ async def _seed_category(client: AsyncClient, email: str, password: str, user_id
     assert created.status_code == 200, created.text
     return created.json()["data"]["id"]
 
-
 @pytest.fixture
 async def verified_supplier(
     client: AsyncClient, email_inbox: MemoryEmailSender
@@ -142,11 +136,10 @@ async def verified_supplier(
     category_id = await _seed_category(
         client, supplier["email"], supplier["password"], supplier["user"]["id"]
     )
-    # Switch back to supplier company for product work.
+                                                       
     await _switch_business(client, business_id)
     supplier["category_id"] = category_id
     return supplier
-
 
 @pytest.mark.asyncio
 async def test_category_tree_and_cycle_prevention(
@@ -189,7 +182,6 @@ async def test_category_tree_and_cycle_prevention(
         },
     )
     assert bad_parent.status_code == 404, bad_parent.text
-
 
 @pytest.mark.asyncio
 async def test_supplier_product_sku_and_ownership(
@@ -253,11 +245,11 @@ async def test_supplier_product_sku_and_ownership(
     )
     assert bad_lead.status_code == 422, bad_lead.text
 
-    # Second supplier can reuse the same SKU.
+                                             
     other = await _register(client, email_inbox, business_type="supplier", business_name="Other Supply")
     await _mark_supplier_verified(other["business"]["id"])
     await _login(client, other["email"], other["password"])
-    # Reuse category (global).
+                              
     other_product = await client.post(
         "/api/v1/catalog/products",
         json={
@@ -269,14 +261,13 @@ async def test_supplier_product_sku_and_ownership(
     )
     assert other_product.status_code == 200, other_product.text
 
-    # Cannot patch first supplier's product.
+                                            
     await _login(client, other["email"], other["password"])
     stolen = await client.patch(
         f"/api/v1/catalog/products/{product['id']}",
         json={"name": "Hijacked"},
     )
     assert stolen.status_code == 403, stolen.text
-
 
 @pytest.mark.asyncio
 async def test_pricing_tiers_and_match(
@@ -337,7 +328,6 @@ async def test_pricing_tiers_and_match(
     assert matched.status_code == 200, matched.text
     assert matched.json()["meta"]["matched_tier"]["unit_price"] == "4.10"
 
-
 @pytest.mark.asyncio
 async def test_inventory_workflows_and_concurrency(
     client: AsyncClient, verified_supplier: dict[str, Any]
@@ -355,7 +345,7 @@ async def test_inventory_workflows_and_concurrency(
     ).json()["data"]
     product_id = product["id"]
 
-    # Need a price tier to activate later; stock first.
+                                                       
     await client.post(
         f"/api/v1/catalog/products/{product_id}/prices",
         json={"min_quantity": 10, "max_quantity": None, "unit_price": "5.00"},
@@ -416,7 +406,7 @@ async def test_inventory_workflows_and_concurrency(
     assert txs.status_code == 200, txs.text
     assert txs.json()["meta"]["total"] >= 4
 
-    # Activate after price + inventory exist.
+                                             
     activated = await client.patch(
         f"/api/v1/catalog/products/{product_id}",
         json={"status": "active"},
@@ -424,12 +414,12 @@ async def test_inventory_workflows_and_concurrency(
     assert activated.status_code == 200, activated.text
     assert activated.json()["data"]["status"] == "active"
 
-    # Concurrent reservations must not oversell.
+                                                
     await client.post(
         f"/api/v1/inventory/products/{product_id}/stock",
         json={"quantity": "10"},
     )
-    # available should be 80 after +10
+                                      
     results = await asyncio.gather(
         client.post(
             f"/api/v1/inventory/products/{product_id}/reserve",
@@ -448,7 +438,7 @@ async def test_inventory_workflows_and_concurrency(
         else:
             statuses.append(result.status_code)
     assert 200 in statuses
-    # One success and one conflict (or both conflict if race lost both — at least not two 200s overselling)
+                                                                                                           
     success_count = statuses.count(200)
     assert success_count == 1, statuses
     assert 409 in statuses
@@ -459,6 +449,37 @@ async def test_inventory_workflows_and_concurrency(
     reserved_qty = float(final.json()["data"]["reserved_quantity"])
     assert available + reserved_qty == 80.0
 
+                                                                                 
+                                             
+    order_id = str(ObjectId())
+    supplier_business_id = verified_supplier["business"]["id"]
+    supplier_user_id = verified_supplier["user"]["id"]
+    await CatalogService().reserve_stock(
+        product_id,
+        business_id=supplier_business_id,
+        user_id=supplier_user_id,
+        quantity=Decimal("5"),
+        reference_type="order",
+        reference_id=order_id,
+    )
+    manual_release = await client.post(
+        f"/api/v1/inventory/products/{product_id}/release",
+        json={"quantity": str(int(reserved_qty) + 5)},
+    )
+    assert manual_release.status_code == 409, manual_release.text
+    for attempt in range(2):
+        try:
+            await CatalogService().release_stock(
+                product_id,
+                business_id=supplier_business_id,
+                user_id=supplier_user_id,
+                quantity=Decimal("5"),
+                reference_type="order",
+                reference_id=order_id,
+            )
+            assert attempt == 0
+        except InsufficientReservedError:
+            assert attempt == 1
 
 @pytest.mark.asyncio
 async def test_buyer_cannot_modify_supplier_catalog(

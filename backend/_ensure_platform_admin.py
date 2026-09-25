@@ -1,4 +1,3 @@
-"""Ensure a local platform admin user exists and print credentials."""
 
 from __future__ import annotations
 
@@ -7,7 +6,6 @@ import os
 from pathlib import Path
 
 from bson import ObjectId
-
 
 def _load_dotenv() -> None:
     for path in (Path(__file__).resolve().parents[1] / ".env", Path(__file__).resolve().parent / ".env"):
@@ -19,7 +17,6 @@ def _load_dotenv() -> None:
                 continue
             key, _, value = stripped.partition("=")
             os.environ.setdefault(key.strip(), value.strip().strip("'").strip('"'))
-
 
 async def main() -> None:
     _load_dotenv()
@@ -34,11 +31,16 @@ async def main() -> None:
     from app.shared.utils.datetime import utc_now
 
     reset_settings_cache()
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    if settings.is_production or settings.app_env == "production":
+        raise SystemExit("Refusing to reset the platform admin password in production.")
     await mongo_manager.connect()
     db = mongo_manager.database
 
     email = "admin@tradebay.com"
-    password = "AdminPass123!"
+    password = os.environ.get("PLATFORM_ADMIN_PASSWORD") or "AdminPass123!"
 
     platform = await db["business_accounts"].find_one({"type": "platform"})
     if platform is None:
@@ -115,7 +117,6 @@ async def main() -> None:
     print(f"PASSWORD={password}")
     print("After login, switch to the TradeBay platform company if needed, then open /admin")
     await mongo_manager.disconnect()
-
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -1,4 +1,4 @@
-/** Shared Business Planner UI helpers. */
+
 
 import type { PlanSectionId } from "@/features/business-planner/constants";
 

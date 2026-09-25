@@ -10,9 +10,6 @@ export type EmptyStateProps = {
   size?: "page" | "section";
 };
 
-/**
- * Empty list / zero-results — same family as loading & error.
- */
 export function EmptyState({
   title,
   description,

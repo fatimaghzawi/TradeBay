@@ -1,9 +1,3 @@
-"""Canonical in-app notification writer (Trust NotificationDocument).
-
-Fans out to active business members when only a business id is provided.
-Important events also email each member's *personal* inbox (never the company
-contact mailbox), and name the business in the message.
-"""
 
 from __future__ import annotations
 
@@ -20,18 +14,16 @@ from app.shared.utils.objectid import parse_object_id
 
 logger = get_logger(__name__)
 
-# High-volume or RFQ-lifecycle pings stay in-app only (no Elastic Email).
+                                                                         
 _EMAIL_SKIP_PREFIXES = ("RFQ_", "QUOTE_", "QUOTATION_", "NEGOTIATION_")
 _EMAIL_SKIP_TYPES = frozenset(
     {"TRACKING_UPDATED", "GENERAL", "CONVERSATION_MESSAGE"}
 )
 
-
 def _email_event(event_type: str) -> bool:
     if event_type in _EMAIL_SKIP_TYPES:
         return False
     return not event_type.startswith(_EMAIL_SKIP_PREFIXES)
-
 
 async def notify(
     *,
@@ -46,7 +38,6 @@ async def notify(
     email: bool | None = None,
     cta_path: str | None = None,
 ) -> int:
-    """Create one or more notifications. Returns how many rows were inserted."""
     biz_oid = parse_object_id(str(recipient_business_id)) if recipient_business_id else None
     user_oids: list[ObjectId] = []
 
@@ -115,9 +106,7 @@ async def notify(
             _spawn_background(coro)
     return len(docs)
 
-
 def _email_should_await() -> bool:
-    """Never block API responses on Elastic Email. Tests keep awaiting in-memory senders."""
     try:
         from app.core.config import get_settings
 
@@ -127,7 +116,6 @@ def _email_should_await() -> bool:
         pass
     return False
 
-
 def _spawn_background(coro: Coroutine[Any, Any, None]) -> None:
     try:
         task = asyncio.get_running_loop().create_task(coro)
@@ -136,14 +124,12 @@ def _spawn_background(coro: Coroutine[Any, Any, None]) -> None:
         return
     task.add_done_callback(_log_background)
 
-
 def _log_background(task: asyncio.Task[None]) -> None:
     if task.cancelled():
         return
     exc = task.exception()
     if exc is not None:
         logger.warning("background_notification_email_failed", error=str(exc))
-
 
 async def notify_platform_staff(
     *,
@@ -154,7 +140,6 @@ async def notify_platform_staff(
     reference_id: str | ObjectId | None = None,
     cta_path: str | None = None,
 ) -> int:
-    """Fan-out an in-app + email notification to the platform tenant."""
     platform = await mongo_manager.collection(CollectionName.BUSINESS_ACCOUNTS).find_one(
         {"type": "platform"},
         {"_id": 1},
@@ -171,9 +156,8 @@ async def notify_platform_staff(
         cta_path=cta_path or "/admin/suppliers",
     )
 
-
 async def _admin_user_oids(business_id: ObjectId) -> list[ObjectId]:
-    from app.modules.identity.constants import MembershipStatus, SYSTEM_ROLE_BUSINESS_ADMIN
+    from app.modules.identity.constants import SYSTEM_ROLE_BUSINESS_ADMIN, MembershipStatus
 
     role_ids = [
         row["_id"]
@@ -202,7 +186,6 @@ async def _admin_user_oids(business_id: ObjectId) -> list[ObjectId]:
             user_oids.append(uid)
     return user_oids
 
-
 async def notify_business_admins(
     *,
     business_id: str | ObjectId,
@@ -215,7 +198,6 @@ async def notify_business_admins(
     exclude_user_id: str | ObjectId | None = None,
     extra_user_ids: list[str | ObjectId | None] | None = None,
 ) -> int:
-    """In-app + email to Business Admins of a trading company (not every member)."""
     biz_oid = parse_object_id(str(business_id))
     exclude = parse_object_id(str(exclude_user_id)) if exclude_user_id else None
     user_oids = [uid for uid in await _admin_user_oids(biz_oid) if uid != exclude]
@@ -242,7 +224,6 @@ async def notify_business_admins(
         )
     return written
 
-
 def _default_cta(reference_type: str | None, reference_id: ObjectId | None) -> str:
     rid = str(reference_id) if reference_id else None
     if reference_type == "order" and rid:
@@ -257,6 +238,10 @@ def _default_cta(reference_type: str | None, reference_id: ObjectId | None) -> s
         return f"/negotiations/{rid}"
     if reference_type == "conversation" and rid:
         return f"/conversations/{rid}"
+    if reference_type == "checkout" and rid:
+        return f"/orders/checkouts/{rid}"
+    if reference_type == "invoice" and rid:
+        return f"/finance/invoices/{rid}"
     if reference_type == "invoice":
         return "/finance"
     if reference_type == "dispute":
@@ -271,14 +256,12 @@ def _default_cta(reference_type: str | None, reference_id: ObjectId | None) -> s
         return "/settings"
     return "/notifications"
 
-
 def _personal_inbox(
     user: dict[str, Any],
     *,
     invite_delivery: dict[str, str],
     company_contact: str | None,
 ) -> str | None:
-    """Prefer the person's own mailbox — never the company contact address."""
     login = str(user.get("email") or "").strip().lower()
     stored = str(user.get("personal_email") or "").strip().lower()
     invited = invite_delivery.get(login, "")
@@ -287,10 +270,9 @@ def _personal_inbox(
         if candidate and candidate != company:
             return candidate
     if login and login == company:
-        # Owner often registered with the same address used as company contact.
+                                                                               
         return login
     return stored or invited or login or None
-
 
 async def _email_personal_inboxes(
     *,

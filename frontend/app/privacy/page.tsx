@@ -24,20 +24,20 @@ export default function PrivacyPage() {
         <p>We may process:</p>
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
-            <span className="font-medium text-[#0c1612]">Account data</span> — name, email,
+            <span className="font-medium text-foreground">Account data</span> — name, email,
             password hash, phone (if provided), verification status.
           </li>
           <li>
-            <span className="font-medium text-[#0c1612]">Business data</span> — company
+            <span className="font-medium text-foreground">Business data</span> — company
             name, type (buyer/supplier), tax and contact details, addresses, verification
             documents.
           </li>
           <li>
-            <span className="font-medium text-[#0c1612]">Membership &amp; access data</span>{" "}
+            <span className="font-medium text-foreground">Membership &amp; access data</span>{" "}
             — roles, invitations, permissions, session devices, IP address, user agent.
           </li>
           <li>
-            <span className="font-medium text-[#0c1612]">Transactional &amp; support data</span>{" "}
+            <span className="font-medium text-foreground">Transactional &amp; support data</span>{" "}
             — RFQs, quotations, messages, audit logs, dispute evidence, and communications
             with support.
           </li>
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
           restriction of your personal data, and object to certain processing. Contact{" "}
           <a
             href="mailto:privacy@tradebay.app"
-            className="font-semibold text-[#0d3b2a] underline underline-offset-2"
+            className="font-semibold text-heading underline underline-offset-2"
           >
             privacy@tradebay.app
           </a>
@@ -111,7 +111,7 @@ export default function PrivacyPage() {
           date. Related obligations appear in our{" "}
           <Link
             href={ROUTES.terms}
-            className="font-semibold text-[#0d3b2a] underline underline-offset-2"
+            className="font-semibold text-heading underline underline-offset-2"
           >
             Terms &amp; Conditions
           </Link>

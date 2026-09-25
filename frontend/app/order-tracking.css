@@ -22,12 +22,12 @@
 }
 
 .tb-shein {
-  --shein-ink: var(--tb-ink, #14201b);
-  --shein-muted: var(--tb-muted-foreground, #5a6560);
-  --shein-accent: var(--tb-primary, #0d3b2a);
-  --shein-line: #e2e8e4;
-  --shein-soft: #f4f7f5;
-  --shein-done: #1a6b4f;
+  --shein-ink: var(--tb-ink);
+  --shein-muted: var(--tb-muted-foreground);
+  --shein-accent: var(--tb-primary);
+  --shein-line: var(--tb-line);
+  --shein-soft: var(--tb-surface-muted);
+  --shein-done: var(--tb-secondary);
   display: grid;
   gap: 1.15rem;
   min-width: 0;
@@ -99,17 +99,16 @@
   padding: 1rem 1.05rem;
   border: 1px solid var(--shein-line);
   border-radius: 0.95rem;
-  background: #fff;
+  background: var(--tb-surface);
   text-decoration: none;
   color: inherit;
-  transition:
-    border-color 0.15s ease,
+  transition: border-color 0.15s ease,
     box-shadow 0.15s ease;
 }
 
 .tb-shein-card:hover {
   border-color: color-mix(in srgb, var(--shein-accent) 35%, var(--shein-line));
-  box-shadow: 0 12px 28px -22px rgba(13, 59, 42, 0.4);
+  box-shadow: 0 12px 28px -22px color-mix(in srgb, var(--tb-primary) 40%, transparent);
 }
 
 .tb-shein-card__top {
@@ -155,7 +154,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--shein-line);
-  color: #9aa8a0;
+  color: var(--tb-muted-fg);
   background: var(--shein-soft);
 }
 
@@ -167,12 +166,12 @@
 .tb-shein-card__mini > span[data-on] {
   border-color: color-mix(in srgb, var(--shein-done) 40%, var(--shein-line));
   color: var(--shein-done);
-  background: #e8f3ee;
+  background: var(--tb-secondary-soft);
 }
 
 .tb-shein-card__mini > span[data-now] {
   border-color: var(--shein-accent);
-  color: #fff;
+  color: var(--tb-primary-foreground);
   background: var(--shein-accent);
 }
 
@@ -214,8 +213,7 @@
   padding: 1.15rem 1.2rem;
   border: 1px solid var(--shein-line);
   border-radius: 1.05rem;
-  background:
-    linear-gradient(135deg, #f7faf8 0%, #eef5f1 55%, #fff 100%);
+  background: linear-gradient(135deg, var(--tb-surface-muted) 0%, var(--tb-secondary-soft) 55%, var(--tb-surface) 100%);
 }
 
 .tb-shein-status__badge {
@@ -224,7 +222,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: #fff;
+  color: var(--tb-primary-foreground);
   background: var(--shein-accent);
   animation: tb-shein-ring 2.4s ease-out infinite;
 }
@@ -254,7 +252,7 @@
   gap: 0.2rem;
   padding: 0.75rem 0.85rem;
   border-radius: 0.75rem;
-  background: #fff;
+  background: var(--tb-surface);
   border: 1px solid var(--shein-line);
 }
 
@@ -328,10 +326,9 @@
   display: grid;
   place-items: center;
   border: 2px solid var(--shein-line);
-  background: #fff;
-  color: #9aa8a0;
-  transition:
-    background 0.25s ease,
+  background: var(--tb-surface);
+  color: var(--tb-muted-fg);
+  transition: background 0.25s ease,
     border-color 0.25s ease,
     color 0.25s ease;
 }
@@ -343,14 +340,14 @@
 
 .tb-shein-stepper__list li[data-done] .tb-shein-stepper__icon {
   border-color: var(--shein-done);
-  background: #e8f3ee;
+  background: var(--tb-secondary-soft);
   color: var(--shein-done);
 }
 
 .tb-shein-stepper__list li[data-current] .tb-shein-stepper__icon {
   border-color: var(--shein-accent);
   background: var(--shein-accent);
-  color: #fff;
+  color: var(--tb-primary-foreground);
   animation: tb-shein-ring 2.4s ease-out infinite;
 }
 
@@ -368,7 +365,7 @@
 
 .tb-shein-stepper__list li[data-todo] strong,
 .tb-shein-stepper__list li[data-todo] em {
-  color: #9aa8a0;
+  color: var(--tb-muted-fg);
 }
 
 .tb-shein-split {
@@ -384,7 +381,7 @@
   padding: 1.1rem 1.15rem;
   border: 1px solid var(--shein-line);
   border-radius: 0.95rem;
-  background: #fff;
+  background: var(--tb-surface);
 }
 
 .tb-shein-panel h2 {
@@ -426,7 +423,7 @@
   height: 0.55rem;
   margin-top: 0.4rem;
   border-radius: 50%;
-  background: #c5d2cb;
+  background: var(--tb-line);
 }
 
 .tb-shein-timeline li[data-first] .tb-shein-timeline__dot {
@@ -500,23 +497,23 @@
 }
 
 .tb-shein-actions input {
-  border: 1px solid #d0d4d7;
+  border: 1px solid var(--tb-line);
   border-radius: 0.45rem;
   padding: 0.5rem 0.65rem;
   font: inherit;
   font-size: 0.88rem;
-  background: #fff;
+  background: var(--tb-surface);
 }
 
 .tb-shein-actions .tb-inv-btn-accent {
-  background: linear-gradient(165deg, #22926a, #0d3b2a);
-  color: #fff;
+  background: linear-gradient(165deg, var(--tb-primary), var(--tb-primary));
+  color: var(--tb-primary-foreground);
   border-color: transparent;
 }
 
 .tb-shein-actions .tb-inv-btn-accent:disabled {
   opacity: 0.55;
-  color: #fff;
+  color: var(--tb-primary-foreground);
 }
 
 .tb-shein-hint {
@@ -566,12 +563,12 @@
 
 /* Dark mode — order tracking */
 html.dark .tb-shein {
-  --shein-ink: var(--tb-ink, #f3f5f8);
-  --shein-muted: var(--tb-muted-fg, #c5ced9);
-  --shein-accent: var(--tb-accent, #5dcc9a);
-  --shein-line: var(--tb-line, rgba(210, 220, 232, 0.16));
-  --shein-soft: var(--tb-surface-muted, #1c232f);
-  --shein-done: #5dcc9a;
+  --shein-ink: var(--tb-ink);
+  --shein-muted: var(--tb-muted-fg);
+  --shein-accent: var(--tb-accent);
+  --shein-line: var(--tb-line);
+  --shein-soft: var(--tb-surface-muted);
+  --shein-done: var(--tb-primary);
 }
 
 html.dark .tb-shein-hero,
@@ -580,37 +577,36 @@ html.dark .tb-shein-stepper,
 html.dark .tb-shein-card,
 html.dark .tb-shein-panel,
 html.dark .tb-shein-aside {
-  background: var(--tb-surface, #222a36) !important;
+  background: var(--tb-surface) !important;
   border-color: var(--tb-line) !important;
   color: var(--tb-ink);
   box-shadow: none !important;
 }
 
 html.dark .tb-shein-hero {
-  background:
-    linear-gradient(135deg, color-mix(in srgb, #5dcc9a 12%, #222a36) 0%, #222a36 55%, #1c232f 100%) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tb-primary) 12%, var(--tb-surface)) 0%, var(--tb-surface) 55%, #1c232f 100%) !important;
 }
 
 html.dark .tb-shein-stepper__icon,
 html.dark .tb-shein-stepper__list li {
-  background: var(--tb-raise, #2f3848) !important;
+  background: var(--tb-raise) !important;
   border-color: var(--tb-line) !important;
   color: var(--tb-ink);
 }
 
 html.dark .tb-shein-stepper__list li[data-done] .tb-shein-stepper__icon,
 html.dark .tb-shein-stepper__list li[data-current] .tb-shein-stepper__icon {
-  background: color-mix(in srgb, #5dcc9a 22%, var(--tb-raise)) !important;
-  color: #5dcc9a !important;
-  border-color: color-mix(in srgb, #5dcc9a 45%, var(--tb-line)) !important;
+  background: color-mix(in srgb, var(--tb-primary) 22%, var(--tb-raise)) !important;
+  color: var(--tb-success) !important;
+  border-color: color-mix(in srgb, var(--tb-success) 45%, var(--tb-line)) !important;
 }
 
 html.dark .tb-shein-nav > a,
 html.dark .tb-shein-kicker {
-  color: var(--tb-accent, #5dcc9a);
+  color: var(--tb-accent);
 }
 
 html.dark .tb-shein-status__badge {
-  background: color-mix(in srgb, #5dcc9a 18%, var(--tb-raise));
-  color: #5dcc9a;
+  background: color-mix(in srgb, var(--tb-primary) 18%, var(--tb-raise));
+  color: var(--tb-success);
 }

@@ -6,7 +6,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-/** Identity hub tabs: Users · Buyers · Suppliers · Verifications · Roles · Permissions */
 const LINKS = [
   { href: ROUTES.admin.users, label: "Users", kind: "users" as const },
   {
@@ -34,9 +33,6 @@ const LINKS = [
   },
 ];
 
-/**
- * Identity section tab rail for platform admin.
- */
 export function AdminIdentityNav({ className }: { className?: string }) {
   const pathname = usePathname();
   const [bizType, setBizType] = useState<string | null>(null);
@@ -66,8 +62,8 @@ export function AdminIdentityNav({ className }: { className?: string }) {
           if (onList) {
             active = bizType === link.type;
           } else if (onDetail) {
-            // Detail pages keep the matching type tab lit when known from referrer query;
-            // otherwise leave inactive so Users/Verifications stay clear.
+            
+            
             active = false;
           }
         }

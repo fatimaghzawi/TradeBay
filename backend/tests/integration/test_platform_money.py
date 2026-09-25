@@ -1,11 +1,9 @@
-"""Platform Money integration — hold → release → payout + idempotent webhooks."""
 
 from __future__ import annotations
 
 from decimal import Decimal
 
 import pytest
-from bson import ObjectId
 from app.core.exceptions import BadRequestError, ForbiddenError
 from app.db.collections import CollectionName
 from app.db.mongodb import mongo_manager
@@ -16,6 +14,7 @@ from app.modules.platform_money.service import (
 )
 from app.shared.types.money import to_decimal128
 from app.shared.utils.datetime import utc_now
+from bson import ObjectId
 
 
 @pytest.mark.asyncio
@@ -55,7 +54,7 @@ async def test_platform_money_routing_lifecycle(app: object) -> None:
     assert commission is not None
     assert Decimal(str(commission["commission_amount"].to_decimal())) == Decimal("50.00")
 
-    # Idempotent commission
+                           
     again = await create_commission_and_payable_for_order(
         order={
             "_id": order_id,
@@ -104,7 +103,7 @@ async def test_platform_money_routing_lifecycle(app: object) -> None:
     )
     assert fee_tx is not None
 
-    # Duplicate payment handoff is idempotent
+                                             
     await svc.on_buyer_payment_completed(payment=payment, invoice=invoice)
     count = await mongo_manager.collection(CollectionName.PLATFORM_TRANSACTIONS).count_documents(
         {"type": "buyer_payment", "order_id": order_id}
@@ -134,16 +133,16 @@ async def test_platform_money_routing_lifecycle(app: object) -> None:
     assert payable is not None
     assert payable["status"] == PayableStatus.SETTLED
 
-    # Invalid transition
+                        
     with pytest.raises(BadRequestError):
         await svc.fail_payout(business=platform, payout_id=payout_id, reason="too late")
 
-    # Supplier isolation
+                        
     other_supplier = {"_id": ObjectId(), "type": "supplier"}
     with pytest.raises(ForbiddenError):
         await svc.get_payout(business=other_supplier, payout_id=payout_id)
 
-    # Webhook idempotency
+                         
     evt = await svc.ingest_provider_event(
         provider="stripe",
         event_id="evt_dup_1",

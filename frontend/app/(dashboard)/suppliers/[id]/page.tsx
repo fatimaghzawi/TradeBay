@@ -8,6 +8,7 @@ import {
   InventoryPanel,
   InventorySkeleton,
 } from "@/components/catalog/InventoryUi";
+import { BackLink } from "@/components/ui/BackLink";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { VerifiedBadge } from "@/components/admin/VerifiedBadge";
 import { ApiError } from "@/lib/api/client";
@@ -93,7 +94,7 @@ function SupplierProfileInner() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="tb-inv-btn tb-inv-btn-soft"
+              className="tb-btn tb-btn--secondary"
               onClick={onToggleSave}
             >
               {saved ? "Saved for later ✓" : "Save for later"}
@@ -146,9 +147,7 @@ function SupplierProfileInner() {
             title="No active products yet"
             body="This supplier has no active listings right now. Save them for later and check back."
             action={
-              <InventoryLinkBtn href={ROUTES.aiSourcing} tone="soft">
-                Back to Ask the Bay
-              </InventoryLinkBtn>
+              <BackLink href={ROUTES.aiSourcing}>Back to Ask the Bay</BackLink>
             }
           />
         ) : (

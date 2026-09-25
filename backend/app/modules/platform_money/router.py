@@ -1,10 +1,9 @@
-"""Platform Money HTTP API."""
 
 from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field, field_validator
 
 from app.modules.identity.dependencies import AuthContext, require_permission
@@ -15,10 +14,8 @@ from app.shared.schemas.response import paginated, success
 router = APIRouter(prefix="/platform-money", tags=["Platform Money"])
 supplier_payouts_router = APIRouter(prefix="/supplier/payouts", tags=["Platform Money"])
 
-
 def get_platform_money_service() -> PlatformMoneyService:
     return PlatformMoneyService()
-
 
 class ProviderWebhookRequest(BaseModel):
     provider: str = Field(min_length=1, max_length=64)
@@ -41,10 +38,8 @@ class ProviderWebhookRequest(BaseModel):
             raise ValueError("Money must be string or int — not float")
         return v
 
-
 class FailPayoutRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
-
 
 @router.get("/overview", summary="Admin finance command-center overview")
 async def platform_money_overview(
@@ -53,6 +48,31 @@ async def platform_money_overview(
 ) -> dict[str, Any]:
     return success(await service.admin_overview(business=auth.business))
 
+@router.get("/movement", summary="Money movement over time")
+async def platform_money_movement(
+    auth: Annotated[AuthContext, Depends(require_permission("settlements", "read"))],
+    service: Annotated[PlatformMoneyService, Depends(get_platform_money_service)],
+    range_key: Annotated[str, Query(alias="range")] = "30d",
+) -> dict[str, Any]:
+    return success(await service.movement(business=auth.business, range_key=range_key))
+
+@router.get("/activity", summary="Grouped financial activity for admins")
+async def financial_activity(
+    auth: Annotated[AuthContext, Depends(require_permission("settlements", "read"))],
+    service: Annotated[PlatformMoneyService, Depends(get_platform_money_service)],
+) -> dict[str, Any]:
+    return success(await service.financial_activity(business=auth.business))
+
+@router.get("/buyer-payments", summary="Buyer payments with commission and supplier share")
+async def list_buyer_payments(
+    auth: Annotated[AuthContext, Depends(require_permission("settlements", "read"))],
+    service: Annotated[PlatformMoneyService, Depends(get_platform_money_service)],
+    pagination: Annotated[PaginationParams, Depends(get_pagination)],
+) -> dict[str, Any]:
+    items, total = await service.list_buyer_payments(
+        business=auth.business, page=pagination.page, page_size=pagination.page_size
+    )
+    return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
 @router.get("/transactions", summary="List platform routing ledger (admin)")
 async def list_transactions(
@@ -65,7 +85,6 @@ async def list_transactions(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @router.get("/transactions/{transaction_id}", summary="Get platform transaction")
 async def get_transaction(
     transaction_id: str,
@@ -75,7 +94,6 @@ async def get_transaction(
     return success(
         await service.get_transaction(business=auth.business, transaction_id=transaction_id)
     )
-
 
 @router.get("/fees", summary="List platform commission (fee) records")
 async def list_fees(
@@ -88,7 +106,6 @@ async def list_fees(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @router.get("/payouts", summary="List supplier payouts (admin sees all)")
 async def list_payouts_admin(
     auth: Annotated[AuthContext, Depends(require_permission("payables", "read"))],
@@ -100,7 +117,6 @@ async def list_payouts_admin(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @router.get("/payouts/{payout_id}", summary="Get payout detail")
 async def get_payout_admin(
     payout_id: str,
@@ -108,7 +124,6 @@ async def get_payout_admin(
     service: Annotated[PlatformMoneyService, Depends(get_platform_money_service)],
 ) -> dict[str, Any]:
     return success(await service.get_payout(business=auth.business, payout_id=payout_id))
-
 
 @router.post("/payouts/{payout_id}/process", summary="Process (complete) a pending payout")
 async def process_payout(
@@ -121,7 +136,6 @@ async def process_payout(
             user_id=auth.user_id, business=auth.business, payout_id=payout_id
         )
     )
-
 
 @router.post("/payouts/{payout_id}/fail", summary="Mark payout failed")
 async def fail_payout(
@@ -136,7 +150,6 @@ async def fail_payout(
         )
     )
 
-
 @router.post("/orders/{order_id}/release", summary="Release held funds after fulfilment")
 async def release_funds(
     order_id: str,
@@ -147,7 +160,6 @@ async def release_funds(
         await service.release_funds_for_order(order_id=order_id, user_id=auth.user_id)
     )
 
-
 @router.get("/orders/{order_id}/summary", summary="Money trail for one purchase order")
 async def order_money_summary(
     order_id: str,
@@ -156,14 +168,13 @@ async def order_money_summary(
 ) -> dict[str, Any]:
     return success(await service.order_money_summary(business=auth.business, order_id=order_id))
 
-
 @router.post("/webhooks/provider", summary="Idempotent payment-provider event ingestion")
 async def provider_webhook(
     body: ProviderWebhookRequest,
     auth: Annotated[AuthContext, Depends(require_permission("settlements", "approve"))],
     service: Annotated[PlatformMoneyService, Depends(get_platform_money_service)],
 ) -> dict[str, Any]:
-    # Auth required for now (no public Stripe secret validation in this graduation scope).
+                                                                                          
     return success(
         await service.ingest_provider_event(
             provider=body.provider,
@@ -181,7 +192,6 @@ async def provider_webhook(
         )
     )
 
-
 @supplier_payouts_router.get("", summary="Supplier: list my payouts")
 async def list_my_payouts(
     auth: Annotated[AuthContext, Depends(require_permission("payables", "read"))],
@@ -192,7 +202,6 @@ async def list_my_payouts(
         business=auth.business, page=pagination.page, page_size=pagination.page_size
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
-
 
 @supplier_payouts_router.get("/{payout_id}", summary="Supplier: get my payout")
 async def get_my_payout(

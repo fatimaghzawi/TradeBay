@@ -1,4 +1,3 @@
-"""Reusable audit logging. Domain modules must not roll their own audit writers."""
 
 from __future__ import annotations
 
@@ -23,7 +22,6 @@ _SECRET_METADATA_KEYS = SENSITIVE_LOG_FIELDS | {
     "new_password",
 }
 
-
 def _sanitize_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     cleaned: dict[str, Any] = {}
     for key, value in metadata.items():
@@ -34,7 +32,6 @@ def _sanitize_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
             continue
         cleaned[key] = value
     return cleaned
-
 
 def _person_label(user: dict[str, Any] | None) -> str | None:
     if not user:
@@ -47,10 +44,8 @@ def _person_label(user: dict[str, Any] | None) -> str | None:
         return email.strip()
     return None
 
-
 class AuditLogRepository(BaseRepository):
     collection_name = CollectionName.AUDIT_LOGS
-
 
 class AuditService:
     def __init__(self, repository: AuditLogRepository | None = None) -> None:
@@ -156,6 +151,8 @@ class AuditService:
         query: dict[str, Any] = {"business_account_id": ObjectId(str(business_account_id))}
         if action:
             query["action"] = action.strip()
+        else:
+            query["action"] = {"$ne": "SESSION_REFRESHED"}
         if resource_type:
             query["resource_type"] = resource_type.strip()
         return query
@@ -235,7 +232,7 @@ class AuditService:
             if email:
                 meta["invited_email"] = email
 
-        # Accept events: actor is the joiner — prefer their name for member copy.
+                                                                                 
         action = str(row.get("action") or "").upper()
         if action in {"INVITATION_ACCEPTED", "MEMBER_JOINED"}:
             if user_id and user_id in user_labels:

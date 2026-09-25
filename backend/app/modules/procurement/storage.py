@@ -1,4 +1,3 @@
-"""Local disk storage for procurement delivery evidence."""
 
 from __future__ import annotations
 
@@ -25,7 +24,6 @@ ALLOWED_CONTENT_TYPES = frozenset(
 ALLOWED_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".pdf"})
 MAX_BYTES = 10 * 1024 * 1024
 
-
 def _safe_ext(filename: str | None, content_type: str | None) -> str:
     name = (filename or "").lower()
     match = re.search(r"(\.[a-z0-9]{2,5})$", name)
@@ -42,7 +40,6 @@ def _safe_ext(filename: str | None, content_type: str | None) -> str:
         return mapping[content_type.lower()]
     raise BadRequestError("Unsupported evidence type. Use JPG, PNG, WEBP, or PDF.")
 
-
 async def save_delivery_evidence(*, shipment_id: str, upload: UploadFile) -> str:
     content_type = (upload.content_type or "").lower().strip()
     if content_type and content_type not in ALLOWED_CONTENT_TYPES:
@@ -57,12 +54,10 @@ async def save_delivery_evidence(*, shipment_id: str, upload: UploadFile) -> str
     folder.mkdir(parents=True, exist_ok=True)
     filename = f"{uuid.uuid4().hex}{ext}"
     (folder / filename).write_bytes(data)
-    # Authenticated download route — not under the public StaticFiles mount.
+                                                                            
     return f"/api/v1/shipments/{shipment_id}/delivery-evidence/files/{filename}"
 
-
 def resolve_evidence_path(*, shipment_id: str, filename: str) -> Path:
-    """Resolve a stored evidence file, rejecting path traversal."""
     safe_name = Path(filename).name
     if safe_name != filename or ".." in filename:
         raise BadRequestError("Invalid evidence filename")
@@ -72,9 +67,7 @@ def resolve_evidence_path(*, shipment_id: str, filename: str) -> Path:
         raise NotFoundError("Evidence file not found")
     return path
 
-
 def public_evidence_url(*, shipment_id: str, stored_url: str | None) -> str | None:
-    """Normalize legacy `/uploads/delivery-evidence/...` URLs to the authz route."""
     if not stored_url:
         return stored_url
     prefix = f"/uploads/delivery-evidence/{shipment_id}/"

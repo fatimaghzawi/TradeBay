@@ -1,4 +1,3 @@
-"""AI Sourcing API — buyer requirement extraction, recommendations, draft requests."""
 
 from __future__ import annotations
 
@@ -19,10 +18,8 @@ from app.shared.schemas.response import paginated, success
 
 router = APIRouter(prefix="/ai-sourcing", tags=["AI Sourcing"])
 
-
 def get_ai_sourcing_service() -> AISourcingService:
     return AISourcingService()
-
 
 @router.post("/analyze", summary="Extract procurement requirements from buyer description")
 async def analyze_description(
@@ -37,7 +34,6 @@ async def analyze_description(
             business_description=body.business_description,
         )
     )
-
 
 @router.post("/requirements/confirm", summary="Confirm or edit extracted requirements")
 async def confirm_requirements(
@@ -54,7 +50,6 @@ async def confirm_requirements(
         )
     )
 
-
 @router.post("/recommendations", summary="Match confirmed requirements to TradeBay catalog")
 async def generate_recommendations(
     body: RecommendRequest,
@@ -69,7 +64,6 @@ async def generate_recommendations(
         )
     )
 
-
 @router.post("/create-request", summary="Create a DRAFT sourcing request from confirmed needs")
 async def create_sourcing_request(
     body: CreateSourcingDraftRequest,
@@ -83,14 +77,12 @@ async def create_sourcing_request(
         )
     )
 
-
 @router.get("/profile", summary="Get buyer procurement profile")
 async def get_procurement_profile(
     auth: Annotated[AuthContext, Depends(require_permission("sourcing", "read"))],
     service: Annotated[AISourcingService, Depends(get_ai_sourcing_service)],
 ) -> dict[str, Any]:
     return success(await service.get_profile(business=auth.business))
-
 
 @router.get("/requests", summary="List sourcing requests for active business")
 async def list_sourcing_requests(
@@ -105,7 +97,6 @@ async def list_sourcing_requests(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @router.get("/requests/{sourcing_request_id}", summary="Get sourcing request detail")
 async def get_sourcing_request(
     sourcing_request_id: str,
@@ -118,7 +109,6 @@ async def get_sourcing_request(
             sourcing_request_id=sourcing_request_id,
         )
     )
-
 
 @router.post(
     "/requests/{sourcing_request_id}/convert-to-rfq",

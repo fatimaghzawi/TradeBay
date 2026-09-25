@@ -18,7 +18,7 @@ type ChangeMemberRoleModalProps = {
   member: Member | null;
   onClose: () => void;
   onUpdated: () => void;
-  /** When set, uses platform oversight APIs for that trading company. */
+  
   businessId?: string;
 };
 
@@ -82,12 +82,12 @@ export function ChangeMemberRoleModal({
       }
       footer={
         <>
-          <button type="button" className="tb-split-btn-ghost" onClick={onClose}>
+          <button type="button" className="tb-btn tb-btn--outline" onClick={onClose}>
             Cancel
           </button>
           <button
             type="button"
-            className="tb-split-btn"
+            className="tb-btn tb-btn--primary"
             disabled={!member || !roleId || pending || unchanged}
             aria-busy={pending || undefined}
             onClick={() => {

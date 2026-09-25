@@ -1,4 +1,3 @@
-"""Typed environment configuration. Secrets are never hardcoded."""
 
 from functools import lru_cache
 
@@ -41,7 +40,7 @@ class Settings(BaseSettings):
     cookie_samesite: str = "lax"
     cookie_domain: str | None = None
 
-    # Email — Elastic Email API. Falls back to log-only when unset.
+                                                                   
     elasticemail_api_key: SecretStr | None = None
     email_from: str = "TradeBay <noreply@localhost>"
     email_timeout_seconds: int = 30
@@ -50,21 +49,48 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 60
 
     ai_provider: str = "openai"
+    ai_base_url: str = "https://api.openai.com/v1"
     ai_api_key: SecretStr | None = None
     ai_timeout_seconds: int = 30
+                                                                                  
+                                                                            
+    ai_max_retries: int = 1
+    ai_structured_retries: int = 1
+                                                                        
     ai_model: str | None = None
-    # RAG for AI sourcing — advisory catalog context only (default off).
-    ai_rag_enabled: bool = False
-    ai_rag_mode: str = "lexical"  # lexical | embedding
-    ai_rag_top_k: int = 8
-    ai_rag_product_limit: int = 400
+    ai_chat_model: str | None = None
     ai_embedding_model: str | None = None
+    ai_max_candidates: int = 80
+    ai_top_k: int = 24
+                                                                        
+    ai_vector_search_enabled: bool = False
+    ai_vector_index_name: str = "catalog_embeddings_vector"
+    ai_embedding_sync_batch: int = 32
+                                                                               
+    ai_category_cache_seconds: int = 60
+                                                                          
+    ai_daily_request_quota: int = 200
 
     tracking_webhook_secret: SecretStr | None = None
+
+                                                                                  
+                                                                                               
+    stripe_secret_key: SecretStr | None = None
+    stripe_publishable_key: str | None = None
+    stripe_webhook_secret: SecretStr | None = None
+    stripe_api_base: str = "https://api.stripe.com"
+    stripe_timeout_seconds: int = 20
     sentry_dsn: str | None = None
     otel_exporter_otlp_endpoint: str | None = None
 
-    @field_validator("sentry_dsn", "otel_exporter_otlp_endpoint", mode="before")
+    @field_validator(
+        "sentry_dsn",
+        "otel_exporter_otlp_endpoint",
+        "stripe_secret_key",
+        "stripe_publishable_key",
+        "stripe_webhook_secret",
+        mode="before",
+    )
     @classmethod
     def empty_str_to_none(cls, value: object) -> object:
         if value is None:
@@ -87,7 +113,7 @@ class Settings(BaseSettings):
         if self.cookie_samesite == "none" and not self.cookie_secure:
             object.__setattr__(self, "cookie_secure", True)
         if self.app_env == AppEnv.PRODUCTION:
-            # Secure cookies and rate limiting are mandatory in production.
+                                                                           
             object.__setattr__(self, "cookie_secure", True)
             object.__setattr__(self, "rate_limit_enabled", True)
             object.__setattr__(self, "app_debug", False)
@@ -127,11 +153,9 @@ class Settings(BaseSettings):
     def redoc_url(self) -> str | None:
         return None if self.is_production else "/redoc"
 
-
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
 
 def reset_settings_cache() -> None:
     get_settings.cache_clear()

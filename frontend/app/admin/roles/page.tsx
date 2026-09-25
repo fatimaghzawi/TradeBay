@@ -20,10 +20,6 @@ import { LoadingEntity } from "@/components/ui/LoadingState";
 
 type Layer = "all" | "system" | "custom";
 
-/**
- * Platform staff roles — full control for Platform Admin (ALL_CODES).
- * Trading-company roles are managed from each company profile.
- */
 function AdminRolesPageInner() {
   const { hasPermission } = useAuth();
   const { success, error: toastError } = useToast();
@@ -122,7 +118,7 @@ function AdminRolesPageInner() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search roles…"
-          className="h-9 w-full max-w-xs rounded-lg border border-[#d4e0da] px-3 text-sm outline-none focus:border-[#e86f2a]"
+          className="h-9 w-full max-w-xs rounded-lg border border-input px-3 text-sm outline-none focus:border-ring"
         />
       </div>
 
@@ -147,7 +143,7 @@ function AdminRolesPageInner() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Link
                     href={`${ROUTES.roles}/${role.id}`}
-                    className="font-semibold text-[#0c1612] hover:underline"
+                    className="font-semibold text-foreground hover:underline"
                   >
                     {role.name}
                   </Link>
@@ -187,8 +183,8 @@ function AdminRolesPageInner() {
       )}
 
       {total > 0 && layer === "all" ? (
-        <div className="flex items-center justify-between border-t border-[#d4e0da] pt-4">
-          <p className="text-sm text-[#6b7a72]">{total} roles</p>
+        <div className="flex items-center justify-between border-t border-input pt-4">
+          <p className="text-sm text-muted-foreground">{total} roles</p>
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
       ) : null}

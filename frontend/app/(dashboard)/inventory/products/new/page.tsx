@@ -24,6 +24,7 @@ import { useLiveFields } from "@/lib/validation/live";
 import { useAuth } from "@/providers/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BackLink } from "@/components/ui/BackLink";
 
 type PendingImage = {
   id: string;
@@ -83,7 +84,7 @@ function NewProductInner() {
     return () => {
       for (const img of images) URL.revokeObjectURL(img.preview);
     };
-    // Only revoke on unmount
+    
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -93,9 +94,7 @@ function NewProductInner() {
         <FeedbackBanner tone="warning" title="Supplier only">
           Only verified supplier companies can create catalog products.
         </FeedbackBanner>
-        <InventoryLinkBtn href={ROUTES.inventoryProducts} tone="ghost">
-          ← Back to marketplace
-        </InventoryLinkBtn>
+        <BackLink href={ROUTES.inventoryProducts}>Back to marketplace</BackLink>
       </div>
     );
   }
@@ -181,9 +180,7 @@ function NewProductInner() {
         title="Add product"
         description="Creates a draft listing under your business. Add photos, price tiers, and stock before activating."
         actions={
-          <InventoryLinkBtn href={ROUTES.inventoryProducts} tone="ghost">
-            ← My products
-          </InventoryLinkBtn>
+          <BackLink href={ROUTES.inventoryProducts}>My products</BackLink>
         }
       />
 
@@ -346,10 +343,10 @@ function NewProductInner() {
           className="mt-4"
         >
           <label className="tb-inv-image-drop">
-            <span className="font-semibold text-[var(--tb-ink)]">
+            <span className="font-semibold text-foreground">
               Drop images here or browse
             </span>
-            <span className="text-xs text-[var(--tb-muted-fg)]">
+            <span className="text-xs text-muted-foreground">
               JPG, PNG, WEBP, GIF · max 8 MB each
             </span>
             {imageError ? (
@@ -398,12 +395,12 @@ function NewProductInner() {
               ))}
             </ul>
           ) : (
-            <p className="mt-3 text-sm text-[var(--tb-muted-fg)]">
+            <p className="mt-3 text-sm text-muted-foreground">
               No images yet — you can also add them after creating the draft.
             </p>
           )}
 
-          <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-[#eef3f0] pt-4">
+          <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-border pt-4">
             <InventoryLinkBtn href={ROUTES.inventoryProducts} tone="ghost">
               Cancel
             </InventoryLinkBtn>

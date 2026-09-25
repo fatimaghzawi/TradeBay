@@ -6,7 +6,6 @@ function metaString(meta: Record<string, unknown>, key: string): string | null {
   return null;
 }
 
-/** Person who performed the action. */
 export function auditActorLabel(event: AuditEvent): string {
   const meta = event.metadata ?? {};
   return (
@@ -18,7 +17,6 @@ export function auditActorLabel(event: AuditEvent): string {
   );
 }
 
-/** Person / invite target affected by the action. Never a role name. */
 export function auditTargetLabel(event: AuditEvent): string {
   const meta = event.metadata ?? {};
   return (
@@ -39,10 +37,6 @@ function roleLabel(meta: Record<string, unknown>): string | null {
   );
 }
 
-/**
- * Translate audit action codes into business language.
- * Falls back to a readable action label when metadata is sparse.
- */
 export function auditHeadline(event: AuditEvent): string {
   const action = (event.action ?? "").toUpperCase();
   const meta = event.metadata ?? {};
@@ -136,6 +130,10 @@ export function auditHeadline(event: AuditEvent): string {
       return `${whom === "a teammate" ? who : whom} created an account`;
     case "USER_EMAIL_VERIFIED":
       return `${who} verified their email`;
+    case "REFRESH_TOKEN_REUSE_DETECTED":
+      return "Suspicious sign-in detected, so related sessions were signed out";
+    case "USER_REGISTRATION_RETRY_REJECTED":
+      return "Someone tried to sign up again with this unverified email";
     default: {
       const readable = action
         .toLowerCase()
@@ -154,6 +152,7 @@ export function auditTone(
   if (
     action.includes("FAILED") ||
     action.includes("REJECTED") ||
+    action.includes("REUSE_DETECTED") ||
     action.includes("SUSPENDED") ||
     action.includes("REVOKED") ||
     action.includes("REMOVED")

@@ -1,7 +1,7 @@
 ﻿"""AI Sourcing — requirement extraction and catalog recommendations.
 
-Uses shared ``AIProvider`` for language understanding and optional ``RagRetriever``
-for catalog vocabulary context. Marketplace facts (prices, stock, verification)
+Uses shared ``AIProvider`` for language understanding and ``MongoHybridRetriever``
+for catalog matching. Marketplace facts (prices, stock, verification)
 come from catalog + identity only. Never invents suppliers, prices, or verification.
 
 Read in this order:

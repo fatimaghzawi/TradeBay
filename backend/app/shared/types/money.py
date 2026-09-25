@@ -1,9 +1,3 @@
-"""Money type.
-
-Money is persisted as BSON ``Decimal128`` (ERD requirement) and handled as
-``Decimal`` in Python. ``float`` is rejected on the way in — binary floats
-cannot represent currency exactly and the error compounds across ledger sums.
-"""
 
 from __future__ import annotations
 
@@ -25,19 +19,16 @@ def _to_decimal(value: Any) -> Decimal:
         return Decimal(value)
     raise TypeError(f"Cannot read money from {type(value).__name__}")
 
-
 def _to_optional_decimal(value: Any) -> Decimal | None:
     if value is None:
         return None
     return _to_decimal(value)
-
 
 Money = Annotated[Decimal, BeforeValidator(_to_decimal)]
 """A monetary amount or rate. Stored as Decimal128."""
 
 OptionalMoney = Annotated[Decimal | None, BeforeValidator(_to_optional_decimal)]
 """A nullable monetary amount or rate."""
-
 
 def to_decimal128(value: Decimal) -> Decimal128:
     return Decimal128(value)

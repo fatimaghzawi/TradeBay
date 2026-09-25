@@ -11,16 +11,13 @@ import { useEffect, useState } from "react";
 
 const FEATURED_CATEGORY_COUNT = 10;
 
-/**
- * Landing category strip — images come from admin-uploaded category.image_url.
- */
 export function LandingCategoriesGrid() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void catalogApi
-      .listCategories({ active_only: true, page_size: 20 })
+      .listCategories({ active_only: true, page_size: 100 })
       .then((result) => {
         const roots = result.data
           .filter((c) => !c.parent_category_id)

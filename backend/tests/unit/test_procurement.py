@@ -1,4 +1,3 @@
-"""Unit tests for procurement commercial Decimal math and transitions."""
 
 from __future__ import annotations
 
@@ -26,7 +25,6 @@ def test_order_draft_can_issue_or_cancel() -> None:
     assert line.subtotal == Decimal("125.00")
     assert line.line_total == Decimal("123.00")
 
-
 def test_document_totals() -> None:
     lines = [
         compute_line(quantity="2", unit_price="10"),
@@ -38,12 +36,10 @@ def test_document_totals() -> None:
     assert totals.tax_total == Decimal("0.50")
     assert totals.total == Decimal("28.50")
 
-
 def test_rejects_float_money_via_decimal_str() -> None:
-    # compute_line accepts str/int/Decimal — float is rejected upstream by schemas
+                                                                                  
     line = compute_line(quantity=5, unit_price=Decimal("1.10"))
     assert line.line_total == Decimal("5.50")
-
 
 def test_money_rejects_blank_and_invalid() -> None:
     from app.modules.procurement.commercial import money, optional_money
@@ -67,17 +63,14 @@ def test_money_rejects_blank_and_invalid() -> None:
     with pytest.raises(Exception):
         RFQItemIn(product_name="Widget", quantity="10", target_unit_price="nope")
 
-
 def test_rfq_transition_enforced() -> None:
     assert_transition(RFQ_TRANSITIONS, RFQStatus.DRAFT, RFQStatus.PUBLISHED)
     with pytest.raises(BadRequestError):
         assert_transition(RFQ_TRANSITIONS, RFQStatus.DRAFT, RFQStatus.AWARDED)
 
-
 def test_order_cannot_go_back_to_pending() -> None:
     with pytest.raises(BadRequestError):
         assert_transition(ORDER_TRANSITIONS, OrderStatus.SHIPPED, OrderStatus.PENDING)
-
 
 def test_rejected_quotation_can_reopen_for_bargain() -> None:
     from app.modules.procurement.constants import QUOTATION_TRANSITIONS, QuotationStatus

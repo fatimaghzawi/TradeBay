@@ -1,10 +1,9 @@
-"""Business Planner API and AI response schemas."""
 
 from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class AdaptiveQuestion(BaseModel):
@@ -14,6 +13,26 @@ class AdaptiveQuestion(BaseModel):
     options: list[str] = Field(default_factory=list)
     why: str | None = None
 
+class AdaptiveAnswers(BaseModel):
+
+    model_config = ConfigDict(extra="allow")
+
+    opportunity_style: str | None = None
+    audience: str | None = None
+    price_positioning: str | None = None
+    electronics_focus: list[str] | None = None
+    condition_pref: str | None = None
+    food_channel: str | None = None
+    channel_pref: str | None = None
+    margin_confirm: str | None = None
+
+def read_adaptive(preferences: dict[str, Any]) -> AdaptiveAnswers:
+    raw = preferences.get("adaptive") or {}
+    if isinstance(raw, AdaptiveAnswers):
+        return raw
+    if not isinstance(raw, dict):
+        return AdaptiveAnswers()
+    return AdaptiveAnswers.model_validate(raw)
 
 class PlannerPreferences(BaseModel):
     business_goal: str | None = None
@@ -33,35 +52,28 @@ class PlannerPreferences(BaseModel):
     product_preferences: list[str] = Field(default_factory=list)
     customer_type: str | None = None
     category_hints: list[str] = Field(default_factory=list)
-    adaptive: dict[str, Any] = Field(default_factory=dict)
-
+    adaptive: AdaptiveAnswers = Field(default_factory=AdaptiveAnswers)
 
 class CreateSessionRequest(BaseModel):
     pass
-
 
 class SubmitAnswersRequest(BaseModel):
     step: str = Field(min_length=1, max_length=64)
     answers: dict[str, Any] = Field(default_factory=dict)
 
-
 class AssistantRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
-
 
 class RegeneratePlanRequest(BaseModel):
     preferences: PlannerPreferences | None = None
     reason: str | None = Field(default=None, max_length=500)
-
 
 class PatchPlanRequest(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     milestone_updates: list[dict[str, Any]] | None = None
     preferences: PlannerPreferences | None = None
 
-
-# --- Strict AI output schema ---
-
+                                 
 
 class AIConceptOut(BaseModel):
     name_suggestion: str
@@ -71,7 +83,6 @@ class AIConceptOut(BaseModel):
     target_customer: str
     value_proposition: str
     why_it_fits: str
-
 
 class AIProductStrategyItem(BaseModel):
     product_id: str | None = None
@@ -91,20 +102,18 @@ class AIProductStrategyItem(BaseModel):
     def _money_str(cls, v: str | None) -> str | None:
         if v is None:
             return v
-        # Reject floats masquerading as numbers in JSON by requiring string decimals
+                                                                                    
         cleaned = str(v).strip().replace(",", "")
         if not cleaned:
             raise ValueError("empty money")
-        float(cleaned)  # validate numeric; finance layer uses Decimal(str)
+        float(cleaned)                                                     
         return cleaned
-
 
 class AIRiskOut(BaseModel):
     title: str
     description: str
     why_it_matters: str
     mitigation: str
-
 
 class AIMilestoneOut(BaseModel):
     phase: str
@@ -114,14 +123,11 @@ class AIMilestoneOut(BaseModel):
     order: int = 0
     tasks: list[str] = Field(default_factory=list)
 
-
 class AIAssumptionOut(BaseModel):
     text: str
     label: Literal["AI estimate", "AI projection", "TradeBay data", "User input"] = "AI estimate"
 
-
 class AIPlanDraft(BaseModel):
-    """Validated AI response before finance + persistence."""
 
     business_concept: AIConceptOut
     product_strategy: list[AIProductStrategyItem] = Field(default_factory=list, max_length=20)

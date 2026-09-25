@@ -1,4 +1,3 @@
-"""Catalog & inventory API schemas."""
 
 from __future__ import annotations
 
@@ -16,7 +15,6 @@ def _reject_float_money(value: Any) -> Any:
         raise ValueError("Money must be a string or integer — not a float")
     return value
 
-
 class CreateCategoryRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     slug: str | None = Field(default=None, max_length=140)
@@ -24,7 +22,6 @@ class CreateCategoryRequest(BaseModel):
     parent_category_id: str | None = None
     display_order: int = Field(default=0, ge=0)
     is_active: bool = True
-
 
 class UpdateCategoryRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
@@ -34,7 +31,6 @@ class UpdateCategoryRequest(BaseModel):
     clear_parent: bool = False
     display_order: int | None = Field(default=None, ge=0)
     is_active: bool | None = None
-
 
 class CreateProductRequest(BaseModel):
     category_id: str
@@ -56,7 +52,6 @@ class CreateProductRequest(BaseModel):
         if not cleaned:
             raise ValueError("SKU is required")
         return cleaned
-
 
 class UpdateProductRequest(BaseModel):
     category_id: str | None = None
@@ -81,7 +76,6 @@ class UpdateProductRequest(BaseModel):
             raise ValueError("SKU is required")
         return cleaned
 
-
 class CreatePriceRequest(BaseModel):
     min_quantity: int = Field(ge=1)
     max_quantity: int | None = Field(default=None, ge=1)
@@ -105,7 +99,6 @@ class CreatePriceRequest(BaseModel):
             raise ValueError("max_quantity must be >= min_quantity")
         return self
 
-
 class UpdatePriceRequest(BaseModel):
     min_quantity: int | None = Field(default=None, ge=1)
     max_quantity: int | None = Field(default=None, ge=1)
@@ -128,7 +121,6 @@ class UpdatePriceRequest(BaseModel):
             return None
         return value.strip().upper()
 
-
 class StockQuantityRequest(BaseModel):
     quantity: Decimal = Field(gt=0)
     reason: str | None = Field(default=None, max_length=500)
@@ -139,7 +131,6 @@ class StockQuantityRequest(BaseModel):
     @classmethod
     def no_float_qty(cls, value: Any) -> Any:
         return _reject_float_money(value)
-
 
 class CategoryPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -155,7 +146,6 @@ class CategoryPublic(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
-
 class ProductPricePublic(BaseModel):
     id: str
     product_id: str
@@ -167,14 +157,12 @@ class ProductPricePublic(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
-
 class InventoryPublic(BaseModel):
     id: str
     product_id: str
     available_quantity: str
     reserved_quantity: str
     updated_at: datetime | None = None
-
 
 class InventoryTransactionPublic(BaseModel):
     id: str
@@ -192,7 +180,6 @@ class InventoryTransactionPublic(BaseModel):
     created_by: str | None = None
     created_at: datetime | None = None
 
-
 class ProductImagePublic(BaseModel):
     id: str
     product_id: str
@@ -201,7 +188,6 @@ class ProductImagePublic(BaseModel):
     is_primary: bool = False
     display_order: int = 0
     created_at: datetime | None = None
-
 
 class ProductPublic(BaseModel):
     id: str

@@ -31,7 +31,7 @@ function writeAll(items: SavedSupplier[]) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     window.dispatchEvent(new Event(SHORTLIST_EVENT));
   } catch {
-    /* ignore quota / private mode */
+    
   }
 }
 

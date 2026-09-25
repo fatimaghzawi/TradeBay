@@ -1,5 +1,6 @@
 "use client";
 
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { IdentityPageShell } from "@/components/identity/IdentityPageShell";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -195,7 +196,7 @@ function MembersPageInner() {
           <button
             type="button"
             onClick={() => setInviteOpen(true)}
-            className="tb-ov-btn-primary"
+            className="tb-btn tb-btn--primary"
           >
             + Invite Member
           </button>
@@ -261,7 +262,7 @@ function MembersPageInner() {
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
-              className="tb-ov-btn-primary mt-4 inline-flex"
+              className="tb-btn tb-btn--primary mt-4"
             >
               + Invite Member
             </button>
@@ -294,10 +295,10 @@ function MembersPageInner() {
                       <span>Joined</span>
                     </div>
                   </div>
-                  <span className="tb-roles-status">Pending</span>
+                  <StatusBadge status="pending" />
                   <Link
                     href={ROUTES.invitations}
-                    className="text-sm font-bold text-[var(--tb-accent)] hover:underline"
+                    className="text-sm font-bold text-accent hover:underline"
                   >
                     Track →
                   </Link>
@@ -346,7 +347,7 @@ function MembersPageInner() {
                     <span>Joined</span>
                   </div>
                 </div>
-                <span className="tb-roles-status">{member.status}</span>
+                <StatusBadge status={member.status} />
                 <div className="relative">
                   <button
                     type="button"
@@ -418,7 +419,7 @@ function MembersPageInner() {
       ) : null}
 
       {total > 0 ? (
-        <div className="mt-4 flex items-center justify-between border-t border-[var(--tb-line)] pt-4">
+        <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
           <p className="tb-meta">
             {total} result{total === 1 ? "" : "s"}
           </p>
@@ -461,9 +462,9 @@ function MembersPageInner() {
           }
         }}
       >
-        <p className="text-sm text-[#5c574e]">
+        <p className="text-sm text-muted-foreground">
           Member:{" "}
-          <span className="font-semibold text-[#0d3b2a]">
+          <span className="font-semibold text-heading">
             {removeMember ? memberDisplayName(removeMember) : ""}
           </span>
         </p>

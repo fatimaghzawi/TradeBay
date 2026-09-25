@@ -15,13 +15,4 @@ export function platformUserName(user: PlatformUser): string {
   return name || user.email || "Unknown user";
 }
 
-export function statusTone(
-  status: string | null | undefined,
-): "ok" | "wait" | "off" | "bad" {
-  const s = (status || "").toLowerCase();
-  if (s === "active" || s === "verified") return "ok";
-  if (s === "pending" || s === "invited") return "wait";
-  if (s === "suspended" || s === "rejected" || s === "revoked" || s === "deactivated")
-    return "bad";
-  return "off";
-}
+export { statusTone } from "@/lib/status";

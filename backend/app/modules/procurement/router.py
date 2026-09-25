@@ -1,4 +1,3 @@
-"""Procurement & Fulfilment HTTP API — RFQ → quotation → PO → shipment → receive."""
 
 from __future__ import annotations
 
@@ -13,9 +12,9 @@ from app.modules.procurement.schemas import (
     CreateRFQRequest,
     CreateShipmentRequest,
     CreateSourcingRFQRequest,
-    HandshakeRFQRequest,
     DeclineInviteRequest,
     DeliveryEvidenceRequest,
+    HandshakeRFQRequest,
     InviteSuppliersRequest,
     IssuePORequest,
     ReceiveShipmentRequest,
@@ -31,17 +30,13 @@ from app.shared.schemas.response import paginated, success
 
 router = APIRouter(tags=["Procurement"])
 
-
 def get_procurement_service() -> ProcurementService:
     return ProcurementService()
-
 
 def _ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
-
-# ── Dashboard ────────────────────────────────────────────────────────────
-
+                                                                           
 
 @router.get("/procurement/dashboard", summary="Buyer/supplier procurement dashboard")
 async def procurement_dashboard(
@@ -50,9 +45,7 @@ async def procurement_dashboard(
 ) -> dict[str, Any]:
     return success(await service.dashboard(business=auth.business))
 
-
-# ── RFQs ─────────────────────────────────────────────────────────────────
-
+                                                                           
 
 @router.post("/rfqs", summary="Create draft RFQ (legacy — prefer /rfqs/product or /rfqs/sourcing)")
 async def create_rfq(
@@ -70,7 +63,6 @@ async def create_rfq(
         )
     )
 
-
 @router.post("/rfqs/product", summary="Create a Product RFQ for a listed product")
 async def create_product_rfq(
     body: CreateProductRFQRequest,
@@ -87,7 +79,6 @@ async def create_product_rfq(
         )
     )
 
-
 @router.post("/rfqs/sourcing", summary="Create a Sourcing RFQ (open requirement)")
 async def create_sourcing_rfq(
     body: CreateSourcingRFQRequest,
@@ -103,7 +94,6 @@ async def create_sourcing_rfq(
             ip=_ip(request),
         )
     )
-
 
 @router.get("/rfqs", summary="List RFQs for active business")
 async def list_rfqs(
@@ -124,7 +114,6 @@ async def list_rfqs(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @router.get("/rfqs/{rfq_id}", summary="Get RFQ detail")
 async def get_rfq(
     rfq_id: str,
@@ -134,7 +123,6 @@ async def get_rfq(
     return success(
         await service.get_rfq(user_id=auth.user_id, business=auth.business, rfq_id=rfq_id)
     )
-
 
 @router.patch("/rfqs/{rfq_id}", summary="Update draft RFQ")
 async def update_rfq(
@@ -152,7 +140,6 @@ async def update_rfq(
         )
     )
 
-
 @router.post("/rfqs/{rfq_id}/publish", summary="Publish RFQ")
 async def publish_rfq(
     rfq_id: str,
@@ -168,7 +155,6 @@ async def publish_rfq(
             ip=_ip(request),
         )
     )
-
 
 @router.post(
     "/rfqs/{rfq_id}/send",
@@ -189,7 +175,6 @@ async def send_rfq(
         )
     )
 
-
 @router.get("/rfqs/{rfq_id}/eligible-suppliers", summary="List verified suppliers for invite")
 async def eligible_suppliers(
     rfq_id: str,
@@ -197,7 +182,6 @@ async def eligible_suppliers(
     service: Annotated[ProcurementService, Depends(get_procurement_service)],
 ) -> dict[str, Any]:
     return success(await service.list_eligible_suppliers(business=auth.business, rfq_id=rfq_id))
-
 
 @router.post("/rfqs/{rfq_id}/invite-suppliers", summary="Invite verified suppliers")
 async def invite_suppliers(
@@ -217,7 +201,6 @@ async def invite_suppliers(
         )
     )
 
-
 @router.post("/rfqs/{rfq_id}/invitations/accept", summary="Supplier accepts RFQ invitation")
 async def accept_invite(
     rfq_id: str,
@@ -229,7 +212,6 @@ async def accept_invite(
             user_id=auth.user_id, business=auth.business, rfq_id=rfq_id, accept=True
         )
     )
-
 
 @router.post("/rfqs/{rfq_id}/invitations/decline", summary="Supplier declines RFQ invitation")
 async def decline_invite(
@@ -247,7 +229,6 @@ async def decline_invite(
             reason=body.reason,
         )
     )
-
 
 @router.post("/rfqs/{rfq_id}/quotations", summary="Create or update quotation (supplier)")
 async def upsert_quotation(
@@ -267,7 +248,6 @@ async def upsert_quotation(
         )
     )
 
-
 @router.get("/rfqs/{rfq_id}/comparison", summary="Compare submitted quotations")
 async def compare_quotations(
     rfq_id: str,
@@ -275,7 +255,6 @@ async def compare_quotations(
     service: Annotated[ProcurementService, Depends(get_procurement_service)],
 ) -> dict[str, Any]:
     return success(await service.comparison(business=auth.business, rfq_id=rfq_id))
-
 
 @router.post("/rfqs/{rfq_id}/handshake", summary="Confirm deal and prepare draft PO")
 async def handshake_rfq(
@@ -296,7 +275,6 @@ async def handshake_rfq(
         )
     )
 
-
 @router.post("/rfqs/{rfq_id}/award", summary="Award RFQ to a quotation and create PO")
 async def award_rfq(
     rfq_id: str,
@@ -316,9 +294,7 @@ async def award_rfq(
         )
     )
 
-
-# ── Quotations ───────────────────────────────────────────────────────────
-
+                                                                           
 
 @router.get("/quotations/{quotation_id}", summary="Get quotation detail")
 async def get_quotation(
@@ -332,7 +308,6 @@ async def get_quotation(
         )
     )
 
-
 @router.post("/quotations/{quotation_id}/withdraw", summary="Withdraw quotation")
 async def withdraw_quotation(
     quotation_id: str,
@@ -344,7 +319,6 @@ async def withdraw_quotation(
             user_id=auth.user_id, business=auth.business, quotation_id=quotation_id
         )
     )
-
 
 @router.post("/quotations/{quotation_id}/reject", summary="Buyer declines a quotation")
 async def reject_quotation(
@@ -362,9 +336,7 @@ async def reject_quotation(
         )
     )
 
-
-# ── Purchase orders ──────────────────────────────────────────────────────
-
+                                                                           
 
 @router.get("/purchase-orders", summary="List purchase orders")
 async def list_orders(
@@ -381,7 +353,6 @@ async def list_orders(
     )
     return paginated(items, page=pagination.page, page_size=pagination.page_size, total=total)
 
-
 @router.get("/purchase-orders/{order_id}", summary="Get purchase order")
 async def get_order(
     order_id: str,
@@ -391,7 +362,6 @@ async def get_order(
     return success(
         await service.get_order(user_id=auth.user_id, business=auth.business, order_id=order_id)
     )
-
 
 @router.post("/purchase-orders/{order_id}/issue", summary="Issue draft purchase order")
 async def issue_order(
@@ -413,7 +383,6 @@ async def issue_order(
         )
     )
 
-
 @router.post("/purchase-orders/{order_id}/acknowledge", summary="Supplier acknowledges PO")
 async def acknowledge_order(
     order_id: str,
@@ -425,7 +394,6 @@ async def acknowledge_order(
             user_id=auth.user_id, business=auth.business, order_id=order_id
         )
     )
-
 
 @router.post("/purchase-orders/{order_id}/shipments", summary="Create shipment for PO")
 async def create_shipment(
@@ -443,9 +411,7 @@ async def create_shipment(
         )
     )
 
-
-# ── Shipments ────────────────────────────────────────────────────────────
-
+                                                                           
 
 @router.get("/shipments/{shipment_id}", summary="Get shipment detail")
 async def get_shipment(
@@ -458,7 +424,6 @@ async def get_shipment(
             user_id=auth.user_id, business=auth.business, shipment_id=shipment_id
         )
     )
-
 
 @router.post("/shipments/{shipment_id}/tracking-events", summary="Append tracking event")
 async def add_tracking(
@@ -476,7 +441,6 @@ async def add_tracking(
         )
     )
 
-
 @router.post("/shipments/{shipment_id}/delivery-evidence", summary="Upload delivery evidence")
 async def add_evidence(
     shipment_id: str,
@@ -492,7 +456,6 @@ async def add_evidence(
             payload=body.model_dump(),
         )
     )
-
 
 @router.post(
     "/shipments/{shipment_id}/delivery-evidence/upload",
@@ -518,7 +481,6 @@ async def upload_evidence_file(
         )
     )
 
-
 @router.get(
     "/shipments/{shipment_id}/delivery-evidence/files/{filename}",
     summary="Download delivery evidence (buyer/supplier on the order)",
@@ -533,13 +495,12 @@ async def download_evidence_file(
 
     from app.modules.procurement.storage import resolve_evidence_path
 
-    # Ensures the caller is buyer or supplier on this shipment's order.
+                                                                       
     await service.get_shipment(
         user_id=auth.user_id, business=auth.business, shipment_id=shipment_id
     )
     path = resolve_evidence_path(shipment_id=shipment_id, filename=filename)
     return FileResponse(path, filename=filename)
-
 
 @router.post("/shipments/{shipment_id}/receive", summary="Buyer records receiving")
 async def receive_shipment(
@@ -556,7 +517,6 @@ async def receive_shipment(
             payload=body.model_dump(),
         )
     )
-
 
 @router.post("/shipments/{shipment_id}/report-issue", summary="Open dispute from delivery issue")
 async def report_shipment_issue(
@@ -576,7 +536,6 @@ async def report_shipment_issue(
             ip=_ip(request),
         )
     )
-
 
 @router.post(
     "/webhooks/tracking/{provider}",
@@ -604,7 +563,6 @@ async def tracking_webhook(
         raise ForbiddenError("Invalid webhook secret")
     return success(await service.apply_tracking_webhook(provider_name=provider, payload=body))
 
-
 @router.get("/purchase-orders/{order_id}/pdf", summary="Download purchase order PDF")
 async def purchase_order_pdf(
     order_id: str,
@@ -621,7 +579,6 @@ async def purchase_order_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
-
 
 @router.get("/quotations/{quotation_id}/pdf", summary="Download quotation PDF")
 async def quotation_pdf(

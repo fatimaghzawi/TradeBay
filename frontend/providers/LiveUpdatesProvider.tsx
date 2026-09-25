@@ -7,10 +7,6 @@ import { useEffect, useRef } from "react";
 
 const POLL_MS = 8_000;
 
-/**
- * Background pulse: watches notifications and broadcasts live bumps so open
- * RFQ / quotation / negotiation screens refresh without a manual reload.
- */
 export function LiveUpdatesProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, hasPermission } = useAuth();
   const canRead = isAuthenticated && hasPermission("notifications.read");
@@ -64,7 +60,7 @@ export function LiveUpdatesProvider({ children }: { children: React.ReactNode })
           });
         }
       } catch {
-        /* keep quiet — screens still have their own pollers */
+        
       }
     }
 

@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { LoadingState, BusyText } from "@/components/ui/LoadingState";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function EditRolePage() {
   const params = useParams<{ id: string }>();
@@ -49,9 +50,7 @@ export default function EditRolePage() {
   if (!canManage) {
     return (
       <div className="space-y-3">
-        <Link href={ROUTES.roles} className="text-sm font-semibold text-[#0d3b2a] hover:underline">
-          ← Back to roles
-        </Link>
+        <BackLink href={ROUTES.roles}>Back to roles</BackLink>
         <FeedbackBanner tone="warning" title="Access restricted">
           You don&apos;t have access to edit roles.
         </FeedbackBanner>
@@ -62,9 +61,7 @@ export default function EditRolePage() {
   if (error && !role) {
     return (
       <div className="space-y-3">
-        <Link href={ROUTES.roles} className="text-sm font-semibold text-[#0d3b2a] hover:underline">
-          ← Back to roles
-        </Link>
+        <BackLink href={ROUTES.roles}>Back to roles</BackLink>
         <FeedbackBanner tone="error" title="Role unavailable">
           {error}
         </FeedbackBanner>
@@ -79,12 +76,7 @@ export default function EditRolePage() {
   if (!canEditRolePermissions(role, { fullControl })) {
     return (
       <div className="space-y-3">
-        <Link
-          href={`${ROUTES.roles}/${role.id}`}
-          className="text-sm font-semibold text-[#0d3b2a] hover:underline"
-        >
-          ← Back to role
-        </Link>
+        <BackLink href={`${ROUTES.roles}/${role.id}`}>Back to role</BackLink>
         <FeedbackBanner tone="info" title="Business Admin is locked">
           <strong>{role.name}</strong> always keeps full business access and cannot be
           limited from the UI.
@@ -128,19 +120,19 @@ export default function EditRolePage() {
           grantable={grantable}
         />
         {error ? (
-          <p className="mt-3 rounded-xl bg-[#fef3f2] px-3 py-2 text-sm text-[#b42318]">
+          <p role="alert" className="mt-3 tb-alert tb-alert--error">
             {error}
           </p>
         ) : null}
       </section>
 
       <footer className="tb-role-create-foot">
-        <Link href={`${ROUTES.roles}/${role.id}`} className="tb-ov-btn-ghost">
+        <Link href={`${ROUTES.roles}/${role.id}`} className="tb-btn tb-btn--outline">
           Cancel
         </Link>
         <button
           type="button"
-          className="tb-ov-btn-primary"
+          className="tb-btn tb-btn--primary"
           disabled={selected.length === 0 || pending}
           onClick={() => {
             if (selected.length === 0) {

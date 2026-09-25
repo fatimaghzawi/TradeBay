@@ -1,10 +1,8 @@
-"""Local disk storage for AI Visual Sourcing assets and concepts."""
 
 from __future__ import annotations
 
 import re
 import uuid
-from pathlib import Path
 
 from fastapi import UploadFile
 
@@ -20,13 +18,11 @@ ALLOWED_CONTENT_TYPES = frozenset(
         "image/png",
         "image/webp",
         "image/gif",
-        "image/svg+xml",
         "application/pdf",
     }
 )
-ALLOWED_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg", ".pdf"})
-MAX_BYTES = 10 * 1024 * 1024  # 10 MB
-
+ALLOWED_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"})
+MAX_BYTES = 10 * 1024 * 1024         
 
 def _safe_ext(filename: str | None, content_type: str | None) -> str:
     name = (filename or "").lower()
@@ -39,13 +35,11 @@ def _safe_ext(filename: str | None, content_type: str | None) -> str:
         "image/png": ".png",
         "image/webp": ".webp",
         "image/gif": ".gif",
-        "image/svg+xml": ".svg",
         "application/pdf": ".pdf",
     }
     if content_type and content_type.lower() in mapping:
         return mapping[content_type.lower()]
-    raise BadRequestError("Unsupported file type. Use JPG, PNG, WEBP, GIF, SVG, or PDF.")
-
+    raise BadRequestError("Unsupported file type. Use JPG, PNG, WEBP, GIF, or PDF.")
 
 async def save_buyer_upload(
     *,
@@ -53,10 +47,9 @@ async def save_buyer_upload(
     kind: str,
     upload: UploadFile,
 ) -> str:
-    """Persist buyer logo/reference; return public `/uploads/ai-sourcing/...` path."""
     content_type = (upload.content_type or "").lower().strip()
-    if content_type and content_type not in ALLOWED_CONTENT_TYPES:
-        raise BadRequestError("Unsupported file type. Use JPG, PNG, WEBP, GIF, SVG, or PDF.")
+    if content_type not in ALLOWED_CONTENT_TYPES:
+        raise BadRequestError("Unsupported file type. Use JPG, PNG, WEBP, GIF, or PDF.")
 
     data = await upload.read()
     if not data:
@@ -71,17 +64,15 @@ async def save_buyer_upload(
     (folder / filename).write_bytes(data)
     return f"/uploads/ai-sourcing/{session_id}/{kind}/{filename}"
 
-
 def save_generated_bytes(
     *,
     session_id: str,
     data: bytes,
     ext: str = ".png",
 ) -> str:
-    """Persist AI-generated concept bytes."""
     if not data:
         raise BadRequestError("Empty generated image")
-    # Stub may return SVG.
+                          
     if data[:200].lstrip().startswith(b"<?xml") or data[:100].lstrip().startswith(b"<svg"):
         ext = ".svg"
     elif data[:8] == b"\x89PNG\r\n\x1a\n":
@@ -94,9 +85,7 @@ def save_generated_bytes(
     (folder / filename).write_bytes(data)
     return f"/uploads/ai-sourcing/{session_id}/concepts/{filename}"
 
-
 def read_upload_bytes(url: str | None) -> tuple[bytes, str] | None:
-    """Read a stored `/uploads/ai-sourcing/...` file for image edits."""
     if not url or not url.startswith("/uploads/ai-sourcing/"):
         return None
     relative = url.removeprefix("/uploads/")

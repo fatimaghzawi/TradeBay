@@ -213,11 +213,52 @@ export type PurchaseOrderSummary = {
   rfq_id: string | null;
   quotation_id: string | null;
   quotation_number?: string | null;
+  source?: string | null;
+  checkout_id?: string | null;
+  checkout_number?: string | null;
+  payment_method?: string | null;
   created_at: string | null;
   confirmed_at: string | null;
 };
 
+export type OrderTimelineStep = {
+  key: "placed" | "paid" | "confirmed" | "shipped" | "delivered" | "completed" | "cancelled" | string;
+  label: string;
+  state: "done" | "current" | "upcoming" | "skipped" | "cancelled";
+  at: string | null;
+};
+
+export type OrderFinancials = {
+  order_amount: string | null;
+  platform_fee: string | null;
+  platform_fee_rate: string | null;
+  platform_fee_percent: string | null;
+  supplier_earnings: string | null;
+  commission_status: string | null;
+  currency: string | null;
+};
+
 export type PurchaseOrder = PurchaseOrderSummary & {
+  payment?: {
+    id: string;
+    reference: string | null;
+    receipt_number: string | null;
+    method: string | null;
+    provider: string | null;
+    status: string;
+    amount_for_this_order: string | null;
+    paid_at: string | null;
+  } | null;
+  invoice?: {
+    id: string;
+    invoice_number: string;
+    status: string;
+    total: string | null;
+    amount_paid: string | null;
+    balance_due: string | null;
+  } | null;
+  financials?: OrderFinancials | null;
+  timeline?: OrderTimelineStep[];
   subtotal: string;
   discount_total: string;
   charge_total: string;

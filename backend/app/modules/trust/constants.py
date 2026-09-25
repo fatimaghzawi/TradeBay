@@ -7,16 +7,13 @@ class ReviewStatus(StrEnum):
     MODERATED = "moderated"
     REMOVED = "removed"
 
-
 class DisputeStatus(StrEnum):
     OPEN = "open"
     UNDER_REVIEW = "under_review"
     RESOLVED = "resolved"
     CLOSED = "closed"
 
-
 class NotificationType(StrEnum):
-    """Common in-app notification type codes (extensible strings allowed)."""
 
     RFQ_INVITED = "RFQ_INVITED"
     RFQ_INVITATION = "RFQ_INVITATION"
@@ -51,7 +48,6 @@ class NotificationType(StrEnum):
     NEGOTIATION_OFFER = "NEGOTIATION_OFFER"
     CONVERSATION_MESSAGE = "CONVERSATION_MESSAGE"
     GENERAL = "GENERAL"
-
 
 DISPUTE_STATUS_TRANSITIONS: dict[str, set[str]] = {
     DisputeStatus.OPEN: {DisputeStatus.UNDER_REVIEW, DisputeStatus.CLOSED},

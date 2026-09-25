@@ -2,6 +2,7 @@
 
 import { PermissionPicker } from "@/components/roles/PermissionPicker";
 import { RoleCardPicker } from "@/components/team/RoleCardPicker";
+import { BackLink } from "@/components/ui/BackLink";
 import { Modal } from "@/components/ui/Modal";
 import { FormField, TextField } from "@/components/ui/FormField";
 import { useToast } from "@/components/ui/Toast";
@@ -215,12 +216,12 @@ export function InviteMemberModal({ open, onClose, onSent }: InviteMemberModalPr
       footer={
         step === 0 ? (
           <>
-            <button type="button" className="tb-split-btn-ghost" onClick={onClose}>
+            <button type="button" className="tb-btn tb-btn--outline" onClick={onClose}>
               Cancel
             </button>
             <button
               type="button"
-              className="tb-split-btn"
+              className="tb-btn tb-btn--primary"
               disabled={!readyForNext}
               onClick={() => {
                 const validation = validateStep();
@@ -237,12 +238,10 @@ export function InviteMemberModal({ open, onClose, onSent }: InviteMemberModalPr
           </>
         ) : (
           <>
-            <button type="button" className="tb-split-btn-ghost" onClick={() => setStep(0)}>
-              ← Back
-            </button>
+            <BackLink onClick={() => setStep(0)}>Back</BackLink>
             <button
               type="button"
-              className="tb-split-btn"
+              className="tb-btn tb-btn--primary"
               disabled={selectedPermissions.length === 0 || pending}
               aria-busy={pending || undefined}
               onClick={send}

@@ -1,4 +1,3 @@
-"""Aggregate versioned API routers."""
 
 from fastapi import APIRouter
 
@@ -32,9 +31,8 @@ api_router.include_router(invitations_router)
 api_router.include_router(users_router)
 api_router.include_router(audit_logs_router)
 
-# Domain routers are included when modules exist (catalog, procurement, etc.).
-# Safe optional imports keep the app startable during incremental scaffolding.
-
+                                                                              
+                                                                              
 
 def _include_optional(module_path: str, attr: str = "router") -> None:
     try:
@@ -44,9 +42,9 @@ def _include_optional(module_path: str, attr: str = "router") -> None:
     except (ImportError, AttributeError):
         pass
 
-
 _include_optional("app.modules.catalog.router")
 _include_optional("app.modules.cart.router")
+_include_optional("app.modules.checkout.router")
 _include_optional("app.modules.settings.router")
 _include_optional("app.modules.procurement.router")
 _include_optional("app.modules.finance.router")

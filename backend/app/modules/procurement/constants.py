@@ -5,13 +5,10 @@ class RFQVisibility(StrEnum):
     OPEN = "open"
     INVITED = "invited"
 
-
 class RFQType(StrEnum):
-    """Two entry modes — product quote vs open sourcing requirement."""
 
     PRODUCT = "product"
     SOURCING = "sourcing"
-
 
 class RFQStatus(StrEnum):
     DRAFT = "draft"
@@ -22,14 +19,12 @@ class RFQStatus(StrEnum):
     CANCELLED = "cancelled"
     EXPIRED = "expired"
 
-
 class SupplierInviteStatus(StrEnum):
     INVITED = "invited"
     VIEWED = "viewed"
     ACCEPTED = "accepted"
     DECLINED = "declined"
     EXPIRED = "expired"
-
 
 class QuotationStatus(StrEnum):
     DRAFT = "draft"
@@ -40,9 +35,10 @@ class QuotationStatus(StrEnum):
     EXPIRED = "expired"
     WITHDRAWN = "withdrawn"
 
-
 class OrderStatus(StrEnum):
     DRAFT = "draft"
+                                                                                         
+    AWAITING_PAYMENT = "awaiting_payment"
     PENDING = "pending"
     CONFIRMED = "confirmed"
     PROCESSING = "processing"
@@ -51,7 +47,6 @@ class OrderStatus(StrEnum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
     DISPUTED = "disputed"
-
 
 class ShipmentStatus(StrEnum):
     PENDING = "pending"
@@ -62,15 +57,12 @@ class ShipmentStatus(StrEnum):
     DELIVERED = "delivered"
     FAILED = "failed"
 
-
 class OrderPaymentStatus(StrEnum):
-    """Denormalized AR rollup on the order. Authoritative outstanding is the ledger."""
 
     UNPAID = "unpaid"
     PARTIALLY_PAID = "partially_paid"
     PAID = "paid"
     REFUNDED = "refunded"
-
 
 RFQ_TRANSITIONS: dict[str, set[str]] = {
     RFQStatus.DRAFT: {RFQStatus.PUBLISHED, RFQStatus.CANCELLED},
@@ -99,13 +91,13 @@ QUOTATION_TRANSITIONS: dict[str, set[str]] = {
         QuotationStatus.WITHDRAWN,
     },
     QuotationStatus.NEGOTIATING: {
-        QuotationStatus.SUBMITTED,  # revision re-submit
+        QuotationStatus.SUBMITTED,                      
         QuotationStatus.ACCEPTED,
         QuotationStatus.REJECTED,
         QuotationStatus.EXPIRED,
         QuotationStatus.WITHDRAWN,
     },
-    # Declining one counter must not kill the quote. A later take/counter can reopen it.
+                                                                                        
     QuotationStatus.REJECTED: {
         QuotationStatus.NEGOTIATING,
         QuotationStatus.SUBMITTED,
@@ -114,6 +106,7 @@ QUOTATION_TRANSITIONS: dict[str, set[str]] = {
 
 ORDER_TRANSITIONS: dict[str, set[str]] = {
     OrderStatus.DRAFT: {OrderStatus.PENDING, OrderStatus.CANCELLED},
+    OrderStatus.AWAITING_PAYMENT: {OrderStatus.PENDING, OrderStatus.CANCELLED},
     OrderStatus.PENDING: {OrderStatus.CONFIRMED, OrderStatus.CANCELLED},
     OrderStatus.CONFIRMED: {OrderStatus.PROCESSING, OrderStatus.CANCELLED, OrderStatus.DISPUTED},
     OrderStatus.PROCESSING: {OrderStatus.SHIPPED, OrderStatus.CANCELLED, OrderStatus.DISPUTED},
@@ -138,12 +131,10 @@ SHIPMENT_TRANSITIONS: dict[str, set[str]] = {
     ShipmentStatus.OUT_FOR_DELIVERY: {ShipmentStatus.DELIVERED, ShipmentStatus.FAILED},
 }
 
-
 RFQ_STATUS_TRANSITIONS = RFQ_TRANSITIONS
 ORDER_STATUS_TRANSITIONS = ORDER_TRANSITIONS
 QUOTATION_STATUS_TRANSITIONS = QUOTATION_TRANSITIONS
 SHIPMENT_STATUS_TRANSITIONS = SHIPMENT_TRANSITIONS
-
 
 def assert_transition(transitions: dict[str, set[str]], current: str, target: str) -> None:
     from app.core.exceptions import BadRequestError

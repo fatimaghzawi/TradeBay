@@ -11,7 +11,6 @@ type Props = {
   durationMs?: number;
 };
 
-/** Full-stage celebration when a number is locked / a PO is born. */
 export function DealHandshake({
   buyerName,
   supplierName,

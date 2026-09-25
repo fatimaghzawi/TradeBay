@@ -1,4 +1,3 @@
-"""TradeBay FastAPI application factory."""
 
 from __future__ import annotations
 
@@ -20,19 +19,18 @@ from app.core.middleware import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.core.paths import UPLOAD_ROOT
 from app.db.health import mongodb_is_healthy
 from app.db.mongodb import mongo_manager
 from app.modules.catalog.storage import CATEGORY_UPLOAD_DIR, PRODUCT_UPLOAD_DIR
 from app.modules.identity.storage import BUSINESS_UPLOAD_DIR
-from app.core.paths import UPLOAD_ROOT
 from app.shared.schemas.response import success
 
 logger = get_logger(__name__)
 
-
 def _configure_sentry(settings: Settings) -> None:
     dsn = (settings.sentry_dsn or "").strip().strip("\"'")
-    # Render often sets SENTRY_DSN="" — treat blank / placeholder as disabled.
+                                                                              
     if not dsn or dsn.lower() in {"none", "null", "undefined"}:
         return
     if "://" not in dsn:
@@ -61,7 +59,6 @@ def _configure_sentry(settings: Settings) -> None:
         return
     logger.info("sentry_configured", environment=str(settings.app_env))
 
-
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
@@ -72,9 +69,13 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_email_sender(settings)
     await mongo_manager.connect(settings)
     yield
+    from app.modules.ai.provider import aclose_http_client
+    from app.modules.ai.retrieval import drain_embedding_syncs
+
+    await drain_embedding_syncs()
+    await aclose_http_client()
     await mongo_manager.disconnect()
     logger.info("application_stopped")
-
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
@@ -88,15 +89,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ),
         docs_url=settings.docs_url,
         redoc_url=settings.redoc_url,
+        openapi_url=None if settings.is_production else "/openapi.json",
         default_response_class=ORJSONResponse,
         lifespan=lifespan,
     )
 
-    # Outermost first for responses: CORS must wrap everything so browser
-    # errors (incl. 401/500) still get Access-Control-Allow-Origin.
+                                                                         
+                                                                   
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(RateLimitMiddleware, settings=settings)
-    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware, settings=settings)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -114,8 +116,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_exception_handlers(app)
     app.include_router(api_router)
 
-    # Public catalog product + category images only. Delivery evidence is served via
-    # authenticated procurement routes — never mount the whole uploads tree.
+                                                                                    
+                                                                            
     UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
     PRODUCT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     CATEGORY_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -149,13 +151,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health", tags=["Health"], summary="Liveness probe")
     async def health() -> dict[str, Any]:
-        return success(
-            {
-                "status": "ok",
-                "app": settings.app_name,
-                "env": settings.app_env,
-            }
-        )
+        return success({"status": "ok"})
 
     @app.get("/ready", tags=["Health"], summary="Readiness probe (MongoDB)")
     async def ready() -> dict[str, Any]:
@@ -165,6 +161,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return success({"status": "ready", "mongodb": True})
 
     return app
-
 
 app = create_app()

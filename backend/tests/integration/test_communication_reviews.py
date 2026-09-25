@@ -1,4 +1,3 @@
-"""Communication + reviews smoke aligned to BRD §8.7."""
 
 from __future__ import annotations
 
@@ -16,7 +15,6 @@ from httpx import AsyncClient
 async def _verify_email(client: AsyncClient, token: str) -> None:
     response = await client.post("/api/v1/auth/email/verify", json={"token": token})
     assert response.status_code == 200, response.text
-
 
 async def _register(
     client: AsyncClient,
@@ -49,7 +47,6 @@ async def _register(
         "business": payload.get("business"),
     }
 
-
 async def _login(client: AsyncClient, email: str, password: str) -> None:
     response = await client.post(
         "/api/v1/auth/login",
@@ -58,13 +55,29 @@ async def _login(client: AsyncClient, email: str, password: str) -> None:
     assert response.status_code == 200, response.text
     client.cookies = response.cookies
 
+async def _seed_rfq(buyer: dict[str, Any], supplier: dict[str, Any]) -> ObjectId:
+    rfq_id = ObjectId()
+    now = utc_now()
+    await mongo_manager.database["rfqs"].insert_one(
+        {
+            "_id": rfq_id,
+            "rfq_number": f"RFQ-TEST-{os.urandom(2).hex()}",
+            "buyer_business_id": ObjectId(buyer["business"]["id"]),
+            "supplier_invites": [
+                {"supplier_business_id": ObjectId(supplier["business"]["id"]), "status": "invited"}
+            ],
+            "status": "published",
+            "created_at": now,
+            "updated_at": now,
+        }
+    )
+    return rfq_id
 
 @pytest.mark.asyncio
 async def test_brd_conversation_poll_messaging(
     client: AsyncClient,
     email_inbox: MemoryEmailSender,
 ) -> None:
-    """FR-MSG-01/02/05/06/07/08 — two-company thread, participants, unread, soft delete."""
     buyer = await _register(client, email_inbox, business_type="buyer")
     supplier = await _register(client, email_inbox, business_type="supplier")
     assert buyer["business"] and supplier["business"]
@@ -132,7 +145,6 @@ async def test_brd_conversation_poll_messaging(
     assert tombstone["is_deleted"] is True
     assert tombstone["body"] is None
 
-
 @pytest.mark.asyncio
 async def test_rfq_context_one_thread_and_system_event(
     client: AsyncClient,
@@ -141,7 +153,7 @@ async def test_rfq_context_one_thread_and_system_event(
     buyer = await _register(client, email_inbox, business_type="buyer")
     supplier = await _register(client, email_inbox, business_type="supplier")
     assert buyer["business"] and supplier["business"]
-    rfq_id = ObjectId()
+    rfq_id = await _seed_rfq(buyer, supplier)
 
     await _login(client, buyer["email"], buyer["password"])
     opened = await client.post(
@@ -175,7 +187,6 @@ async def test_rfq_context_one_thread_and_system_event(
     types = {m["message_type"] for m in msgs.json()["data"]}
     assert "SYSTEM" in types
 
-
 @pytest.mark.asyncio
 async def test_same_companies_reuse_one_thread(
     client: AsyncClient,
@@ -199,7 +210,7 @@ async def test_same_companies_reuse_one_thread(
             "counterparty_business_id": supplier["business"]["id"],
             "type": "RFQ",
             "context_type": "rfq",
-            "context_id": str(ObjectId()),
+            "context_id": str(await _seed_rfq(buyer, supplier)),
             "subject": "First RFQ",
         },
     )
@@ -212,13 +223,27 @@ async def test_same_companies_reuse_one_thread(
             "counterparty_business_id": supplier["business"]["id"],
             "type": "RFQ",
             "context_type": "rfq",
-            "context_id": str(ObjectId()),
+            "context_id": str(await _seed_rfq(buyer, supplier)),
             "subject": "Second RFQ",
         },
     )
     assert rfq_b.status_code == 200, rfq_b.text
     assert rfq_b.json()["data"]["id"] == thread_id
 
+    order_id = ObjectId()
+    now = utc_now()
+    await mongo_manager.database["orders"].insert_one(
+        {
+            "_id": order_id,
+            "order_number": f"PO-TEST-{os.urandom(2).hex()}",
+            "quotation_id": ObjectId(),
+            "buyer_business_id": ObjectId(buyer["business"]["id"]),
+            "supplier_business_id": ObjectId(supplier["business"]["id"]),
+            "status": "pending",
+            "created_at": now,
+            "updated_at": now,
+        }
+    )
     await _login(client, supplier["email"], supplier["password"])
     from_supplier = await client.post(
         "/api/v1/conversations",
@@ -226,12 +251,33 @@ async def test_same_companies_reuse_one_thread(
             "counterparty_business_id": buyer["business"]["id"],
             "type": "ORDER",
             "context_type": "order",
-            "context_id": str(ObjectId()),
+            "context_id": str(order_id),
         },
     )
     assert from_supplier.status_code == 200, from_supplier.text
     assert from_supplier.json()["data"]["id"] == thread_id
 
+@pytest.mark.asyncio
+async def test_thread_cannot_link_another_companys_deal(
+    client: AsyncClient,
+    email_inbox: MemoryEmailSender,
+) -> None:
+    buyer = await _register(client, email_inbox, business_type="buyer")
+    supplier = await _register(client, email_inbox, business_type="supplier")
+    outsider = await _register(client, email_inbox, business_type="buyer")
+    rfq_id = await _seed_rfq(buyer, supplier)
+
+    await _login(client, outsider["email"], outsider["password"])
+    snooping = await client.post(
+        "/api/v1/conversations",
+        json={
+            "counterparty_business_id": supplier["business"]["id"],
+            "type": "RFQ",
+            "context_type": "rfq",
+            "context_id": str(rfq_id),
+        },
+    )
+    assert snooping.status_code == 403, snooping.text
 
 @pytest.mark.asyncio
 async def test_review_only_on_completed_order(

@@ -5,10 +5,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-/**
- * Desktop sticky sidebar + mobile slide-over drawer for company / inventory / commerce spaces.
- * Drawer is portaled to document.body so page cards cannot paint above it.
- */
 export function SpaceSidebarShell({
   children,
   label,

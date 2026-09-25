@@ -4,13 +4,15 @@ import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingEntity } from "@/components/ui/LoadingState";
 import { ApiError } from "@/lib/api/client";
 import { procurementApi, type Address, type PurchaseOrder } from "@/lib/api/procurementApi";
+import { paymentMethodLabel, paymentView } from "@/lib/commerce/format";
 import { ROUTES } from "@/lib/constants";
 import { mediaUrl } from "@/lib/media";
 import { dealInitials } from "@/lib/procurement/dealRoom";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { BackLink } from "@/components/ui/BackLink";
 
-function DocLogo({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
+export function DocLogo({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
   const src = mediaUrl(logoUrl);
   return (
     <span className="tb-doc-logo" aria-hidden>
@@ -32,7 +34,7 @@ function formatAddress(addr?: Address | null): string | null {
   return line || null;
 }
 
-function PartyBlock({
+export function PartyBlock({
   label,
   name,
   legalName,
@@ -101,6 +103,46 @@ export function OrderWorkspace({ orderId }: Props) {
     );
   }
 
+  return (
+    <div className="tb-docs tb-doc--po">
+      <OrderDocToolbar order={order} />
+      <OrderDocument order={order} />
+    </div>
+  );
+}
+
+export function OrderDocToolbar({ order, children }: { order: PurchaseOrder; children?: ReactNode }) {
+  const canTrack = !["draft", "cancelled", "awaiting_payment"].includes(order.status);
+  return (
+    <div className="tb-docs__toolbar">
+      <nav className="tb-docs__toolbar-nav">
+        <BackLink href={ROUTES.orders}>Orders</BackLink>
+        {order.checkout_id ? <Link href={ROUTES.checkoutDetail(order.checkout_id)}>Checkout {order.checkout_number}</Link> : null}
+        {order.rfq_id ? <Link href={ROUTES.procurementRfq(order.rfq_id)}>Related RFQ</Link> : null}
+      </nav>
+      <div className="tb-docs__actions">
+        {children}
+        {canTrack ? (
+          <Link href={ROUTES.trackingOrder(order.id)} className="tb-btn tb-btn--primary">
+            Track package
+          </Link>
+        ) : null}
+        {order.status !== "draft" ? (
+          <a
+            href={procurementApi.orderPdfUrl(order.id)}
+            className="tb-btn tb-btn--secondary"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Download PDF
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function OrderDocument({ order }: { order: PurchaseOrder }) {
   const buyerName = order.buyer_name || "Buyer";
   const supplierName = order.supplier_name || "Supplier";
   const shipTo = formatAddress(order.shipping_address);
@@ -113,40 +155,9 @@ export function OrderWorkspace({ orderId }: Props) {
           day: "numeric",
         })
       : "—";
-  const canTrack = !["draft", "cancelled"].includes(order.status);
+  const payment = paymentView(order.payment_method, order.payment_status);
 
   return (
-    <div className="tb-docs tb-doc--po">
-      <div className="tb-docs__toolbar">
-        <nav className="tb-docs__toolbar-nav">
-          <Link href={ROUTES.orders}>← Purchase orders</Link>
-          {order.rfq_id ? <Link href={ROUTES.procurementRfq(order.rfq_id)}>Related RFQ</Link> : null}
-        </nav>
-        <div className="tb-docs__actions">
-          {canTrack ? (
-            <Link href={ROUTES.trackingOrder(order.id)} className="tb-inv-btn tb-inv-btn-accent">
-              Track package
-            </Link>
-          ) : null}
-          {order.status !== "draft" ? (
-            <a
-              href={procurementApi.orderPdfUrl(orderId)}
-              className="tb-inv-btn tb-inv-btn-soft"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Download PDF
-            </a>
-          ) : null}
-        </div>
-      </div>
-
-      {error ? (
-        <FeedbackBanner tone="error" title="Something went wrong">
-          {error}
-        </FeedbackBanner>
-      ) : null}
-
       <article className="tb-doc-paper--po tb-doc-paper--po-wide">
         <header className="tb-doc-band">
           <div className="tb-doc-band__brand">
@@ -211,7 +222,7 @@ export function OrderWorkspace({ orderId }: Props) {
             </div>
             <div>
               <dt>Payment method</dt>
-              <dd>{order.payment_method || "—"}</dd>
+              <dd>{paymentMethodLabel(order.payment_method)}</dd>
             </div>
             <div>
               <dt>Delivery terms</dt>
@@ -219,7 +230,7 @@ export function OrderWorkspace({ orderId }: Props) {
             </div>
             <div>
               <dt>Payment status</dt>
-              <dd>{(order.payment_status || "unpaid").replaceAll("_", " ")}</dd>
+              <dd>{payment.label}</dd>
             </div>
             <div>
               <dt>{order.tax_name_snapshot || "VAT"}</dt>
@@ -317,6 +328,5 @@ export function OrderWorkspace({ orderId }: Props) {
           </div>
         </div>
       </article>
-    </div>
   );
 }

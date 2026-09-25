@@ -1,8 +1,3 @@
-"""Deterministic Decimal finance for Business Planner.
-
-AI may propose unit prices and quantities; this module owns all arithmetic.
-Never use float for money math.
-"""
 
 from __future__ import annotations
 
@@ -16,7 +11,6 @@ TWOPLACES = Decimal("0.01")
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
 
-
 def money(value: Decimal | int | str | None) -> Decimal:
     if value is None:
         return ZERO
@@ -24,10 +18,8 @@ def money(value: Decimal | int | str | None) -> Decimal:
         return value
     return Decimal(str(value))
 
-
 def quantize(value: Decimal) -> Decimal:
     return money(value).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
-
 
 @dataclass(frozen=True)
 class LineFinance:
@@ -40,7 +32,6 @@ class LineFinance:
     margin_ratio: Decimal
     margin_pct: Decimal
 
-
 @dataclass(frozen=True)
 class PlanFinance:
     lines: list[LineFinance]
@@ -52,7 +43,6 @@ class PlanFinance:
     financial_projection: dict[str, Any]
     over_budget: bool
     adjustments: list[str]
-
 
 def compute_line(
     *,
@@ -82,7 +72,6 @@ def compute_line(
         margin_pct=margin_pct,
     )
 
-
 def _split_amounts(total: Decimal, weights: dict[str, Decimal]) -> dict[str, Decimal]:
     if total <= ZERO:
         return {k: ZERO for k in weights}
@@ -101,14 +90,12 @@ def _split_amounts(total: Decimal, weights: dict[str, Decimal]) -> dict[str, Dec
             running += share
     return allocated
 
-
 def allocate_startup_budget(
     *,
     available_budget: Decimal,
     inventory_investment: Decimal,
     inventory_budget_cap: Decimal | None = None,
 ) -> dict[str, Any]:
-    """Allocate startup capital. Inventory is pinned; remaining split across ops buckets."""
     available = quantize(available_budget)
     inventory = quantize(inventory_investment)
     if inventory_budget_cap is not None:
@@ -133,7 +120,6 @@ def allocate_startup_budget(
     }
     return allocation
 
-
 def estimate_break_even_units(
     *,
     monthly_operating_expenses: Decimal,
@@ -144,7 +130,6 @@ def estimate_break_even_units(
     if profit <= ZERO:
         return None
     return (opex / profit).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-
 
 def build_financial_projection(
     *,
@@ -162,9 +147,9 @@ def build_financial_projection(
         + money(budget_allocation.get("marketing"))
         + money(budget_allocation.get("logistics"))
     )
-    # Spread non-inventory startup costs over ~3 months as a simple opex proxy
+                                                                              
     monthly_opex = quantize(monthly_opex / Decimal("3")) if monthly_opex > ZERO else ZERO
-    expected_monthly_sales = quantize(expected_revenue)  # first-cycle sell-through assumption
+    expected_monthly_sales = quantize(expected_revenue)                                       
     operating_profit = quantize(gross_profit - monthly_opex)
     cash_reserve = money(budget_allocation.get("reserve"))
     return {
@@ -186,7 +171,6 @@ def build_financial_projection(
         ),
     }
 
-
 def suggest_budget_adjustments(
     *,
     available_budget: Decimal,
@@ -207,13 +191,11 @@ def suggest_budget_adjustments(
         tips.append("Narrow the assortment for your first order cycle.")
     return tips
 
-
 def scale_quantities_to_budget(
     lines: list[tuple[Decimal, Decimal, Decimal]],
     *,
     inventory_budget: Decimal,
 ) -> list[tuple[Decimal, Decimal, Decimal]]:
-    """Scale quantities down proportionally so sum(qty*cost) fits inventory_budget."""
     budget = quantize(inventory_budget)
     if budget <= ZERO or not lines:
         return [(ZERO, c, s) for _, c, s in lines]
@@ -227,7 +209,7 @@ def scale_quantities_to_budget(
         if new_qty < Decimal("1") and money(qty) >= Decimal("1"):
             new_qty = Decimal("1")
         scaled.append((new_qty, money(cost), money(sell)))
-    # If still over (MOQ floor of 1), drop trailing lines
+                                                         
     while scaled and sum((q * c for q, c, _ in scaled), ZERO) > budget:
         if len(scaled) == 1:
             _q, c, s = scaled[0]
@@ -236,7 +218,6 @@ def scale_quantities_to_budget(
             break
         scaled.pop()
     return scaled
-
 
 def compute_plan_finance(
     *,

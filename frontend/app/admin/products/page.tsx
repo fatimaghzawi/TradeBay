@@ -138,7 +138,7 @@ function AdminProductsInner() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search product name…"
-          className="h-9 w-full max-w-sm border-0 border-b border-[#b8c0b9] bg-transparent px-0 text-sm outline-none focus:border-[#e86f2a]"
+          className="h-9 w-full max-w-sm border-0 border-b border-input bg-transparent px-0 text-sm outline-none focus:border-ring"
         />
         {(
           [
@@ -161,7 +161,7 @@ function AdminProductsInner() {
         <select
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
-          className="h-9 rounded-lg border border-[#d4e0da] bg-white px-2 text-sm"
+          className="h-9 rounded-lg border border-input bg-card px-2 text-sm"
         >
           <option value="">All categories</option>
           {categories.map((c) => (
@@ -173,7 +173,7 @@ function AdminProductsInner() {
         <select
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
-          className="h-9 rounded-lg border border-[#d4e0da] bg-white px-2 text-sm"
+          className="h-9 rounded-lg border border-input bg-card px-2 text-sm"
         >
           {[10, 20, 50].map((n) => (
             <option key={n} value={n}>
@@ -204,30 +204,30 @@ function AdminProductsInner() {
                   <div className="min-w-0">
                     <Link
                       href={ROUTES.admin.productDetail(product.id)}
-                      className="font-semibold text-[#0c1612] hover:underline"
+                      className="font-semibold text-foreground hover:underline"
                     >
                       {product.name}
                     </Link>
-                    <p className="mt-0.5 text-sm text-[#5a6a62]">
+                    <p className="mt-0.5 text-sm text-muted-foreground">
                       {product.sku}
                       {` · ${categoryName(product.category_id)}`}
                       {` · MOQ ${product.moq} ${product.unit}`}
                     </p>
                   </div>
                 </div>
-                <div className="min-w-0 text-sm text-[#5a6a62]">
+                <div className="min-w-0 text-sm text-muted-foreground">
                   <p className="flex items-center gap-2">
                     {product.supplier_logo_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={mediaUrl(product.supplier_logo_url)}
                         alt=""
-                        className="h-6 w-6 shrink-0 rounded-md object-contain bg-[#f4efe4]"
+                        className="h-6 w-6 shrink-0 rounded-md object-contain bg-muted"
                       />
                     ) : null}
                     <Link
                       href={ROUTES.admin.businessDetail(product.business_account_id)}
-                      className="font-semibold text-[#0d3b2a] hover:underline"
+                      className="font-semibold text-heading hover:underline"
                     >
                       {product.supplier_name || "Supplier"}
                     </Link>

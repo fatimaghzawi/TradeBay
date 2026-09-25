@@ -33,7 +33,7 @@ export function VerificationSuccess({
 
   return (
     <div className="verify-success relative mx-auto flex w-full max-w-sm flex-col items-center text-center">
-      {/* Confetti burst */}
+      {}
       <div
         className="pointer-events-none absolute inset-x-[-20%] top-0 h-56 overflow-visible"
         aria-hidden
@@ -72,13 +72,13 @@ export function VerificationSuccess({
         Your email has been successfully verified. You can now sign in to your
         account.
         {email ? (
-          <span className="mt-1 block text-xs text-[#8a9690]">{email}</span>
+          <span className="mt-1 block text-xs text-subtle-foreground">{email}</span>
         ) : null}
       </p>
 
       <Link
         href={ROUTES.login}
-        className={`mt-8 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#e86f2a] text-sm font-semibold text-white transition hover:bg-[#d46220] ${burst ? "verify-copy-in verify-copy-delay-2" : "opacity-0"}`}
+        className={`mt-8 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-semibold text-white transition hover:bg-accent/90 ${burst ? "verify-copy-in verify-copy-delay-2" : "opacity-0"}`}
       >
         Continue to sign in
         <span aria-hidden>→</span>
@@ -90,10 +90,10 @@ export function VerificationSuccess({
 function CelebrationMark() {
   return (
     <div className="relative flex h-[11.5rem] w-[11.5rem] items-center justify-center" aria-hidden>
-      {/* Soft glow */}
-      <span className="verify-glow absolute inset-[18%] rounded-full bg-[#e86f2a]/15 blur-2xl" />
+      {}
+      <span className="verify-glow absolute inset-[18%] rounded-full bg-accent/15 blur-2xl" />
 
-      {/* Leaf / petal cluster behind — wireframe style */}
+      {}
       <svg
         className="verify-petals absolute inset-0 h-full w-full"
         viewBox="0 0 184 184"
@@ -125,7 +125,7 @@ function CelebrationMark() {
         />
       </svg>
 
-      {/* Sparkle rays above — wireframe celebration lines */}
+      {}
       <svg
         className="verify-sparks absolute left-1/2 top-2 h-16 w-28 -translate-x-1/2"
         viewBox="0 0 112 64"
@@ -138,7 +138,7 @@ function CelebrationMark() {
         <path d="M94 24 78 30" stroke="#c45b2a" strokeWidth="2.5" strokeLinecap="round" className="verify-ray verify-ray-5" />
       </svg>
 
-      {/* Envelope */}
+      {}
       <svg
         className="verify-envelope relative z-[1] h-[5.75rem] w-[6.75rem] drop-shadow-[0_14px_28px_rgba(13,59,42,0.18)]"
         viewBox="0 0 108 90"
@@ -170,8 +170,8 @@ function CelebrationMark() {
         />
       </svg>
 
-      {/* Green check badge */}
-      <span className="verify-badge absolute left-1/2 top-[48%] z-[2] flex h-[3.6rem] w-[3.6rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#0d3b2a] text-white shadow-[0_10px_24px_-6px_rgba(13,59,42,0.55)] ring-[5px] ring-[#e8ebe6]">
+      {}
+      <span className="verify-badge absolute left-1/2 top-[48%] z-[2] flex h-[3.6rem] w-[3.6rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_10px_24px_-6px_rgba(13,59,42,0.55)] ring-[5px] ring-border">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
           <path
             d="M5 12.5 9.5 17 19 7.5"

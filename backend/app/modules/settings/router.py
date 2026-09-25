@@ -1,4 +1,3 @@
-"""System Settings admin API."""
 
 from __future__ import annotations
 
@@ -17,10 +16,8 @@ from app.shared.schemas.response import success
 
 router = APIRouter(prefix="/admin/settings", tags=["System Settings"])
 
-
 def get_settings_service() -> SettingsService:
     return SettingsService()
-
 
 @router.get("", summary="Get all system settings (platform admin)")
 async def get_settings(
@@ -28,7 +25,6 @@ async def get_settings(
     service: Annotated[SettingsService, Depends(get_settings_service)],
 ) -> dict[str, Any]:
     return success(await service.get_all(business=auth.business))
-
 
 @router.patch("/platform", summary="Update platform settings")
 async def update_platform(
@@ -44,7 +40,6 @@ async def update_platform(
         )
     )
 
-
 @router.patch("/tax", summary="Update tax / VAT settings")
 async def update_tax(
     body: UpdateTaxSettingsRequest,
@@ -58,7 +53,6 @@ async def update_tax(
             payload=body.model_dump(exclude_unset=True),
         )
     )
-
 
 @router.patch("/business", summary="Update business letterhead / invoice prefix")
 async def update_business(

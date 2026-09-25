@@ -18,7 +18,7 @@ export type AuthScene =
 type AuthShellProps = {
   children: ReactNode;
   scene?: AuthScene;
-  /** @deprecated prefer scene="celebrate" */
+  
   variant?: "split" | "centered";
   compact?: boolean;
   plain?: boolean;
@@ -42,7 +42,7 @@ export function AuthShell({
   return (
     <div
       className={cn(
-        "auth-root min-h-svh bg-[#f3f7f5]",
+        "auth-root min-h-svh bg-muted",
         "lg:grid lg:h-svh lg:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)] lg:overflow-hidden",
       )}
     >
@@ -75,7 +75,7 @@ export function AuthShell({
               width={140}
               height={36}
               priority
-              className="h-8 w-auto object-contain object-left sm:h-9"
+              className="h-8 w-auto object-contain object-left sm:h-9 dark:brightness-0 dark:invert"
             />
           </Link>
         </div>
@@ -98,7 +98,7 @@ function HarborPanel() {
   const PLAYBACK_RATE = 0.65;
 
   return (
-    <aside className="relative hidden h-full overflow-hidden bg-[#0d3b2a] lg:block">
+    <aside className="relative hidden h-full overflow-hidden bg-primary lg:block">
       <video
         className={cn(
           "absolute inset-0 h-full w-full object-cover object-center transition-[filter,transform] duration-700",
@@ -187,7 +187,7 @@ function DockPanel() {
       <div
         className={cn(
           "absolute inset-0 transition-opacity duration-700",
-          ended ? "bg-[#1a120c]/50 backdrop-blur-[2px]" : "bg-[#0d3b2a]/25",
+          ended ? "bg-[#1a120c]/50 backdrop-blur-[2px]" : "bg-primary/25",
         )}
       />
       <WaveEdge tone="warm" />
@@ -264,11 +264,11 @@ function CelebrateStage({
         <>
           <div
             aria-hidden
-            className="pointer-events-none absolute -right-16 top-10 h-64 w-64 bg-[#e86f2a]/15 blur-3xl"
+            className="pointer-events-none absolute -right-16 top-10 h-64 w-64 bg-accent/15 blur-3xl"
           />
           <div
             aria-hidden
-            className="pointer-events-none absolute -left-12 bottom-8 h-56 w-56 bg-[#1a6b4f]/20 blur-3xl"
+            className="pointer-events-none absolute -left-12 bottom-8 h-56 w-56 bg-primary/20 blur-3xl"
           />
         </>
       ) : null}
@@ -279,7 +279,7 @@ function CelebrateStage({
             alt="TradeBay"
             width={140}
             height={36}
-            className="h-8 w-auto object-contain sm:h-9"
+            className="h-8 w-auto object-contain sm:h-9 dark:brightness-0 dark:invert"
           />
         </Link>
         <div className="flex min-h-0 flex-1 flex-col items-center justify-start lg:justify-center lg:overflow-y-auto lg:pb-6">
@@ -311,7 +311,7 @@ function BrandOnDark({ tagline }: { tagline?: string }) {
 }
 
 function WaveEdge({ tone = "cool" }: { tone?: "cool" | "warm" | "coast" | "desk" }) {
-  const fill = "#f3f7f5";
+  const fill = "var(--tb-auth-panel)";
   return (
     <svg
       className="pointer-events-none absolute inset-y-0 right-0 z-20 h-full w-[6.5rem] translate-x-[1px]"

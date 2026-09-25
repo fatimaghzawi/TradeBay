@@ -132,16 +132,16 @@ export function RegisterForm() {
       </div>
 
       {isInviteSignup && invitePreview ? (
-        <div className="rounded-xl border border-[#d4e0da] bg-[#f0f6f3] px-3 py-2.5 text-[0.8rem] text-[#4a5f55]">
+        <div className="rounded-xl border border-input bg-muted px-3 py-2.5 text-[0.8rem] text-muted-foreground">
           Joining{" "}
-          <span className="font-[family-name:var(--font-syne)] font-bold text-[#0d3b2a]">
+          <span className="font-[family-name:var(--font-syne)] font-bold text-heading">
             {invitePreview.business_name ?? "a TradeBay business"}
           </span>
           {invitePreview.role_name ? (
             <>
               {" "}
               as{" "}
-              <span className="font-semibold text-[#1a6b4f]">
+              <span className="font-semibold text-link">
                 {invitePreview.role_name}
               </span>
             </>
@@ -197,7 +197,7 @@ export function RegisterForm() {
         readOnly={isInviteSignup}
       />
       {isInviteSignup ? (
-        <p className="-mt-1 text-[0.72rem] leading-snug text-[#5a6a62]">
+        <p className="-mt-1 text-[0.72rem] leading-snug text-muted-foreground">
           This is the company login from the invitation — not your Gmail. Set a password;
           no verification code is needed.
         </p>
@@ -268,14 +268,14 @@ export function RegisterForm() {
             if (v) setTermsError(null);
           }}
           label={
-            <span className="text-[0.78rem] leading-snug text-[#5a6a62]">
+            <span className="text-[0.78rem] leading-snug text-muted-foreground">
               I have read and agree to the TradeBay{" "}
               <Link
                 href={ROUTES.terms}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="font-semibold text-[#0d3b2a] underline decoration-[#0d3b2a]/35 underline-offset-[3px] transition hover:decoration-[#0d3b2a]"
+                className="font-semibold text-heading underline decoration-heading/35 underline-offset-[3px] transition hover:decoration-heading"
               >
                 Terms &amp; Conditions
               </Link>{" "}
@@ -285,7 +285,7 @@ export function RegisterForm() {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="font-semibold text-[#0d3b2a] underline decoration-[#0d3b2a]/35 underline-offset-[3px] transition hover:decoration-[#0d3b2a]"
+                className="font-semibold text-heading underline decoration-heading/35 underline-offset-[3px] transition hover:decoration-heading"
               >
                 Privacy Policy
               </Link>
@@ -294,7 +294,7 @@ export function RegisterForm() {
           }
         />
         {termsError ? (
-          <p className="mt-1 text-xs text-[#b42318]">{termsError}</p>
+          <p className="mt-1 text-xs text-destructive">{termsError}</p>
         ) : null}
       </div>
 
@@ -310,9 +310,9 @@ export function RegisterForm() {
             : "Create account"}
       </AuthSubmitButton>
 
-      <p className="text-center text-[0.8rem] text-[#5a6a62]">
+      <p className="text-center text-[0.8rem] text-muted-foreground">
         Already have an account?{" "}
-        <Link href={loginHref} className="font-semibold text-[#0d3b2a] hover:underline">
+        <Link href={loginHref} className="font-semibold text-heading hover:underline">
           Log in
         </Link>
       </p>

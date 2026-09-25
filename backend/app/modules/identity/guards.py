@@ -1,8 +1,3 @@
-"""Membership invariants that future invite / remove / demote flows must call.
-
-These are the documented rules, not the full workflows. Call `assert_not_last_admin`
-before removing a membership or changing its role.
-"""
 
 from __future__ import annotations
 
@@ -22,9 +17,7 @@ def would_remove_last_admin(
     admin_role_id: ObjectId,
     active_admin_count: int,
 ) -> bool:
-    """True when this membership is the only remaining active Business Admin."""
     return membership_role_id == admin_role_id and active_admin_count <= 1
-
 
 async def assert_not_last_admin(
     *,
@@ -33,7 +26,6 @@ async def assert_not_last_admin(
     memberships: MembershipRepository | None = None,
     roles: RoleRepository | None = None,
 ) -> None:
-    """Refuse to remove or demote the last active Business Admin of a company."""
     memberships = memberships or MembershipRepository()
     roles = roles or RoleRepository()
     business_id = parse_object_id(str(business_account_id))

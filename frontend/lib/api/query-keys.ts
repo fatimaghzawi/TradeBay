@@ -1,4 +1,4 @@
-/** Query keys for identity/auth and Domain 2 catalog. */
+
 export const queryKeys = {
   me: ["auth", "me"] as const,
   businesses: ["identity", "businesses"] as const,

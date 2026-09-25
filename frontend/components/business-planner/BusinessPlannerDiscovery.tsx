@@ -2,11 +2,11 @@
 
 import {
   InventoryBtn,
-  InventoryLinkBtn,
   InventoryPageHeader,
   InventoryPanel,
   InventorySkeleton,
 } from "@/components/catalog/InventoryUi";
+import { BackLink } from "@/components/ui/BackLink";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Spinner } from "@/components/ui/LoadingState";
 import {
@@ -91,9 +91,7 @@ function DiscoveryInner() {
         title="Build your business step by step"
         description="Answer a few questions to build your plan."
         actions={
-          <InventoryLinkBtn href={ROUTES.businessPlanner} tone="ghost">
-            Back to plans
-          </InventoryLinkBtn>
+          <BackLink href={ROUTES.businessPlanner}>Back to plans</BackLink>
         }
         meta={
           <div className="bp-progress-wrap">

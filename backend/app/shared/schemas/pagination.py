@@ -1,4 +1,3 @@
-"""Pagination query parameters."""
 
 from __future__ import annotations
 
@@ -20,12 +19,10 @@ class PaginationParams(BaseModel):
     def limit(self) -> int:
         return self.page_size
 
-
 def get_pagination(
     page: int = Query(1, ge=1, description="1-based page index"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page (max 100)"),
 ) -> PaginationParams:
     return PaginationParams(page=page, page_size=page_size)
-
 
 Pagination = Annotated[PaginationParams, Query()]

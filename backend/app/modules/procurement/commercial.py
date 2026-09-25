@@ -1,4 +1,3 @@
-"""Server-side commercial totals for quotations and orders. Decimal only."""
 
 from __future__ import annotations
 
@@ -8,9 +7,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 TWOPLACES = Decimal("0.01")
 ZERO = Decimal("0")
 
-
 def money(value: Decimal | int | str | None) -> Decimal:
-    """Parse a required commercial amount. ``None`` → 0; blank/invalid → ValueError."""
     if value is None:
         return ZERO
     if isinstance(value, Decimal):
@@ -27,19 +24,15 @@ def money(value: Decimal | int | str | None) -> Decimal:
     except InvalidOperation as exc:
         raise ValueError(f"Invalid money amount: {text!r}") from exc
 
-
 def optional_money(value: Decimal | int | str | None) -> Decimal | None:
-    """Parse an optional amount. Blank/None → None; invalid → ValueError."""
     if value is None:
         return None
     if isinstance(value, str) and not value.strip():
         return None
     return money(value)
 
-
 def quantize(value: Decimal) -> Decimal:
     return money(value).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
-
 
 @dataclass(frozen=True)
 class LineTotals:
@@ -51,7 +44,6 @@ class LineTotals:
     subtotal: Decimal
     line_total: Decimal
 
-
 @dataclass(frozen=True)
 class DocumentTotals:
     subtotal: Decimal
@@ -60,7 +52,6 @@ class DocumentTotals:
     tax_total: Decimal
     total: Decimal
     lines: list[LineTotals]
-
 
 def compute_line(
     *,
@@ -90,7 +81,6 @@ def compute_line(
         subtotal=subtotal,
         line_total=line_total,
     )
-
 
 def compute_document_totals(
     lines: list[LineTotals],

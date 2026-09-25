@@ -1,4 +1,3 @@
-"""AI requirement extraction schemas — structured output only."""
 
 from __future__ import annotations
 
@@ -10,9 +9,7 @@ class QuantityRequirement(BaseModel):
     quantity: float | None = Field(default=None, ge=0)
     unit: str | None = Field(default=None, max_length=40)
 
-
 class ProcurementRequirements(BaseModel):
-    """Extracted buyer needs. Missing facts stay empty — never invented."""
 
     business_type: str | None = Field(default=None, max_length=120)
     business_description: str = Field(min_length=1, max_length=8000)

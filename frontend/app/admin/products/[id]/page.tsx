@@ -4,6 +4,7 @@ import { AdminAct, AdminPage } from "@/components/admin/AdminUi";
 import { AdminProductPhoto, productPrimaryImageUrl } from "@/components/admin/AdminProductPhoto";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { DirectoryMast } from "@/components/shared/DirectoryMast";
+import { BackLink } from "@/components/ui/BackLink";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { LoadingEntity } from "@/components/ui/LoadingState";
 import { statusTone } from "@/lib/admin/identityDirectory";
@@ -92,9 +93,7 @@ function AdminProductDetailInner() {
         <FeedbackBanner tone="error" title="Product unavailable">
           {error ?? "Not found"}
         </FeedbackBanner>
-        <AdminAct href={ROUTES.admin.products} tone="ghost">
-          ← Back to products
-        </AdminAct>
+        <BackLink href={ROUTES.admin.products}>Back to products</BackLink>
       </AdminPage>
     );
   }
@@ -122,9 +121,7 @@ function AdminProductDetailInner() {
         size="page"
         actions={
           <div className="flex flex-wrap gap-2">
-            <AdminAct href={ROUTES.admin.products} tone="soft">
-              ← All products
-            </AdminAct>
+            <BackLink href={ROUTES.admin.products}>All products</BackLink>
             <AdminAct
               href={ROUTES.admin.businessDetail(product.business_account_id)}
               tone="go"

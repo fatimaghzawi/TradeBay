@@ -1,16 +1,15 @@
-"""Notification service unit/integration smoke."""
 
 from __future__ import annotations
 
 from typing import Any
 
 import pytest
-from bson import ObjectId
 from app.db.collections import CollectionName
 from app.db.mongodb import mongo_manager
-from app.modules.trust.notify import notify
 from app.modules.trust.notifications import NotificationService
+from app.modules.trust.notify import notify
 from app.shared.utils.datetime import utc_now
+from bson import ObjectId
 
 
 @pytest.mark.asyncio
@@ -56,7 +55,6 @@ async def test_notify_list_and_mark_read(app: object) -> None:
 
     await svc.mark_all_read(user_id=str(user_id))
     assert await svc.unread_count(user_id=str(user_id)) == 0
-
 
 @pytest.mark.asyncio
 async def test_notify_emails_personal_inbox_not_company_contact(
@@ -108,7 +106,6 @@ async def test_notify_emails_personal_inbox_not_company_contact(
     )
     assert created >= 1
     assert not [m for m in email_inbox.messages if m["template"] == "business_event"]
-
 
 @pytest.mark.asyncio
 async def test_notify_uses_invitation_delivery_email(
@@ -169,7 +166,6 @@ async def test_notify_uses_invitation_delivery_email(
     assert sent
     assert sent[-1]["to"] == "nora.khoury@gmail.com"
     assert sent[-1]["context"]["business_name"] == "Levant Wholesale"
-
 
 @pytest.mark.asyncio
 async def test_tracking_updated_stays_in_app_unless_emailed(

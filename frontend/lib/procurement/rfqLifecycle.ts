@@ -34,7 +34,6 @@ export const ORDER_STATUS_LABEL: Record<string, string> = {
   disputed: "Disputed",
 };
 
-/** Buyer-facing fulfilment stages (excludes draft / terminal branches). */
 export const ORDER_TRACK_STAGES = [
   "pending",
   "confirmed",
@@ -67,7 +66,6 @@ export function formatEta(iso: string | null | undefined): string | null {
   });
 }
 
-/** Soonest open shipment ETA, else latest delivery timestamp. */
 export function orderArrivalHint(
   shipments: {
     status: string;

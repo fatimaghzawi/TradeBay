@@ -1,5 +1,6 @@
 "use client";
 
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { IdentityPageShell } from "@/components/identity/IdentityPageShell";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -106,7 +107,7 @@ function InvitationsPageInner() {
           <button
             type="button"
             onClick={() => setInviteOpen(true)}
-            className="tb-ov-btn-primary"
+            className="tb-btn tb-btn--primary"
           >
             + Invite Member
           </button>
@@ -188,7 +189,7 @@ function InvitationsPageInner() {
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
-              className="tb-ov-btn-primary mt-4 inline-flex"
+              className="tb-btn tb-btn--primary mt-4"
             >
               + Invite Member
             </button>
@@ -228,7 +229,7 @@ function InvitationsPageInner() {
                   <span>Role</span>
                 </div>
               </div>
-              <span className="tb-roles-status">{invite.status}</span>
+              <StatusBadge status={invite.status} />
               <div className="relative flex flex-wrap items-center gap-2">
                 {canInvite &&
                 (invite.status === "pending" || invite.status === "expired") ? (
@@ -236,7 +237,7 @@ function InvitationsPageInner() {
                     <button
                       type="button"
                       disabled={busyId === invite.id}
-                      className="text-sm font-bold text-[var(--tb-accent)] hover:underline disabled:opacity-50"
+                      className="text-sm font-bold text-accent hover:underline disabled:opacity-50"
                       onClick={() => {
                         setBusyId(invite.id);
                         void identityApi
@@ -268,7 +269,7 @@ function InvitationsPageInner() {
                       <button
                         type="button"
                         disabled={busyId === invite.id}
-                        className="text-sm font-bold text-[#b42318] hover:underline disabled:opacity-50"
+                        className="text-sm font-bold text-destructive hover:underline disabled:opacity-50"
                         onClick={() => setRevokeInvite(invite)}
                       >
                         Revoke
@@ -304,7 +305,7 @@ function InvitationsPageInner() {
       ) : null}
 
       {total > 0 ? (
-        <div className="mt-4 flex items-center justify-between border-t border-[var(--tb-line)] pt-4">
+        <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
           <p className="tb-meta">
             {total} invitation{total === 1 ? "" : "s"}
           </p>
@@ -343,9 +344,9 @@ function InvitationsPageInner() {
           }
         }}
       >
-        <p className="text-sm text-[#5c574e]">
+        <p className="text-sm text-muted-foreground">
           Invitation:{" "}
-          <span className="font-semibold text-[#0d3b2a]">
+          <span className="font-semibold text-heading">
             {revokeInvite?.invited_email}
           </span>
         </p>

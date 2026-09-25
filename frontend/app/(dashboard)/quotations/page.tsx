@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { LoadingEntity } from "@/components/ui/LoadingState";
 import { useLivePoll } from "@/lib/live/useLivePoll";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function QuotationsPage() {
   const { business } = useAuth();
@@ -66,9 +67,7 @@ export default function QuotationsPage() {
         }
         meta={<span className="tb-inv-chip">{rfqs.length} live</span>}
         actions={
-          <InventoryLinkBtn href={ROUTES.procurement} tone="soft">
-            ← Procurement hub
-          </InventoryLinkBtn>
+          <BackLink href={ROUTES.procurement}>Procurement hub</BackLink>
         }
       />
       {error ? (

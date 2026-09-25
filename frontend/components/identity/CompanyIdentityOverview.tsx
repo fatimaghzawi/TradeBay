@@ -207,7 +207,7 @@ export function CompanyIdentityOverview({
             and grow your opportunities.
           </p>
           <div className="tb-ov-actions">
-            <button type="button" onClick={onEditCompany} className="tb-ov-btn-primary">
+            <button type="button" onClick={onEditCompany} className="tb-btn tb-btn--primary">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
                 <path
@@ -222,7 +222,7 @@ export function CompanyIdentityOverview({
             <button
               type="button"
               onClick={onEditCompany}
-              className="tb-ov-btn-ghost"
+              className="tb-btn tb-btn--outline"
             >
               View Company Profile
               <span aria-hidden>→</span>
@@ -231,7 +231,7 @@ export function CompanyIdentityOverview({
               <button
                 type="button"
                 onClick={onOpenDocuments}
-                className="tb-ov-btn-accent"
+                className="tb-btn tb-btn--accent"
               >
                 {business.verification_status === "pending"
                   ? "View verification"

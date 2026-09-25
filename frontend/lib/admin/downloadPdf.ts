@@ -1,7 +1,4 @@
-/**
- * Lightweight client-side PDF table export (no dependency).
- * A4 landscape, Helvetica, paginated rows.
- */
+
 
 function pdfEscape(text: string): string {
   return text
@@ -27,7 +24,7 @@ function buildPdf(
   rows: string[][],
   subtitle?: string,
 ): Uint8Array {
-  const pageWidth = 842; // A4 landscape
+  const pageWidth = 842; 
   const pageHeight = 595;
   const marginX = 36;
   const marginTop = 40;
@@ -174,7 +171,6 @@ function buildPdf(
   return out;
 }
 
-/** Download current table rows as a PDF (client-side export of the loaded page). */
 export function downloadPdf(
   filename: string,
   headers: string[],

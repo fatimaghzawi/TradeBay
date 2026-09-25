@@ -1,4 +1,4 @@
-/** Shared sanitizers so price / quantity fields never accept letters. */
+
 
 export type NumericKind = "integer" | "decimal";
 
